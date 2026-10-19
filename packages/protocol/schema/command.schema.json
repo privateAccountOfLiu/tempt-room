@@ -1302,6 +1302,12 @@
                 "teal"
               ]
             },
+            "schedulerWeight": {
+              "default": 1,
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 10
+            },
             "enabled": {
               "default": false,
               "type": "boolean"
@@ -1461,6 +1467,7 @@
             "provider",
             "role",
             "color",
+            "schedulerWeight",
             "enabled",
             "executable",
             "endpoint",

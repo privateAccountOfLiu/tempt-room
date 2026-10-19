@@ -144,7 +144,7 @@ export class Worker {
     });
     const runs = this.store.list<Run>('runs');
     const settings=this.store.settings();
-    for (const run of fairOrder(runs,this.fairServed)) {
+    for (const run of fairOrder(runs,this.fairServed,this.schedulerWeights())) {
       if (this.active.size >= settings.concurrency) break;
       if (run.status !== 'queued' || this.active.has(run.id)) continue;
       const thread = this.threadKey(run);
@@ -177,6 +177,7 @@ export class Worker {
       }).finally(() => { this.executions.delete(fence.executionId);if(this.active.get(run.id)===controller)this.active.delete(run.id); });
     }
   }
+  private schedulerWeights(){const weights=new Map<string,number>();for(const agent of this.store.list<AgentDescriptor>('agents'))weights.set(agent.id,agent.schedulerWeight??1);return weights;}
   /** Real project directory touched by a host-mode task run, if any. */
   private threadKey(run:Run):string|undefined {
     return run.codex?.binding.threadId ?? codexThreadKey(this.store.get<AgentDescriptor>('agents',run.agentId)!);
