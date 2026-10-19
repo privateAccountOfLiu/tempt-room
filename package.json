@@ -53,7 +53,8 @@
     "restore": "node scripts/restore-state.mjs",
     "dev:open": "node scripts/dev-open.mjs",
     "test:sandbox-handoff": "tsx scripts/smoke-sandbox-handoff.ts",
-    "test:faults": "tsx --test tests/fault-injection.test.ts"
+    "test:faults": "tsx --test tests/fault-injection.test.ts",
+    "test:concurrency": "tsx --test tests/concurrency-conflict.test.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

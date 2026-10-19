@@ -121,7 +121,7 @@
 - `discussion.start` 新增可选 `quorum`（默认等于参与者数）；拒绝 quorum 超过参与人数、或 maxResponses 小于 quorum 的不可达配置。
 - 每轮成功响应达到 quorum 即推进下一轮：未完成成员记入 `Discussion.absent` 并以 `superseded` 取消，避免慢成员阻塞本轮；若所有运行终止仍未达 quorum 则停止讨论。默认 quorum 为全员，保留原语义。
 - 讨论横幅显示 Quorum 与缺席成员；创建讨论表单增加 quorum 字段（0=全部）。
-- 测试：`tests/discussion-quorum.test.ts` 覆盖提前推进、缺席记录、迟到取消、quorum 不可达拒绝；`npm test` **217/217**。
+- 测试：`tests/discussion-quorum.test.ts` 覆盖提前推进、缺席记录、迟到取消、quorum 不可达拒绝；`npm test` **218/218**。
 
 ## 增量：房间 / 成员待处理运行上限
 
@@ -179,20 +179,26 @@
 
 ## 增量：公平性压力测试与移动端布局
 
-- 新增 20 Agent × 5 运行的无模型公平性压力测试：使用公平排序连续调度 100 次，所有 Agent 均被服务 5 次，无饥饿；`npm test` **217/217**。
+- 新增 20 Agent × 5 运行的无模型公平性压力测试：使用公平排序连续调度 100 次，所有 Agent 均被服务 5 次，无饥饿；`npm test` **218/218**。
 - 浏览器 E2E 新增 390×844 移动端步骤：右侧详情面板隐藏、消息输入框可见、无水平溢出；移动端截图 `docs/screenshots/ui-mobile-20261019.png`，全量 **41/41**。
 
 ## 增量：随机 seq 故障注入与 CI 门禁
 
 - 新增种子化随机命令历史测试：40 条随机消息/决策后，在 30 个任意 seq 边界重建真实投影，要求投影字节与 head 完全一致、房间游标不前进；故障扫描后的继续写入仍可回放。
 - 新增 `npm run test:faults`，并加入本地 CI 配置步骤（在单元测试、replay 契约之后，build 之前）；种子固定，失败可重放。
-- 测试：`tests/fault-injection.test.ts` 1 项；`npm test` **217/217**。GitHub Actions 仍未实际执行。
+- 测试：`tests/fault-injection.test.ts` 1 项；`npm test` **218/218**。GitHub Actions 仍未实际执行。
 
 ## 增量：Agent 权重与加权公平调度
 
 - `AgentDescriptor.schedulerWeight`（0.1–10，默认 1）加入协议与 Agent 设置表单；权重越高，最近服务虚拟时间越小，越容易获得下一次调度机会。
 - `fairOrder(runs, servedAt, weights)` 按 `servedAt / weight` 排序；未配置权重时保持原有行为。Worker 每 tick 读取本地 Agent 权重并传入。
-- 测试：`tests/fair-scheduler.test.ts` 新增静态权重偏好与 12 次调度中高权重获得更多机会的验证；`npm test` **217/217**，浏览器 E2E 41/41。
+- 测试：`tests/fair-scheduler.test.ts` 新增静态权重偏好与 12 次调度中高权重获得更多机会的验证；`npm test` **218/218**，浏览器 E2E 41/41。
+
+## 增量：双连接并发写入门禁
+
+- 新增两个独立 SQLite 连接互发 40 条消息的并发测试：每轮比较双方快照与房间 seq，最终事件连续、投影一致；从任意水位重建后投影字节不变。
+- 新增 `npm run test:concurrency` 并加入本地 CI 配置；测试不调用模型。
+- 测试：`tests/concurrency-conflict.test.ts` 1 项；`npm test` **218/218**。
 
 ## 原计划逐项剩余工作
 
@@ -200,7 +206,7 @@ P0 尚未完成：
 
 1. 把可恢复副作用的操作记录扩展到适配器内部的命令执行，区分可证明幂等与结果未知的原生工作；Room 工具 fencing 与账本已完成，不能替代内部 Shell/网络副作用的验收。
 2. 带 generation/租约的崩溃恢复与安全自动重入队。中断标记、generation 撤销与显式重入队事件已具备；必须先解决外部命令副作用不受 SQLite 回滚保护的问题，当前仍不盲目重试状态不明的写运行。
-3. 已添加种子化随机 seq 故障注入压力（`tests/fault-injection.test.ts`）与 CI 步骤；更广泛的并发冲突门禁与远端 CI 实际执行仍未完成。
+3. 已添加种子化随机 seq 故障注入与双 SQLite 连接交错写入/重建门禁，并写入 CI 配置；更广泛并发场景与远端 CI 实际执行仍未完成。
 
 P1 尚未完成：
 
