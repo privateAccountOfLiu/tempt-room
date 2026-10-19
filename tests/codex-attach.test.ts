@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, existsSync, writeFileSync } from 'node:
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { agentSchema, capabilitiesFor, commandSchema, type AgentOutput, type CodexRunState, type Run, type Message } from '../packages/protocol/src/index.ts';
+import { agentSchema, capabilitiesFor, commandSchema, type AgentOutput, type CodexRunState, type Run, type Message,type ToolOperation } from '../packages/protocol/src/index.ts';
 import { runAdapter, diagnose, ExecutionUnknown, RemoteCanceled, type AdapterContext } from '../apps/server/src/adapters.ts';
 import { AttachedCodexChannel } from '../apps/server/src/codex-attached-channel.ts';
 import { reconcileAttachedRun } from '../apps/server/src/codex-attach.ts';
@@ -135,6 +135,20 @@ test('legacy history never treats summary-only items as a confirmed full result'
     if(frame.method==='thread/read'&&frame.params.includeTurns){f.reply(socket,frame,{thread:{id:f.binding.threadId,turns:[{id:'summary',status:'completed',itemsView:'summary'}]}});return true;}
   });
   await assert.rejects(collect(f.ctx),ExecutionUnknown);assert.notEqual(f.saved.at(-1)?.phase,'completed');
+});
+
+test('a temporarily empty native rollout retries history reads without resubmitting input',async t=>{
+  const f=await mockBackend(t);let unavailable=0;
+  f.intercept((frame,socket)=>{if(frame.method==='thread/turns/list'&&++unavailable===1){socket.send(JSON.stringify({id:frame.id,error:{code:-32603,message:'failed to read session metadata fixture: rollout at fixture is empty'}}));return true;}});
+  const output=await collect(f.ctx);assert.equal(output.filter(item=>item.type==='text').map(item=>item.text).join(''),'Own answer');
+  assert.ok(unavailable>=2);assert.equal(f.requests.filter(frame=>frame.method==='thread/queue/add').length,1);assert.equal(f.requests.filter(frame=>frame.method==='thread/queue/start').length,1);
+});
+
+test('other native history corruption is never reinterpreted as an empty successful history',async t=>{
+  const f=await mockBackend(t);let reads=0;
+  f.intercept((frame,socket)=>{if(frame.method==='thread/turns/list'){reads++;socket.send(JSON.stringify({id:frame.id,error:{code:-32603,message:'invalid nonempty session metadata'}}));return true;}});
+  await assert.rejects(collect(f.ctx),ExecutionUnknown);assert.equal(reads,2);assert.equal(f.requests.filter(frame=>frame.method==='thread/queue/add').length,1);
+  assert.notEqual(f.saved.at(-1)?.phase,'completed');
 });
 test('canceling a busy queued run deletes only its own submission and confirms removal', async t => {
   const f = await mockBackend(t); f.model.active = true;
@@ -289,6 +303,27 @@ test('Worker submits a distinct native queue item for the reconciled generation 
   assert.match(adds[0].params.clientUserMessageId,/_g1$/);assert.match(adds[1].params.clientUserMessageId,/_g2$/);
   assert.equal(adds[0].params.threadId,adds[1].params.threadId);assert.ok(adds[1].params.input[0].text.includes('New criterion during native work'));
   assert.equal(run.contextRound,1);assert.equal(run.generation,2);assert.equal(a.store.list<Message>('messages').filter(message=>message.runId===run.id).length,1);
+});
+
+test('an attached completed turn with an unsettled tool stays unknown until read-only history confirms its receipt',async t=>{
+  const f=await mockBackend(t),a=await appFixture(t,f);
+  f.intercept((frame,socket)=>{
+    if(frame.method!=='thread/queue/start')return;
+    const submission=f.queue.shift(),turn={id:'receipt-turn',status:'completed',itemsView:'full',items:[{type:'userMessage',id:'user',clientId:submission.clientUserMessageId,content:submission.input},{type:'commandExecution',id:'command',status:'inProgress',command:'PRIVATE_COMMAND'},{type:'agentMessage',id:'answer',text:'Candidate after native work'}]};
+    f.turns.push(turn);f.reply(socket,frame,{turn});return true;
+  });
+  a.command('message.send',{text:'native receipt test',mentions:[f.agent.id]});a.worker.tick();
+  await until(()=>a.store.list<Run>('runs')[0].status==='unknown');await delay(50);
+  const run=a.store.list<Run>('runs')[0];assert.equal(run.codex!.nativeStatus,'completed');
+  assert.equal(a.store.list<Message>('messages').filter(message=>message.runId===run.id).length,0);
+  await assert.rejects(a.worker.reconcileCodex(run.id),ExecutionUnknown);
+  assert.ok(a.store.list<ToolOperation>('operations',a.roomId).some(operation=>operation.status==='unknown'));
+  f.turns[0].items.find((item:any)=>item.id==='command').status='completed';
+  const confirmed=await a.worker.reconcileCodex(run.id);assert.equal(confirmed.run!.status,'completed');
+  assert.equal(a.store.list<Message>('messages').find(message=>message.runId===run.id)!.text,'Candidate after native work');
+  assert.ok(a.store.list<ToolOperation>('operations',a.roomId).every(operation=>operation.status==='completed'));
+  assert.equal(f.requests.filter(frame=>frame.method==='thread/queue/add').length,1);assert.equal(f.requests.filter(frame=>frame.method==='thread/queue/start').length,1);
+  assert.doesNotMatch(JSON.stringify(a.store.list('operations',a.roomId)),/PRIVATE_COMMAND/);
 });
 test('Worker serializes one thread across rooms, rejects rebinding, and blocks behind an uncertain native run', async t => {
   const f = await mockBackend(t), a = await appFixture(t, f); f.model.active = true;

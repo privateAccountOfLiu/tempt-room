@@ -26,7 +26,7 @@ try{
  check('published-file-shape',()=>{
   for(const entry of [protocol,client]){const paths=entry.result.files.map(file=>file.path);assert.ok(paths.includes('dist/index.js'));assert.ok(paths.includes('dist/index.d.ts'));assert.ok(paths.includes('package.json'));assert.ok(!paths.some(path=>path.startsWith('src/')||path.startsWith('.state/')));}
   assert.ok(protocol.result.files.some(file=>file.path==='schema/agent-tool-call.schema.json'));
-  for(const schema of ['run-fence','tool-operation','run-partial','context-policy','context-delta','task-context'])assert.ok(protocol.result.files.some(file=>file.path===`schema/${schema}.schema.json`));
+  for(const schema of ['run-fence','tool-operation','run-partial','context-policy','context-delta','task-context','native-operation','native-reconciliation'])assert.ok(protocol.result.files.some(file=>file.path===`schema/${schema}.schema.json`));
  });
  // Pack the already-installed Zod dependency too: the consumer installation is
  // fully offline and cannot silently satisfy it from this repo's node_modules.
@@ -40,7 +40,7 @@ try{
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {readFileSync} from 'node:fs';
-import {VERSION,commandSchema,agentSchema,agentToolCallSchema,messageSchema,runFenceSchema,sameRunFence,runPartialSchema,terminalStates,contextPolicySchema,contextSeqOf,taskContextSchema} from '@tempt/room-protocol';
+import {VERSION,commandSchema,agentSchema,agentToolCallSchema,messageSchema,runFenceSchema,sameRunFence,runPartialSchema,terminalStates,contextPolicySchema,contextSeqOf,taskContextSchema,nativeOperationSchema,nativeReconciliationSchema} from '@tempt/room-protocol';
 import {RoomClient,RoomAgentClient} from '@tempt/room-client';
 const require=createRequire(import.meta.url);
 assert.equal(VERSION,'0.1');
@@ -52,6 +52,8 @@ assert.equal(terminalStates.has('superseded'),true);
 const taskReceipt=taskContextSchema.parse({token:'context_receipt',baseSeq:1,throughSeq:7,hasMore:false,policy:{}});assert.equal(taskReceipt.throughSeq,7);
 assert.equal(agentToolCallSchema.parse({commandId:'task_context_read',roomId:'room_fixture',name:'task_context'}).name,'task_context');
 assert.equal(contextPolicySchema.parse({}).maxRounds,3);assert.equal(contextSeqOf({basedOnSeq:1,contextSeq:7}),7);
+const native=nativeOperationSchema.parse({provider:'codex',scope:'execution',evidence:'execution-intent',inputId:'a'.repeat(64),kind:'execution'});assert.equal(native.scope,'execution');
+assert.equal(nativeReconciliationSchema.safeParse({threadId:'thread',turnId:'turn',clientUserMessageId:'client',status:'completed',itemsView:'full'}).success,true);
 const partialSchema=JSON.parse(readFileSync(require.resolve('@tempt/room-protocol/schema/run-partial.schema.json'),'utf8'));assert.equal(partialSchema.properties.text['x-maxUtf8Bytes'],65536);
 assert.equal(runPartialSchema.safeParse({id:'draft',messageId:'stream',text:'Draft',createdAt:new Date().toISOString(),streamIndex:0,truncated:false}).success,true);
 assert.equal(agentSchema.parse({id:'external',name:'External',provider:'api',connectionMode:'external'}).executionMode,'sandbox');
@@ -81,7 +83,7 @@ console.log('Installed ESM modules, schemas, author credentials and retry identi
 `);
  check('installed-esm-and-protocol',()=>run([join(consumer,'verify.mjs')],consumer));
  writeFileSync(join(consumer,'usage.ts'),`
-import {agentSchema,commandSchema,type Task,type Run,type Command,type RunFence,type ToolOperation,type TaskContext} from '@tempt/room-protocol';
+import {agentSchema,commandSchema,type Task,type Run,type Command,type RunFence,type ToolOperation,type TaskContext,type NativeOperation} from '@tempt/room-protocol';
 import {RoomClient,RoomAgentClient,type AgentToolCall,type Receipt} from '@tempt/room-client';
 const agent=agentSchema.parse({id:'fixture',name:'Fixture',provider:'api'});
 const command:Command=commandSchema.parse({version:'0.1',commandId:'one',type:'message.send',roomId:'room_fixture',payload:{text:'hello'}});
@@ -94,7 +96,8 @@ const prepared:AgentToolCall=external.prepare('room_status');
 const result:Promise<unknown>=external.send(prepared);
 function taskVersion(task:Task,run:Run){return task.version===run.taskVersion;}
 const taskInput:TaskContext={token:'context_input',baseSeq:1,throughSeq:7,hasMore:false,policy:{maxLag:64,maxRounds:0,maxDeltaBytes:262144}};
-void [agent,accepted,result,taskVersion,operations,fence,taskInput];
+const nativeInput:NativeOperation={provider:'claude',scope:'tool',evidence:'provider-notification',inputId:'b'.repeat(64),kind:'Bash',itemId:'native_tool'};
+void [agent,accepted,result,taskVersion,operations,fence,taskInput,nativeInput];
 `);
  writeFileSync(join(consumer,'tsconfig.json'),JSON.stringify({compilerOptions:{target:'ES2023',module:'NodeNext',moduleResolution:'NodeNext',strict:true,noEmit:true,types:[],lib:['ES2023','DOM'],skipLibCheck:false},files:['usage.ts']}));
  check('installed-typescript-declarations',()=>run([join(project,'node_modules/typescript/bin/tsc'),'--project',join(consumer,'tsconfig.json')],consumer));

@@ -15,13 +15,15 @@ import { probeCodexVersion } from './executable-version.ts';
 import { CodexOutputParser,answerCodexQuestions } from './codex.ts';
 import { claudeMcpConfig,writeClaudeRoomConfig, requireClaudeRoomMcp, checkClaudeRoomMcp } from './claude.ts';
 import { structuredReplyInstruction,structuredOutputs,apiUsage } from './api-output.ts';
-import { ExecutionUnknown, RemoteCanceled } from './errors.ts';
+import { ExecutionUnknown, NativeExecutionFailed,RemoteCanceled } from './errors.ts';
 import { HostChannel, HostRoomPipe, hostDebug, hostDebugProcesses } from './host.ts';
 import { attachedCodexRun, diagnoseCodexAttachment } from './codex-attach.ts';
 import type { CodexRunState } from '../../../packages/protocol/src/index.ts';
+import {NativeEvidenceParser,type NativeEvidence} from './native-evidence.ts';
+import {nativeExecutionStream} from './native-stream.ts';
 export { ExecutionUnknown, RemoteCanceled } from './errors.ts';
 
-export interface AdapterContext { executionId?:string; agent: AgentDescriptor; run: Run; prompt: string; workspace: string; home: string; stateRoot: string; nativeSession?: string; signal: AbortSignal; host: SandboxHost; hostMode?: boolean; onRoomTool?: (request:any)=>Promise<any>; requestInput?: (question:string,signal?:AbortSignal)=>Promise<string>; transport?:typeof remoteRequest; saveCodexState?:(state:CodexRunState)=>void }
+export interface AdapterContext { onNativeEvidence?:(evidence:NativeEvidence)=>void; executionId?:string; agent: AgentDescriptor; run: Run; prompt: string; workspace: string; home: string; stateRoot: string; nativeSession?: string; signal: AbortSignal; host: SandboxHost; hostMode?: boolean; onRoomTool?: (request:any)=>Promise<any>; requestInput?: (question:string,signal?:AbortSignal)=>Promise<string>; transport?:typeof remoteRequest; saveCodexState?:(state:CodexRunState)=>void }
 export type AgentAdapter = ProtocolAdapter<AdapterContext,SandboxHost>;
 const native = new Set(['codex', 'claude', 'deepseek']);
 export async function diagnose(agent: AgentDescriptor, host: SandboxHost): Promise<Diagnostic> {
@@ -318,9 +320,9 @@ async function hostLaunch(ctx: AdapterContext): Promise<NativeLaunch> {
   } catch(error) { pipe.close(); throw error; }
 }
 
-export function nativeRun(ctx:AdapterContext):AsyncIterable<AgentOutput> {
-  const output=new AsyncQueue<AgentOutput>();
-  const execute=async()=>{
+export function nativeRun(input:AdapterContext):AsyncIterable<AgentOutput> {
+  return nativeExecutionStream(input.signal,async(signal,output)=>{
+    const ctx={...input,signal};
     ctx.signal.throwIfAborted();
     await mkdir(ctx.home,{recursive:true});
     const hostMode=ctx.agent.executionMode==='host'||ctx.hostMode===true;
@@ -336,12 +338,14 @@ export function nativeRun(ctx:AdapterContext):AsyncIterable<AgentOutput> {
       if(ctx.signal.aborted){await channel.terminate();ctx.signal.throwIfAborted();}
       if(ctx.agent.provider==='codex') {
         const parser=new CodexOutputParser();let threadId:string|undefined,turnId:string|undefined,inputQueue=Promise.resolve();
+        const evidence=new NativeEvidenceParser(item=>ctx.onNativeEvidence?.(item));
         channel.onFrame=frame=>{
-          if(frame.params?.threadId===threadId&&(!turnId||frame.params?.turnId===turnId))for(const item of parser.accept(frame))output.push(item);
+          const owned=threadId&&frame.params?.threadId===threadId&&(!turnId||frame.params?.turnId===turnId);
+          if(owned){evidence.codex(frame);for(const item of parser.accept(frame))output.push(item);}
           if(frame.method==='serverRequest/resolved')pendingInputs.get(frame.params?.requestId)?.abort(new Error('Agent 已结束这项输入请求'));
           if(frame.id!==undefined&&frame.method){
-            if(['item/commandExecution/requestApproval','item/fileChange/requestApproval'].includes(frame.method))void channel.reply(frame.id,{decision:ctx.signal.aborted?'cancel':'accept'}).catch(error=>output.end(error));
-            else if(frame.method==='item/tool/requestUserInput'){
+            if(['item/commandExecution/requestApproval','item/fileChange/requestApproval'].includes(frame.method))void channel.reply(frame.id,{decision:ctx.signal.aborted||!owned?'cancel':'accept'}).catch(error=>output.end(error));
+            else if(frame.method==='item/tool/requestUserInput'&&owned){
               const input=new AbortController();pendingInputs.set(frame.id,input);
               inputQueue=inputQueue.then(async()=>{
                 const signal=AbortSignal.any([ctx.signal,input.signal]);signal.throwIfAborted();if(!ctx.requestInput)throw new Error('Codex 输入通道不可用');
@@ -358,26 +362,26 @@ export function nativeRun(ctx:AdapterContext):AsyncIterable<AgentOutput> {
         turnId=started.turn?.id;if(turnId)cancelProtocol=()=>channel.request('turn/interrupt',{threadId,turnId}).then(()=>{});
         let finished=false;
         for await(const frame of channel.frames){
-          if(frame.method==='turn/completed'&&frame.params?.threadId===threadId&&frame.params?.turn?.id===turnId){finished=true;const status=frame.params?.turn?.status;if(status!=='completed')throw new Error(`Codex turn ${status}`);break;}
+          if(frame.method==='turn/completed'&&frame.params?.threadId===threadId&&frame.params?.turn?.id===turnId){finished=true;const status=frame.params?.turn?.status;if(status==='failed')throw new NativeExecutionFailed('Codex turn failed');if(status!=='completed')throw new Error(`Codex turn ${status}`);break;}
         }
         if(!finished)throw new Error('Codex 未报告轮次完成');
       } else if(ctx.agent.provider==='claude') {
         await checkClaudeRoomMcp(channel);
+        const evidence=new NativeEvidenceParser(item=>ctx.onNativeEvidence?.(item));channel.onFrame=frame=>evidence.claude(frame);
         await channel.write(JSON.stringify({type:'user',message:{role:'user',content:ctx.prompt},parent_tool_use_id:null})+'\n'); await channel.closeInput();
         let textSeen=false,finished=false;
         for await(const frame of channel.frames){
           requireClaudeRoomMcp(frame);
           for(const item of parseClaudeFrame(frame)){if(item.type==='text')textSeen=true;output.push(item);}
-          if(frame.type==='result') { if(frame.is_error||String(frame.subtype).startsWith('error'))throw new Error(frame.errors?.join('; ')||'Claude 执行失败'); if(!textSeen&&frame.result)output.push({type:'text',text:frame.result}); if(frame.session_id)output.push({type:'session',id:frame.session_id}); finished=true; }
+          if(frame.type==='result') { if(frame.is_error||String(frame.subtype).startsWith('error'))throw new NativeExecutionFailed(frame.errors?.join('; ')||'Claude 执行失败'); if(!textSeen&&frame.result)output.push({type:'text',text:frame.result}); if(frame.session_id)output.push({type:'session',id:frame.session_id}); finished=true; }
         }
         const exit=await channel.exit; if(!finished||exit.exitCode!==0)throw new Error('Claude 未成功完成运行');
       } else {
-        await runAcp({channel,workspace:ctx.workspace,model:ctx.agent.model,nativeSession:ctx.nativeSession,prompt:ctx.prompt,mcpServers:hostMode?[]:[mcp],signal:ctx.signal,emit:item=>output.push(item),setCancel:cancel=>{cancelProtocol=cancel;},onError:error=>output.end(error)});
+        await runAcp({channel,workspace:ctx.workspace,model:ctx.agent.model,nativeSession:ctx.nativeSession,prompt:ctx.prompt,mcpServers:hostMode?[]:[mcp],signal:ctx.signal,emit:item=>output.push(item),onNativeEvidence:ctx.onNativeEvidence,setCancel:cancel=>{cancelProtocol=cancel;},onError:error=>output.end(error)});
       }
-    } catch(error){if(error instanceof ExecutionUnknown)throw error;throw channel.diagnostic(error,[key]);}
+    } catch(error){if(error instanceof ExecutionUnknown)throw error;const diagnostic=channel.diagnostic(error,[key]);if(error instanceof NativeExecutionFailed)throw new NativeExecutionFailed(diagnostic.message,{cause:error});throw diagnostic;}
     finally {for(const input of pendingInputs.values())input.abort(new Error('Agent 运行已结束'));ctx.signal.removeEventListener('abort',abort); try{if(aborting)await aborting;if(hostMode&&channel instanceof HostChannel)hostDebugProcesses(channel.child.pid);await channel.terminate();}finally{channel.dispose();setup.cleanup();} }
-  };
-  execute().then(()=>output.end(),error=>output.end(error)); return output;
+  });
 }
 
 async function* apiRun(ctx:AdapterContext):AsyncGenerator<AgentOutput> {

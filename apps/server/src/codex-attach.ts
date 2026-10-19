@@ -4,8 +4,9 @@ import type { AgentDescriptor, AgentOutput, CodexBinding, CodexRunState, Diagnos
 import type { AdapterContext } from './adapters.ts';
 import { AttachedCodexChannel, CodexRpcError } from './codex-attached-channel.ts';
 import { AsyncQueue } from './queue.ts';
-import { ExecutionUnknown, RemoteCanceled } from './errors.ts';
+import { ExecutionUnknown, NativeExecutionFailed,RemoteCanceled } from './errors.ts';
 import { redactDiagnostic } from './diagnostics.ts';
+import {NativeEvidenceParser} from './native-evidence.ts';
 
 // Thread ids are globally unique. Locking by thread alone also covers URL aliases
 // and multiple transports that happen to connect to the same backend.
@@ -27,7 +28,18 @@ async function readLegacyTurnPage(channel:AttachedCodexChannel,params:Record<str
 
 async function readTurnPage(channel:AttachedCodexChannel,params:Record<string,unknown>){
   if(legacyHistory.has(channel))return readLegacyTurnPage(channel,params);
-  try{return await channel.request('thread/turns/list',params);}
+  const read=async()=>{
+    const deadline=Date.now()+5000;
+    while(true){try{return await channel.request('thread/turns/list',params);}
+      catch(error){
+        // A just-created rollout can be visible before its metadata is flushed.
+        // Retry only the read. An empty file is never treated as empty history.
+        if(!(error instanceof CodexRpcError&&error.code===-32603&&/failed to read session metadata[\s\S]*rollout at [\s\S]* is empty$/.test(error.detail))||Date.now()>=deadline)throw error;
+        await delay(150);
+      }
+    }
+  };
+  try{return await read();}
   catch(error){
     if(error instanceof CodexRpcError&&error.code===-32600&&error.detail.includes('is not materialized yet; thread/turns/list is unavailable before first user message'))return {data:[],nextCursor:null};
     if(error instanceof CodexRpcError&&error.code===-32601&&error.detail.includes('list_turns is not supported yet')){
@@ -172,6 +184,7 @@ async function execute(ctx: AdapterContext, output: AsyncQueue<AgentOutput>) {
   leasedThreads.add(binding.threadId);
   let channel: AttachedCodexChannel | undefined, state: CodexRunState | undefined, sent = false, lost: Error | undefined;
   const texts = new Map<string, string>(), completedItems = new Set<string>();
+  const evidence=new NativeEvidenceParser(item=>ctx.onNativeEvidence?.(item));
   let drainFrames=()=>{};
   const save = (update: Partial<CodexRunState>) => { state = { ...state!, ...update }; ctx.saveCodexState!(structuredClone(state)); if(state.nativeTurnId)drainFrames(); };
   const acceptItem = (item: any) => {
@@ -185,11 +198,11 @@ async function execute(ctx: AdapterContext, output: AsyncQueue<AgentOutput>) {
   const finishTurn = (turn: any) => {
     if (turn.status === 'inProgress') return false;
     if (turn.itemsView && turn.itemsView !== 'full') throw new ExecutionUnknown('后端未提供完整的本轮输出');
-    for (const item of turn.items ?? []) acceptItem(item);
+    for (const item of turn.items ?? []){evidence.codex({method:'item/completed',params:{threadId:binding.threadId,turnId:turn.id,item}});acceptItem(item);}
     if (turn.status === 'interrupted') { save({ phase: 'canceled', nativeStatus:'interrupted' }); throw new RemoteCanceled('Codex 已确认对应轮次停止'); }
     if(!['completed','failed'].includes(turn.status))throw new ExecutionUnknown('Codex 返回了未知轮次状态');
     save({ phase: 'completed', nativeStatus:turn.status });
-    if (turn.status !== 'completed') throw new Error('Codex 对应轮次执行失败；详细信息请在原客户端查看');
+    if (turn.status !== 'completed') throw new NativeExecutionFailed('Codex 对应轮次执行失败；详细信息请在原客户端查看');
     return true;
   };
   try {
@@ -209,6 +222,7 @@ async function execute(ctx: AdapterContext, output: AsyncQueue<AgentOutput>) {
       if (!state?.nativeTurnId || frame.params?.threadId !== binding.threadId) return;
       const params = frame.params;
       if ((params.turnId ?? params.turn?.id) !== state.nativeTurnId) return;
+      evidence.codex(frame);
       // Only append deltas on this connection. After reconnect, use authoritative
       // full items, never replay all item deltas or another desktop turn.
       if (!disableStreaming && frame.method === 'item/agentMessage/delta' && typeof params.itemId === 'string' && typeof params.delta === 'string' && !completedItems.has(params.itemId)) {
@@ -218,8 +232,9 @@ async function execute(ctx: AdapterContext, output: AsyncQueue<AgentOutput>) {
     };
     drainFrames=()=>{for(const frame of earlyFrames.splice(0))handleFrame(frame);earlyBytes=0;};
     channel.onFrame=frame=>{
-      if(frame.params?.threadId!==binding.threadId||frame.method!=='item/agentMessage/delta')return;
+      if(frame.params?.threadId!==binding.threadId)return;
       if(state?.nativeTurnId){handleFrame(frame);return;}
+      if(frame.method!=='item/agentMessage/delta')return;
       if(disableStreaming)return;
       earlyBytes+=typeof frame.params.delta==='string'?Buffer.byteLength(frame.params.delta):0;
       if(earlyFrames.length>=1000||earlyBytes>1024*1024){earlyFrames.length=0;disableStreaming=true;return;}

@@ -16,7 +16,7 @@
     "build:sandbox": "dotnet build sandbox/RoomSandbox/RoomSandbox.csproj -c Release --nologo && npm run build:pipe-compat",
     "build:pipe-compat": "node scripts/build-pipe-compat.mjs",
     "test": "tsx --test tests/*.test.ts",
-    "test:replay": "tsx --test tests/event-replay.test.ts tests/event-cursor.test.ts tests/execution-fencing.test.ts tests/run-partial.test.ts tests/context-reconciliation.test.ts tests/external-context.test.ts tests/recovery-proof.test.ts",
+    "test:replay": "tsx --test tests/event-replay.test.ts tests/event-cursor.test.ts tests/execution-fencing.test.ts tests/run-partial.test.ts tests/context-reconciliation.test.ts tests/external-context.test.ts tests/recovery-proof.test.ts tests/native-operations.test.ts",
     "test:fencing-native": "tsx scripts/probe-execution-fencing.ts",
     "test:sandbox": "tsx scripts/probe-sandbox.ts",
     "test:agent-protocols": "tsx scripts/probe-agents.ts",

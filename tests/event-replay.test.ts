@@ -63,6 +63,12 @@ test('every registered durable event declares and passes its payload contract an
       const current=store.get<Run>('runs',run.id)!;current.executionId='contract_execution';store.event(roomId,'run.updated',SYSTEM,{run:current});
       payload.operation={id:'contract_operation',runId:run.id,roomId,agentId:run.agentId,generation:2,executionId:'contract_execution',operationId:'contract_op',name:'room_post',hash:'a'.repeat(64),status:entry.type.split('.')[1],createdAt:stamp,updatedAt:stamp};
       if(entry.type==='operation.unknown')payload.operation.id='unknown_contract_operation';
+      if(entry.type==='operation.reconciled'){
+        current.codex={binding:{transport:'control-socket',endpoint:resolve('contract.sock'),credentialEnv:'',threadId:'contract_thread',expectedCwd:resolve('.')},clientUserMessageId:'contract_client',nativeTurnId:'contract_turn',nativeStatus:'completed',phase:'completed'};store.event(roomId,'run.updated',SYSTEM,{run:current});
+        payload.operation={...payload.operation,id:'contract_native_operation',operationId:'contract_native_input',name:'native.execution',status:'completed',native:{provider:'codex',scope:'execution',evidence:'execution-intent',inputId:'b'.repeat(64),kind:'execution',clientUserMessageId:'contract_client',sessionId:'contract_thread'}};
+        store.event(roomId,'operation.started',SYSTEM,{operation:{...payload.operation,status:'started'}});store.event(roomId,'operation.unknown',SYSTEM,{operation:{...payload.operation,status:'unknown'}});
+        payload.proof={threadId:'contract_thread',turnId:'contract_turn',clientUserMessageId:'contract_client',status:'completed',itemsView:'full'};payload.operation.result={outcome:'completed',reconciled:true};
+      }
     }
     if(entry.type==='run.context.advanced'){
       const previous={...run,id:'contract_context_run',status:'running' as const,generation:1,executionId:'context_old',basedOnSeq:store.room(roomId)!.seq};store.put('runs',previous);
@@ -185,7 +191,7 @@ test('v2 migration preserves raw history and seals unlogged old rows into a repl
   const oldTask={id:'old_task',roomId:room.id,title:'Unlogged lease',agentId:'legacy-agent',projectPath:'',version:3,status:'running',dependencies:[],leaseUntil:new Date(Date.now()+600000).toISOString(),createdAt:stamp};
   legacy.prepare('INSERT INTO tasks VALUES(?,?,?)').run(oldTask.id,room.id,JSON.stringify(oldTask));legacy.prepare('INSERT INTO agents VALUES(?,?,?)').run('legacy-agent',null,JSON.stringify({id:'legacy-agent',name:'Legacy',provider:'demo',enabled:true}));legacy.exec('PRAGMA user_version=2');legacy.close();
   const store=new Store(path);t.after(()=>{store.close();removeDirectory(root);});
-  assert.equal((store.db.prepare('PRAGMA user_version').get() as any).user_version,7);assert.equal((store.db.prepare('SELECT body FROM events WHERE event_id=?').get('old_fact') as any).body,raw);
+  assert.equal((store.db.prepare('PRAGMA user_version').get() as any).user_version,8);assert.equal((store.db.prepare('SELECT body FROM events WHERE event_id=?').get('old_fact') as any).body,raw);
   const checkpoint=store.events(room.id).at(-1)!;assert.equal(checkpoint.type,'projection.checkpoint');assert.equal(store.projectionStatus(room.id).historyFloor,checkpoint.seq);
   const before=store.projectionBytes(room.id);store.rebuildProjections(room.id);assert.equal(store.projectionBytes(room.id),before);assert.equal(store.get<Task>('tasks',oldTask.id)!.leaseUntil,oldTask.leaseUntil);
   assert.throws(()=>store.snapshotAt(room.id,1),/cursor/);assert.equal(store.snapshotWithTail(room.id,1).reset,true);

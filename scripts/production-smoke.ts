@@ -162,7 +162,7 @@ try {
   try {
     const versionRow = db.prepare('PRAGMA user_version').get() as {user_version?: number};
     const countRow = db.prepare('SELECT COUNT(*) AS count FROM rooms').get() as {count?: number};
-    if (versionRow.user_version !== 7) fail(`数据库 user_version 应为 7，实际 ${versionRow.user_version}`);
+    if (versionRow.user_version !== 8) fail(`数据库 user_version 应为 8，实际 ${versionRow.user_version}`);
     if ((countRow.count ?? 0) < 1) fail('数据库中没有房间记录');
     step('database-schema-and-data', {userVersion: versionRow.user_version, rooms: countRow.count});
   } finally { db.close(); }

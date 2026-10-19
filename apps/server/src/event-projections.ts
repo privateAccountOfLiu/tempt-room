@@ -129,9 +129,17 @@ export function projectEvent(sink:ProjectionSink,event:RoomEvent){
     case 'operation':{
       const operation=payload.operation,previous=sink.get('operations',operation.id);
       const run=sink.get('runs',operation.runId);
-      if(event.type!=='operation.unknown'&&(!run||operation.generation!==(run.generation??1)||operation.executionId!==run.executionId||operation.agentId!==run.agentId))throw new Error('Stale tool operation generation or execution identity');
-      if(previous&&(previous.hash!==operation.hash||previous.runId!==operation.runId||previous.generation!==operation.generation||previous.operationId!==operation.operationId||previous.executionId!==operation.executionId))throw new Error('Tool operation identity cannot change');
-      if(previous&&previous.status!=='started'&&projectionJson(previous)!==projectionJson(operation))throw new Error('Tool operation is already settled');
+      const reconciled=event.type==='operation.reconciled';
+      if(reconciled){
+        const native=previous?.native,proof=payload.proof,state=run?.codex;
+        if(!native||native.provider!=='codex'||previous.status==='completed'||operation.agentId!==run?.agentId||native.clientUserMessageId!==proof.clientUserMessageId||state?.clientUserMessageId!==proof.clientUserMessageId||state.binding.threadId!==proof.threadId||native.sessionId!==proof.threadId||state.nativeTurnId!==proof.turnId||state.nativeStatus!==proof.status||!['completed','canceled'].includes(state.phase))throw new Error('Native operation has no verified recovery binding');
+        if(native.scope==='tool'&&(native.itemId!==proof.itemId||!proof.itemStatus))throw new Error('Native tool recovery has no matching item receipt');
+        if(operation.result?.reconciled!==true||operation.result?.outcome!==(native.scope==='tool'?proof.itemStatus:proof.status))throw new Error('Native recovery result disagrees with its receipt');
+      }
+      if(event.type!=='operation.unknown'&&!reconciled&&(!run||operation.generation!==(run.generation??1)||operation.executionId!==run.executionId||operation.agentId!==run.agentId))throw new Error('Stale tool operation generation or execution identity');
+      if(previous&&(previous.hash!==operation.hash||previous.runId!==operation.runId||previous.roomId!==operation.roomId||previous.agentId!==operation.agentId||previous.generation!==operation.generation||previous.operationId!==operation.operationId||previous.executionId!==operation.executionId))throw new Error('Tool operation identity cannot change');
+      if(previous&&projectionJson([previous.native])!==projectionJson([operation.native]))throw new Error('Native operation provenance cannot change');
+      if(previous&&previous.status!=='started'&&!reconciled&&projectionJson(previous)!==projectionJson(operation))throw new Error('Tool operation is already settled');
       put('operations',operation);break;
     }
     case 'sandbox':{

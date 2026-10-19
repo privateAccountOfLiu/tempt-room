@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "threadId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "turnId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "clientUserMessageId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "failed",
+        "interrupted"
+      ]
+    },
+    "itemsView": {
+      "type": "string",
+      "const": "full"
+    },
+    "itemId": {
+      "type": "string"
+    },
+    "itemStatus": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "failed",
+        "declined",
+        "canceled"
+      ]
+    }
+  },
+  "required": [
+    "threadId",
+    "turnId",
+    "clientUserMessageId",
+    "status",
+    "itemsView"
+  ],
+  "additionalProperties": false
+}

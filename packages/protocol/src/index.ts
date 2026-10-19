@@ -5,7 +5,7 @@ export { eventRegistry, eventRegistryManifest, eventDefinition, eventMetadata, E
 export { codexBindingSchema, codexRunStateSchema, type CodexBinding, type CodexRunState } from './codex.ts';
 export { executionSettingsSchema,runLimitsSchema,defaultExecutionSettings,budgetError,roomBudgetError,type ExecutionSettings,type RunLimits,type BudgetUsage,type RoomBudgetRun } from './settings.ts';
 export { actorSchema,sandboxProfileSchema,messageSchema,taskSchema,runSchema,artifactSchema } from './models.ts';
-export { runFenceSchema,toolOperationSchema,sameRunFence,type RunFence,type ToolOperation } from './execution.ts';
+export { runFenceSchema,toolOperationSchema,nativeOperationSchema,nativeReconciliationSchema,sameRunFence,type RunFence,type ToolOperation,type NativeOperation } from './execution.ts';
 export { classifyFailure, type FailureInfo, type FailureKind } from './failure.ts';
 export {contextPolicySchema,contextDeltaSchema,taskContextSchema,contextSeqOf,type ContextPolicy,type ContextDelta,type TaskContext} from './reconciliation.ts';
 import {contextPolicySchema,type ContextPolicy,type TaskContext} from './reconciliation.ts';

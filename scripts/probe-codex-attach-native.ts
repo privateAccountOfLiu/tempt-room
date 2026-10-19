@@ -12,6 +12,8 @@ import { AttachedCodexChannel } from '../apps/server/src/codex-attached-channel.
 import { diagnoseCodexAttachment, attachedCodexRun } from '../apps/server/src/codex-attach.ts';
 
 const { values } = parseArgs({ options: { codex: { type: 'string' } } });
+const methods:Record<string,number>={},originalRequest=AttachedCodexChannel.prototype.request;
+AttachedCodexChannel.prototype.request=function(method,params,timeoutMs){methods[method]=(methods[method]??0)+1;return originalRequest.call(this,method,params,timeoutMs);};
 if (!values.codex) throw new Error('Usage: npm run test:codex-attach-native -- --codex <absolute-codex.exe>');
 const parent = resolve('.state/codex-attach/native'); mkdirSync(parent, { recursive: true });
 const root = mkdtempSync(join(parent, 'probe-')), home = join(root, 'codex-home'), cwd = join(root, 'workspace');
@@ -79,6 +81,7 @@ try {
   if (!report.ok) throw new Error('Native fixture did not produce the expected completed output');
 } catch (error) { report.error = error instanceof Error ? error.message : String(error); report.cause=error instanceof Error&&error.cause instanceof Error?{message:error.cause.message,detail:(error.cause as any).detail}:undefined;report.stderrPresent = Boolean(stderr); process.exitCode = 1; }
 finally {
+  report.methods=methods;
   channel?.close(); delete process.env[credentialEnv];
   // Only the backend created above belongs to this script.
   child.kill(); const deadline = Date.now() + 3000; while (!childExited && Date.now() < deadline) await delay(50);

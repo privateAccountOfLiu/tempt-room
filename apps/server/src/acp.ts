@@ -1,5 +1,7 @@
 import type { AgentOutput } from '../../../packages/protocol/src/index.ts';
 import { hostDebug } from './host.ts';
+import {NativeEvidenceParser,type NativeEvidence} from './native-evidence.ts';
+import {NativeExecutionFailed} from './errors.ts';
 
 export interface AcpChannel {
   request(method:string,params?:unknown,timeoutMs?:number):Promise<any>;
@@ -16,16 +18,19 @@ export function acpModelValue(option:any,requested:string):string {
   return matches[0].value;
 }
 
-export async function runAcp(options:{channel:AcpChannel;workspace:string;model:string;nativeSession?:string;prompt:string;mcpServers:unknown[];signal:AbortSignal;emit:(item:AgentOutput)=>void;setCancel:(cancel:()=>Promise<void>)=>void;onError:(error:unknown)=>void}) {
+export async function runAcp(options:{channel:AcpChannel;workspace:string;model:string;nativeSession?:string;prompt:string;mcpServers:unknown[];signal:AbortSignal;emit:(item:AgentOutput)=>void;onNativeEvidence?:(item:NativeEvidence)=>void;setCancel:(cancel:()=>Promise<void>)=>void;onError:(error:unknown)=>void}) {
   const {channel,signal}=options;
+  const evidence=new NativeEvidenceParser(item=>options.onNativeEvidence?.(item));let ownedSession:string|undefined;
   hostDebug('[acp] start nativeSession='+(options.nativeSession??'none'));
   channel.onFrame=frame=>{
+    if(frame.method==='session/update'&&(!ownedSession||frame.params?.sessionId!==ownedSession))return;
+    if(ownedSession&&frame.params?.sessionId===ownedSession)evidence.acp(frame);
     const update=frame.params?.update;
     if(frame.method==='session/update'&&update?.sessionUpdate!=='agent_message_chunk')hostDebug('[acp] update '+(update?.sessionUpdate??'?')+' '+JSON.stringify(update).slice(0,350));
     if(frame.method==='session/update'&&update?.sessionUpdate==='agent_message_chunk'&&update.content?.type==='text')options.emit({type:'text',text:update.content.text});
     if(frame.method==='session/request_permission'&&frame.id!==undefined){
       const choice=frame.params?.options?.find((item:any)=>item.kind==='allow_once');
-      void channel.reply(frame.id,signal.aborted||!choice?{outcome:{outcome:'cancelled'}}:{outcome:{outcome:'selected',optionId:choice.optionId}}).catch(options.onError);
+      void channel.reply(frame.id,signal.aborted||!choice||!ownedSession||frame.params?.sessionId!==ownedSession?{outcome:{outcome:'cancelled'}}:{outcome:{outcome:'selected',optionId:choice.optionId}}).catch(options.onError);
     }
   };
   const initialized=await channel.request('initialize',{protocolVersion:1,clientCapabilities:{},clientInfo:{name:'tempt-room',version:'0.1.0'}});
@@ -38,6 +43,7 @@ export async function runAcp(options:{channel:AcpChannel;workspace:string;model:
   hostDebug('[acp] session response '+JSON.stringify(session).slice(0,1500));
   const sessionId=options.nativeSession??session.sessionId;
   if(typeof sessionId!=='string'||!sessionId)throw new Error('ACP 未返回有效会话标识');
+  ownedSession=sessionId;
   options.emit({type:'session',id:sessionId});
   let prompt:Promise<any>|undefined;
   options.setCancel(async()=>{await channel.send('session/cancel',{sessionId});if(prompt)await prompt.catch(()=>{});});
@@ -47,7 +53,7 @@ export async function runAcp(options:{channel:AcpChannel;workspace:string;model:
     signal.throwIfAborted();
     prompt=channel.request('session/prompt',{sessionId,prompt:[{type:'text',text:options.prompt}]},1800000);
     const result=await prompt;signal.throwIfAborted();
-    if(result.stopReason!=='end_turn')throw new Error(`DeepSeek stopReason: ${result.stopReason}`);
+    if(result.stopReason!=='end_turn')throw new NativeExecutionFailed(`DeepSeek stopReason: ${result.stopReason}`);
   }finally{
     // Close only an idle session. Forced Job termination remains the bounded
     // fallback, and is the authority for process-tree cancellation status.

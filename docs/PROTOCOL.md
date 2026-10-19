@@ -142,7 +142,7 @@ Run.limits 保存入队时的内存、进程、超时与单次运行 Token/费�
 - `GET /api/rooms/:id/audit/export`：Owner 认证，按事件原样返回 `application/x-ndjson` 附件（每行一个事件，含 eventId/seq/type/actor/payload）；Agent 令牌不可访问。房间头部提供下载按钮。
 - WebSocket 与 SDK：持久序号出现缺口时通过 REST 补齐；同一房间连续提交、重复忽略、跨房间拒收。慢客户端可以丢瞬态；持久事件由游标恢复。客户端不会因为订阅建立就把缺失事件算作已处理。
 
-数据库 v3 为旧数据追加 migration checkpoint，而不重写旧事件；v4 新增 operations 投影及索引；v5 支持持久草稿和 superseded 终态；v6 增加 baseSeq 上下文对账与上下文预算；当前开发版 v7 强制外部任务输入回执并冻结执行副作用范围。`historyFloor` 是可证明完整快照的最早水位。运行/工具的 generation fencing 与 baseSeq 提交前对账已接入；纯讨论恢复、WFQ/EWMA、quorum 与预算已有实现，原生副作用恢复、每轮配额和完整验收仍在 [实施记录](AGENT-PARALLEL-PROGRESS.md) 中跟踪。
+数据库 v3 为旧数据追加 migration checkpoint，而不重写旧事件；v4 新增 operations 投影及索引；v5 支持持久草稿和 superseded 终态；v6 增加 baseSeq 上下文对账与上下文预算；v7 强制外部任务输入回执并冻结执行副作用范围；当前开发版 v8 保存原生执行意图和工具证据。`historyFloor` 是可证明完整快照的最早水位。运行/工具的 generation fencing 与 baseSeq 提交前对账已接入；纯讨论恢复、WFQ/EWMA、quorum 与预算已有实现，原生副作用恢复、每轮配额和完整验收仍在 [实施记录](AGENT-PARALLEL-PROGRESS.md) 中跟踪。
 
 
 ## 执行 generation 与工具操作（开发版 v4）
@@ -191,3 +191,19 @@ Message.final=true 时，supersedes 必须指向当前 partial.id（没有草稿
 自动网络重试和重启恢复仍须用户开启，仅允许创建时和当前均为演示/API、沙箱模式、无任务/讨论、无 Room 写操作或交付物的纯讨论运行。恢复子运行、原运行标记与审计在同一事务提交；重复 supervisor 不会创建第二份子运行。原生进程可能执行过命令或访问网络，即使 Room 操作表为空也不会自动重跑。原生内部副作用的完整前置账本与安全续接仍为后续工作。
 
 历史 Run.limits 中缺少的 tokenBudget/costBudgetUsd 保持缺失，回放不得补入默认值。新运行在入队时显式冻结设置中的预算默认值，历史字段缺失并不表示已证明费用为零。
+
+## 原生执行意图与工具证据（开发版 v8）
+
+ToolOperation 可带 native：`{provider,scope,evidence,inputId,kind,sessionId?,turnId?,itemId?,clientUserMessageId?}`。scope=execution/evidence=execution-intent 是 Worker 在调用原生适配器之前提交的执行意图；inputId 由业务 Run 与其不可变上下文输入生成，不依赖重试次数或新进程。相同输入即使更换 generation 或修改提示字符串，也不能越过既有意图重新启动；新的上下文对账轮次使用新的输入标识。显式 owner run.retry 仍会创建新 Run，使用前必须自行核对未知副作用。诊断/版本查询不属于模型任务意图。
+
+scope=tool/evidence=provider-notification 是 CLI 报告的命令、文件、MCP 或其他工具生命周期。Codex item、Claude tool_use/tool_result（含子任务）和 ACP tool_call 更新归一化为有界身份、参数哈希及终态/exitCode/durationMs；命令、完整输入、输出与推理正文不写入该账本。通知可能在动作已发生后才到达，不能当作逐命令的执行前授权或幂等证明。未知的新工具类型也不能据此获得自动重试许可。
+
+started/completed/unknown 表示回执生命周期；completed 的 result.outcome 可以是 failed/declined/canceled，不能把已收到失败回执渲染成工具成功。消费输出流提前结束时会撤销本次原生执行并等待清理，预算超限仍归类为预算失败。原生意图只有在适配器结束且本次执行中已记录的工具均有终态时才确认；工具仍有 unknown 时，模型报告 completed 也不能覆盖为业务成功。失败或进程中断保留原意图与未知记录。结构化原生失败在适配器清理结束后保留 known failed 回执；取消不代表回滚文件或网络效果。
+
+`operation.reconciled` 是显式恢复事件，附 `{threadId,turnId,clientUserMessageId,status,itemsView:'full',itemId?,itemStatus?}`。当前仅接通已有 Codex 后端：owner 核对接口只读定位本输入的完整轮次；客户端请求、线程、轮次及具体工具条目均匹配后，才能将原 generation 的 unknown 记录确认。事件保留原 executionId/generation，投影器验证恢复绑定和回执结果，不能用该事件确认 Room 工具或改换来源。缺失或 summary-only 历史不能确认；部分可证明的回执可以保存，未确认的部分继续阻止交付。
+
+原生历史暂未写入元数据时，仅对明确的“rollout is empty”内部读取错误在 5 秒内重试原历史读取；不将其当成空历史，不重复 queue/add 或 queue/start。其他历史损坏保持失败/未知。Codex/ACP 的工具证据与输入请求按当前线程/会话过滤，外来审批请求不授予权限。
+
+运行详情显示执行意图、工具回执和结果未知；打开时按房间水位有界刷新，单次只保留一个请求，关闭或切换运行后忽略旧响应。SDK 提供 native-operation / native-reconciliation JSON Schema；数据库 v8 阻止不了解这些来源字段与恢复事件的旧写入程序打开。通用工具前置拦截、对外部副作用的幂等/补偿以及旧上下文下的显式安全续接仍在后续计划中；原生和 A2A 的 unrestricted 自动恢复继续关闭。
+
+接口依据：[Codex App Server](https://learn.chatgpt.com/docs/app-server)、[Claude Code hooks/tool 生命周期](https://code.claude.com/docs/en/hooks)、[ACP tool calls](https://agentclientprotocol.com/protocol/v1/tool-calls)。这些接口描述生命周期，未宣称本应用可以撤销任意 Shell/网络效果。

@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { VERSION, capabilitiesFor, executionSettingsSchema,eventSchema,eventMetadata,EventContractError,projectionTableNames,type ProjectionTable,type ExecutionSettings, type Actor, type AgentDescriptor, type Room, type RoomEvent, type RoomSnapshot, type Run, type Task, type Discussion,type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { MemoryProjectionSink,SqlProjectionSink,projectEvent,projectionJson } from './event-projections.ts';
-export const DATABASE_VERSION=7;
+export const DATABASE_VERSION=8;
 
 export const uid = (prefix = 'id') => `${prefix}_${randomUUID().replaceAll('-', '')}`;
 export const now = () => new Date().toISOString();
@@ -80,6 +80,8 @@ export class Store {
     // v7 gates writers which do not enforce external task input receipts.
     // Existing leases keep their facts and must fetch task_context before completion.
     if(version<7)this.atomic(()=>this.db.exec('PRAGMA user_version=7'));
+    // Native operation provenance and explicit receipt reconciliation require v8 writers.
+    if(version<8)this.atomic(()=>this.db.exec('PRAGMA user_version=8'));
     this.seed();
     this.atomic(() => {
       for (const run of this.list<Run>('runs')) if (['running', 'waiting_input', 'cancel_requested'].includes(run.status) || (run.status==='queued' && run.codex)) {

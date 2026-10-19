@@ -3,7 +3,7 @@ import { actorSchema, artifactSchema, messageSchema, runContextSchema, runSchema
 import { executionSettingsSchema } from './settings.ts';
 import {runPartialSchema} from './run-state.ts';
 import {contextDeltaSchema} from './reconciliation.ts';
-import { toolOperationSchema } from './execution.ts';
+import { toolOperationSchema,nativeReconciliationSchema } from './execution.ts';
 
 const id=z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/);
 const room=z.object({id,name:z.string(),description:z.string(),members:z.array(id),createdAt:z.string().datetime(),seq:z.number().int().nonnegative()}).passthrough();
@@ -48,6 +48,7 @@ register(['run.context.advanced'],'run.context.advanced','run','run',body({run:r
 register(['run.context.confirmed'],'run.context.confirmed','run','context-confirmed',body({runId:id,generation:z.number().int().positive(),executionId:id,throughSeq:z.number().int().nonnegative()}));
 register(['run.lease.renewed'],'run.lease','run','run',body({run:runSchema.passthrough()}));
 for(const [type,status] of Object.entries({'operation.started':'started','operation.completed':'completed','operation.unknown':'unknown'}))register([type],type,'run','operation',body({operation:toolOperationSchema.extend({status:z.literal(status)})}));
+register(['operation.reconciled'],'operation.reconciled','run','operation',body({operation:toolOperationSchema.extend({status:z.literal('completed')}),proof:nativeReconciliationSchema}));
 register(['artifact.created','artifact.published'],'artifact.published','artifact','artifact',body({artifact:artifactSchema.passthrough()}));
 register(['artifact.applied'],'artifact.applied','artifact','artifact',body({artifact:artifactSchema.extend({applied:z.literal(true)}).passthrough()}));
 register(['discussion.started','discussion.round','discussion.scheduled','discussion.completed','discussion.stopped'],'discussion.state','room','discussion',body({discussion}));

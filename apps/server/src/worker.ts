@@ -21,6 +21,8 @@ import { dependencyInputs } from './dependencies.ts';
 import { codexThreadKey, reconcileAttachedRun } from './codex-attach.ts';
 import { assertRunFence,assertRunIdentity,executionFence } from './execution.ts';
 import { ToolOperations } from './tool-operations.ts';
+import {NativeOperations} from './native-operations.ts';
+import {NativeExecutionFailed} from './errors.ts';
 import type { RunFence,AgentOutput }  from '../../../packages/protocol/src/index.ts';
 
 /** A hard budget stop is a failed run, not a user cancellation. */
@@ -90,6 +92,7 @@ export class Worker {
   private active = new Map<string, AbortController>();
   private executions=new Map<string,Readonly<RunFence>>();
   private operations:ToolOperations;
+  private nativeOperations:NativeOperations;
   private inputs = new Map<string,{fence:RunFence;receive:(text:string)=>void}>();
   private timer?: NodeJS.Timeout;
   private closed = false;
@@ -98,6 +101,7 @@ export class Worker {
   readonly streamListeners = new Set<(delta: StreamDelta) => void>();
   constructor(public store: Store, public service: RoomService, public root: string,private options:{adapter?:typeof runAdapter}={}) {
     this.operations=new ToolOperations(store,()=>store.settings().maxToolResultBytes);
+    this.nativeOperations=new NativeOperations(store);
     this.host = new SandboxHost(root, resolve('sandbox/RoomSandbox/bin/Release/net10.0-windows/RoomSandbox.exe'));
     this.workspaces = new Workspaces(root);
     service.onCancel = id => this.active.get(id)?.abort(new Error('用户取消'));
@@ -216,9 +220,11 @@ export class Worker {
   private async consumeAttempt(run:Run,controller:AbortController,options:{agent:AgentDescriptor;workspace:string;home:string;scope:string;prompt:string;hostMode:boolean;attached:boolean}){
     const {agent,workspace,home,scope,prompt,hostMode,attached}=options,fence=executionFence(run);
     const artifacts:Extract<AgentOutput,{type:'artifact'}>[]=[];
+    let nativeIntent:ToolOperation|undefined;
     let text = '', messageId = uid('msg'), deltaIndex = 0,partialTimer:ReturnType<typeof setTimeout>|undefined;
     const checkpoint=()=>{clearTimeout(partialTimer);partialTimer=undefined;try{const saved=this.publishPartial(run,text,messageId,Math.max(0,deltaIndex-1));if(!saved){const current=this.store.get<Run>('runs',run.id);if(current?.partial&&!current.finalMessageId&&['running','waiting_input'].includes(current.status)){partialTimer=setTimeout(checkpoint,Math.max(1,PARTIAL_INTERVAL_MS-(Date.now()-Date.parse(current.partial.createdAt))));partialTimer.unref();}}}catch{/* Cancellation or a new generation revokes this draft writer. */}};
     try {
+      if(['codex','claude','deepseek'].includes(agent.provider))nativeIntent=this.nativeOperations.begin(fence,agent,prompt,attached?undefined:this.store.session(scope));
       const saveCodexState=(state:CodexRunState)=>{
         assertRunIdentity(this.store,run);
         run.codex=state;run.nativeSessionId=state.binding.threadId;
@@ -227,7 +233,7 @@ export class Worker {
         if(current.status!=='cancel_requested')current.status='running';
         current.updatedAt=now();this.store.atomic(()=>{this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);});
       };
-      for await (const output of (this.options.adapter??runAdapter)({ executionId:fence.executionId,agent, run, prompt, workspace, home, stateRoot: this.root, hostMode, onRoomTool: hostMode ? (request:any) => this.executeTool(run.id, request, fence) : undefined, nativeSession: attached?undefined:this.store.session(scope), signal: controller.signal, host: this.host, saveCodexState, requestInput:(question,signal)=>this.requestInput(run,question,signal?AbortSignal.any([controller.signal,signal]):controller.signal) })) {
+      for await (const output of (this.options.adapter??runAdapter)({ onNativeEvidence:nativeIntent?evidence=>this.nativeOperations.observe(nativeIntent!,evidence):undefined, executionId:fence.executionId,agent, run, prompt, workspace, home, stateRoot: this.root, hostMode, onRoomTool: hostMode ? (request:any) => this.executeTool(run.id, request, fence) : undefined, nativeSession: attached?undefined:this.store.session(scope), signal: controller.signal, host: this.host, saveCodexState, requestInput:(question,signal)=>this.requestInput(run,question,signal?AbortSignal.any([controller.signal,signal]):controller.signal) })) {
         assertRunIdentity(this.store,run);
         if(!attached||run.codex?.nativeStatus!=='completed')controller.signal.throwIfAborted();
         if (output.type === 'text') {
@@ -244,8 +250,15 @@ export class Worker {
         else if (output.type === 'input') { this.publishMessage(run, output.question, uid('msg')); }
         else if (output.type === 'artifact'){if(artifacts.length>=10||Buffer.byteLength(output.text)>2**20)throw new Error('候选交付物超过 10 份或单份 1 MiB 上限');artifacts.push(output);}
       }
+      if(nativeIntent)this.nativeOperations.complete(nativeIntent);
       return {text,messageId,artifacts};
-    }catch(error){try{if(text.trim())this.publishPartial(run,text,messageId,Math.max(0,deltaIndex-1));}catch{/* Preserve only authorized checkpoints. */}throw error;}
+    }catch(error){
+      if(nativeIntent&&error instanceof NativeExecutionFailed){try{this.nativeOperations.complete(nativeIntent,'failed');}catch(uncertain){this.nativeOperations.abandon(nativeIntent);throw uncertain;}}
+      if(nativeIntent)this.nativeOperations.abandon(nativeIntent);
+      try{if(text.trim())this.publishPartial(run,text,messageId,Math.max(0,deltaIndex-1));}catch{/* Preserve only authorized checkpoints. */}
+      if(nativeIntent&&!controller.signal.aborted&&!(error instanceof ExecutionUnknown)&&!(error instanceof RemoteCanceled)&&!(error instanceof NativeExecutionFailed)&&!(error instanceof BudgetExceeded))throw new ExecutionUnknown('原生执行未取得完整可核对回执：'+redactDiagnostic(error,[agent.credentialEnv?process.env[agent.credentialEnv]:undefined]),{cause:error});
+      throw error;
+    }
     finally{clearTimeout(partialTimer);}
   }
   private async execute(initialRun: Run, controller: AbortController) {
@@ -330,7 +343,7 @@ export class Worker {
       if(error instanceof ProtocolError&&error.code==='lease_expired'){this.finish(run,'interrupted','执行租约已过期，未提交迟到输出');return;}
       const message = redactDiagnostic(error,[agent?.credentialEnv?process.env[agent.credentialEnv]:undefined,agent?.codexBinding?.credentialEnv?process.env[agent.codexBinding.credentialEnv]:undefined]);
       const contextFailure=error instanceof ProtocolError&&error.code.startsWith('context_');
-      const status = error instanceof BudgetExceeded?'failed':contextFailure?'failed':run.codex?.nativeStatus==='completed'?'completed':run.codex?.nativeStatus==='failed'?'failed':error instanceof ExecutionUnknown?'unknown':error instanceof RemoteCanceled?'canceled':controller.signal.aborted ? ['api','a2a'].includes(agent.provider) ? 'interrupted' : 'canceled' : 'failed';
+      const status = error instanceof BudgetExceeded?'failed':contextFailure?'failed':error instanceof ExecutionUnknown?'unknown':run.codex?.nativeStatus==='completed'?'completed':run.codex?.nativeStatus==='failed'?'failed':error instanceof RemoteCanceled?'canceled':controller.signal.aborted ? ['api','a2a'].includes(agent.provider) ? 'interrupted' : 'canceled' : 'failed';
       this.finish(run, status, status==='completed'?undefined:status==='interrupted' && ['api','a2a'].includes(agent.provider) ? '已停止接收；远程计算是否停止未知。' : message);
     } finally { clearTimeout(timeout);for(const id of ownedExecutions)this.executions.delete(id); }
   }
@@ -458,6 +471,7 @@ export class Worker {
       if(found.kind==='canceled')this.finish(run,'canceled','已确认移除本运行的原生排队项',true);
       else if(found.kind==='turn'&&found.turn.status!=='inProgress'){
         if(found.turn.itemsView&&found.turn.itemsView!=='full')throw new ExecutionUnknown('后端未提供完整轮次，不能确认交付');
+        this.nativeOperations.reconcileCodex(run,found.turn);
         const text=(found.turn.items??[]).filter((item:any)=>item.type==='agentMessage'&&typeof item.text==='string').map((item:any)=>item.text).join('\n\n');
         if(text.trim()&&run.stopReason!=='superseded')this.publishFinalMessage(run,text,uid('msg'));
         this.finish(run,found.turn.status==='completed'?'completed':found.turn.status==='interrupted'?'canceled':'failed',undefined,true);

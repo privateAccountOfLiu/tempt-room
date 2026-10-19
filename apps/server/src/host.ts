@@ -113,7 +113,9 @@ export class HostChannel {
     hostDebug(`[host] spawned pid=${child.pid} run=${runId}`);
     createInterface({ input: child.stdout }).on('line', line => {
       if (!line.trim()) return;
-      try { this.accept(JSON.parse(line)); } catch { this.rawStdout = (this.rawStdout + line + '\n').slice(-8192); }
+      let frame:any;
+      try { frame=JSON.parse(line); } catch { this.rawStdout = (this.rawStdout + line + '\n').slice(-8192);return; }
+      try { this.accept(frame); } catch(error) {this.fail(error instanceof Error?error:new Error(String(error)));void this.terminate().catch(error=>this.fail(error));}
     });
     child.stderr.on('data', chunk => { this.stderr = (this.stderr + chunk.toString()).slice(-8192); hostDebug(`[stderr] ${String(chunk).slice(-400)}`); });
     const finish = (code: number | null, signal: NodeJS.Signals | null) => {

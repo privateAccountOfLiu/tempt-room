@@ -144,7 +144,7 @@ npm run test:agent-protocols -- --agent=deepseek  # 沙箱通过后，无模型�
 
 `npm run test:browser` 是自动化端到端冒烟：用隔离的数据目录和独立 HMR 端口启动真实服务，通过 Chrome DevTools Protocol 驱动无头 Edge/Chrome 完成登录、界面发送消息、演示成员流式回复、刷新后历史恢复、运行设置弹窗、**任务创建与转交（demo-planner→demo-reviewer，含版本递增与完成态）**、**@提及选择与发送**、**有界讨论（轮次/响应上限、结束后横幅移除）**、**WebSocket 断线后自动重连并补取断线期间消息**、**外部 Agent 发布交付物并在界面查看预览**、**任务修改目标（v3 新版本、旧回复标记“基于旧要求”）**、**界面新建房间与房间设置改名**、**添加外部会话 Agent、启用并邀请进房间、移除成员**、**带依赖的任务创建与父任务再次改版后的依赖升级（子任务 v2 重跑完成）**、**讨论中途停止**、**打开补丁预览并应用到原项目（真实文件写入、标记已应用）**、**任务改版后旧交付物应用被拒绝且文件不变**，并断言页面无控制台错误；不调用任何模型。报告与截图写入 `.state/browser-e2e/run-*/`（稳定入口 `.state/browser-e2e/latest.json`，最新截图另存 `docs/screenshots/browser-e2e.png`）。找不到浏览器时可用 `ROOM_BROWSER=<可执行文件>` 指定；`ROOM_E2E_HEADFUL=1` 可观察界面。它覆盖 UI/WS/持久化/任务协作/断线恢复/交付物/成果应用与版本拒绝/房间与成员管理/依赖版本链路，但不替代真实 Agent 场景验收。
 
-`npm run test:production` 对**生产构建产物**做本机启动冒烟：用隔离状态目录启动 `dist/server/main.js`，检查静态 SPA 与 CSP、未认证请求 401、Owner API 认证、WebSocket 事件流、消息持久化、退出后的重启恢复与 `room.sqlite` 的 `user_version=7`。Windows 上外部终止不会触发 Node 信号处理器，因此脚本验证“终止后重新启动可恢复”（含陈旧锁处理），而 POSIX 上验证优雅退出。报告写入 `.state/production-smoke/latest.json`；不调用模型。
+`npm run test:production` 对**生产构建产物**做本机启动冒烟：用隔离状态目录启动 `dist/server/main.js`，检查静态 SPA 与 CSP、未认证请求 401、Owner API 认证、WebSocket 事件流、消息持久化、退出后的重启恢复与 `room.sqlite` 的 `user_version=8`。Windows 上外部终止不会触发 Node 信号处理器，因此脚本验证“终止后重新启动可恢复”（含陈旧锁处理），而 POSIX 上验证优雅退出。报告写入 `.state/production-smoke/latest.json`；不调用模型。
 
 `npm run test:preflight` 按固定顺序串联发布前无模型检查：`typecheck → npm test → check:secrets → build → test:sdk → test:browser → test:production`，任一失败即中止并写入 `.state/preflight/latest.json`；可用 `--skip-browser` / `--skip-sdk` 跳过慢检查，`--with-native` 追加 `test:connectors` 与 `test:sandbox`（原生检查依赖 Windows 环境）。它不替代用户显式运行的付费真实 Agent 场景验收。
 
@@ -294,3 +294,5 @@ SQLite 使用 WAL，触发事件、上下文快照与入队工作在同一事务
 当前并行协作开发版数据库为 v5：运行 generation/executionId 隔离、执行租约与 Room 写工具操作账本已接入。`npm run test:fencing-native` 在全新临时目录内用真实 AppContainer 和 MCP 管道验证旧进程拒写，不调用模型；证据索引为 `.state/fencing-native-probes/latest.json`。完整状态与剩余范围见上述实施记录。
 
 开发版支持独立的持久草稿视图、final supersedes 链与 superseded 运行终态。普通历史消息保留当前工作；新的点名请求可替代该成员旧聊天任务，代码任务与讨论通过各自的修改目标/停止操作控制。数据库 v5 会阻止不理解这些状态的旧版本打开数据。
+
+开发版 v8 为原生执行增加持久意图与工具回执：同一上下文输入有未确认记录时不会再次启动；运行详情区分 Room 操作与原生通知。已有 Codex 后端可通过只读完整历史核对旧回执；这不代表所有 CLI 工具都有执行前拦截，也不会自动开启原生命令重试。详见 [并行协作实施记录](docs/AGENT-PARALLEL-PROGRESS.md)。

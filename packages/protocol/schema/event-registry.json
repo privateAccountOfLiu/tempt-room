@@ -457,6 +457,16 @@
     ]
   },
   {
+    "type": "operation.reconciled",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "operation",
+    "schemaVersion": 1,
+    "kinds": [
+      "operation.reconciled"
+    ]
+  },
+  {
     "type": "artifact.created",
     "durability": "durable",
     "aggregate": "artifact",

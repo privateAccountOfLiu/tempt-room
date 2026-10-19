@@ -61,6 +61,71 @@
           "const": "unknown"
         },
         "result": {},
+        "native": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "type": "string",
+              "enum": [
+                "codex",
+                "claude",
+                "deepseek"
+              ]
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "execution",
+                "tool"
+              ]
+            },
+            "evidence": {
+              "type": "string",
+              "enum": [
+                "execution-intent",
+                "provider-notification"
+              ]
+            },
+            "inputId": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64
+            },
+            "kind": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "clientUserMessageId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "sessionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "turnId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "itemId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          },
+          "required": [
+            "provider",
+            "scope",
+            "evidence",
+            "inputId",
+            "kind"
+          ],
+          "additionalProperties": false
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time",

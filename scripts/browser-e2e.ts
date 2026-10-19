@@ -13,6 +13,8 @@ import WebSocket from 'ws';
 import {contextDelta,advanceContext} from '../apps/server/src/context-reconciliation.ts';
 import {createApp} from '../apps/server/src/app.ts';
 import {issueAgentToken} from '../apps/server/src/agent-tokens.ts';
+import {NativeOperations} from '../apps/server/src/native-operations.ts';
+import {executionFence} from '../apps/server/src/execution.ts';
 
 interface StepReport { name: string; at: string; detail?: Record<string, unknown> }
 interface CdpReply { id?: number; result?: Record<string, any>; error?: { message: string }; method?: string; params?: Record<string, any> }
@@ -353,9 +355,9 @@ try {
     await evaluate("(()=>{const details=document.querySelector('.usage-history');if(details)details.open=true;return !!details;})()");
     const detailClicked = await evaluate("(()=>{const button=[...document.querySelectorAll('.usage-history button')].find(item=>(item.textContent??'').includes('详情'));if(!button)return false;button.click();return true;})()");
     if (!detailClicked) fail('找不到运行详情入口');
-    await waitFor('运行详情', async () => { const text = await bodyText(); return text.includes('运行详情') && text.includes('Room 工具操作'); }, 10000);
+    await waitFor('运行详情', async () => { const text = await bodyText(); return text.includes('运行详情') && text.includes('执行与工具操作'); }, 10000);
     await evaluate("(()=>{const button=[...document.querySelectorAll('dialog.modal button')].find(item=>(item.textContent??'').trim()==='关闭');if(button)button.click();return !!button;})()");
-    await waitFor('关闭运行详情', async () => !(await bodyText()).includes('Room 工具操作'), 10000);
+    await waitFor('关闭运行详情', async () => !(await bodyText()).includes('执行与工具操作'), 10000);
     step('run-detail-modal');
 
     const newRoomName = `浏览器新房间 ${Date.now()}`;
@@ -567,6 +569,28 @@ try {
     await waitFor('旧目标草稿保留并显示替代状态',async()=>await evaluate(`document.querySelector('.run-draft')?.textContent.includes('SUPERSEDED_DRAFT_01')&&document.querySelector('.run-draft')?.textContent.includes('已被新目标替代')`),15000);
     const draftShot=await send('Page.captureScreenshot',{format:'png'},sessionId);const draftShotPath=join(runDir,'partial-drafts.png');writeFileSync(draftShotPath,Buffer.from(draftShot.data,'base64'));report.screenshots.push(draftShotPath);
     step('superseded-draft-preserved',{screenshot:draftShotPath});
+
+    // Display-only native evidence fixture. No native agent is enabled or launched.
+    const evidenceStore=appHandle.store,evidenceWorker=appHandle.worker;
+    let evidenceRunId='';
+    evidenceStore.atomic(()=>{
+      const queued=appHandle!.service.enqueue(draftRoom,'demo-planner','NATIVE_RECEIPT_UI_FIXTURE',evidenceStore.room(draftRoom)!.seq,{effectScope:'unrestricted'});
+      evidenceRunId=queued.id;
+      const binding={transport:'control-socket' as const,endpoint:join(stateRoot,'display-only.sock'),credentialEnv:'',threadId:'display-only-thread',expectedCwd:stateRoot};
+      const run={...queued,status:'running' as const,executionId:'browser_native_evidence',codex:{binding,clientUserMessageId:`tempt_room_${queued.id}_g1`,nativeTurnId:'display-only-turn',nativeStatus:'completed' as const,phase:'completed' as const}};evidenceStore.event(draftRoom,'run.started',{id:'system',kind:'system'},{run});
+      const ledger=new NativeOperations(evidenceStore),intent=ledger.begin(executionFence(run),{...evidenceStore.get<any>('agents','demo-planner'),provider:'codex',connectionMode:'attach',codexBinding:binding},run.prompt);
+      ledger.observe(intent,{provider:'codex',kind:'commandExecution',itemId:'ui-command',phase:'started',requestHash:'a'.repeat(64)});ledger.abandon(intent);evidenceWorker.finish(run,'unknown','NATIVE_RECEIPT_UI_FIXTURE');
+    });
+    await waitFor('原生未知回执卡片',async()=>(await bodyText()).includes('NATIVE_RECEIPT_UI_FIXTURE'),10000);
+    const nativeDetail=await evaluate(`(()=>{const card=[...document.querySelectorAll('.run-error')].find(item=>item.textContent.includes('NATIVE_RECEIPT_UI_FIXTURE'));const button=card&&[...card.querySelectorAll('button')].find(item=>item.textContent==='详情');if(!button)return false;button.click();return true;})()`);
+    if(!nativeDetail)fail('找不到原生操作详情');
+    await waitFor('原生意图与回执明确显示未知',async()=>{const text=await bodyText();return text.includes('原生执行意图')&&text.includes('原生工具回执 · commandExecution')&&text.includes('结果未知')&&text.includes('不代表副作用已撤销');},10000);
+    const evidenceShot=await send('Page.captureScreenshot',{format:'png'},sessionId),evidenceShotPath=join(runDir,'native-evidence.png');writeFileSync(evidenceShotPath,Buffer.from(evidenceShot.data,'base64'));report.screenshots.push(evidenceShotPath);
+    new NativeOperations(evidenceStore).reconcileCodex(evidenceStore.get<any>('runs',evidenceRunId),{id:'display-only-turn',status:'completed',itemsView:'full',items:[{id:'ui-command',type:'commandExecution',status:'completed'}]});
+    await waitFor('打开的详情实时更新原生回执',async()=>await evaluate(`(()=>{const modal=document.querySelector('dialog.modal');const text=modal?.querySelector('.run-operations')?.textContent??'';return text.includes('收到回执')&&!text.includes('结果未知');})()`),10000);
+    step('native-evidence-live-refresh');
+    if(await clickByText('dialog.modal button','关闭')!=='ok')fail('无法关闭原生操作详情');
+    step('native-evidence-visible',{screenshot:evidenceShotPath});
 
     // Lost-cookie recovery: clearing the HttpOnly session cookie must show the
     // reconnect screen, and pasting the startup URL/token must restore the app

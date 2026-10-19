@@ -145,12 +145,20 @@ function App(){
   {helpOpen&&<Modal title="快捷键与使用提示" subtitle="键盘优先，也可以随时用鼠标操作。" onClose={()=>setHelpOpen(false)}><div className="shortcut-list"><div><kbd>Enter</kbd><span>发送消息</span></div><div><kbd>Shift</kbd><kbd>Enter</kbd><span>换行</span></div><div><kbd>Ctrl/⌘</kbd><kbd>K</kbd><span>聚焦消息输入框</span></div><div><kbd>Ctrl/⌘</kbd><kbd>/</kbd><span>打开本帮助</span></div><div><kbd>Esc</kbd><span>关闭弹窗或提及菜单</span></div><div><kbd>?</kbd><span>在非输入状态打开帮助</span></div></div><p className="form-note">快捷键不会绕过权限、预算或确认流程；所有实际操作仍受房间设置与安全策略约束。</p><div className="modal-actions"><button className="button primary" onClick={()=>setHelpOpen(false)}>知道了</button></div></Modal>}
   {mobileDetailsOpen&&<MobileDetailsModal agents={agents} tasks={tasks} artifacts={artifacts} runs={runs} discussions={discussions} settings={settings} onClose={()=>setMobileDetailsOpen(false)}/>}
   {discussionDetail&&<DiscussionDetailModal discussion={discussionDetail} agents={agents} runs={runs} messages={messages} onClose={()=>setDiscussionDetailId(undefined)}/>}
-  {runDetail&&<RunDetailModal run={runDetail} agents={agents} onClose={()=>setRunDetailId(undefined)} onRetry={()=>void command('run.retry',{runId:runDetail.id}).then(()=>{setRunDetailId(undefined);notify('已创建重试运行');}).catch(error=>notify((error as Error).message))} onCancel={()=>void command('run.cancel',{runId:runDetail.id}).catch(error=>notify((error as Error).message))}/>}
+  {runDetail&&<RunDetailModal run={runDetail} revision={snapshot?.room.seq??0} agents={agents} onClose={()=>setRunDetailId(undefined)} onRetry={()=>void command('run.retry',{runId:runDetail.id}).then(()=>{setRunDetailId(undefined);notify('已创建重试运行');}).catch(error=>notify((error as Error).message))} onCancel={()=>void command('run.cancel',{runId:runDetail.id}).catch(error=>notify((error as Error).message))}/>}
  </div>;
 }
-function RunDetailModal({run,agents,onClose,onRetry,onCancel}:{run:Run;agents:AgentDescriptor[];onClose:()=>void;onRetry:()=>void;onCancel:()=>void}){
+function RunDetailModal({run,revision,agents,onClose,onRetry,onCancel}:{run:Run;revision:number;agents:AgentDescriptor[];onClose:()=>void;onRetry:()=>void;onCancel:()=>void}){
  const [operations,setOperations]=useState<ToolOperation[]|null>(null);
- useEffect(()=>{let active=true;client.request<ToolOperation[]>(`/api/runs/${encodeURIComponent(run.id)}/operations`).then(value=>{if(active)setOperations(value);}).catch(()=>{if(active)setOperations([]);});return()=>{active=false;};},[run.id]);
+ const currentRevision=useRef(revision);currentRevision.current=revision;
+ useEffect(()=>{
+   let active=true,inFlight=false,loaded=-1;setOperations(null);
+   const refresh=async()=>{if(!active||inFlight||loaded===currentRevision.current)return;inFlight=true;const requested=currentRevision.current;
+     try{const value=await client.request<ToolOperation[]>(`/api/runs/${encodeURIComponent(run.id)}/operations`);if(active){setOperations(value);loaded=requested;}}
+     catch{if(active)setOperations([]);}finally{inFlight=false;}
+   };
+   void refresh();const timer=setInterval(()=>void refresh(),250);return()=>{active=false;clearInterval(timer);};
+ },[run.id]);
  const agent=agents.find(item=>item.id===run.agentId);
  const retryable=['failed','canceled','interrupted','unknown'].includes(run.status);
  const active=!terminalStates.has(run.status);
@@ -166,7 +174,8 @@ function RunDetailModal({run,agents,onClose,onRetry,onCancel}:{run:Run;agents:Ag
    <div className="run-detail-block"><small>提示词</small><pre>{run.prompt}</pre></div>
    {run.error&&<div className="run-detail-block error"><small>错误原文 · {classifyFailure(run.error,run.status).label}</small><pre>{run.error}</pre><p className="muted">{classifyFailure(run.error,run.status).advice}</p></div>}
    <RunSummary run={run}/>
-   <div className="run-detail-block"><div className="form-section-title"><strong>Room 工具操作</strong><small>{operations===null?'读取中…':`${operations.length} 条`}</small></div>{operations?.length?<div className="run-operations">{operations.map(operation=><div key={operation.operationId}><code>{operation.name}</code><span className={`status ${operationStatus(operation.status)}`}>{operation.status}</span><small>{new Date(operation.createdAt).toLocaleTimeString('zh-CN')}</small></div>)}</div>:<p className="muted">{operations===null?'读取中…':'本次运行没有 Room 写工具操作记录。'}</p>}</div>
+   {operations?.some(operation=>operation.native)&&<p className="muted">原生工具回执来自 CLI 通知；执行意图在启动前保存。收到回执不代表副作用已撤销或可以安全重做。</p>}
+   <div className="run-detail-block"><div className="form-section-title"><strong>执行与工具操作</strong><small>{operations===null?'读取中…':`${operations.length} 条`}</small></div>{operations?.length?<div className="run-operations">{operations.map(operation=><div key={operation.id}><code>{operation.native?(operation.native.scope==='execution'?'原生执行意图':'原生工具回执 · '+operation.native.kind):operation.name}</code><span className={`status ${operationStatus(operation.native&&(operation.result as any)?.outcome==='failed'?'unknown':operation.status)}`}>{operation.native?(operation.status==='unknown'?'结果未知':operation.status==='started'?'等待回执':(operation.result as any)?.outcome==='failed'?'失败回执':'收到回执'):operation.status}</span><small>{new Date(operation.createdAt).toLocaleTimeString('zh-CN')}</small></div>)}</div>:<p className="muted">{operations===null?'读取中…':'本次运行没有执行或工具操作记录。'}</p>}</div>
   </div>
   <div className="modal-actions"><button className="button" onClick={onClose}>关闭</button>{active&&<button className="button" onClick={onCancel}>停止运行</button>}{retryable&&<button className="button primary" onClick={onRetry}>重试运行</button>}</div>
  </Modal>;

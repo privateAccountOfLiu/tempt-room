@@ -34,8 +34,8 @@ function mockAcp(signal:AbortSignal,{resume=false,cancel=false}={}){
    if(method==='initialize')return {protocolVersion:1,agentCapabilities:{sessionCapabilities:{resume:true,close:true}}};
    if(['session/new','session/resume'].includes(method))return {sessionId:'s1',configOptions:[model]};
    if(method==='session/prompt'){
-    channel.onFrame?.({method:'session/update',params:{update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Hello'}}}});
-    channel.onFrame?.({id:7,method:'session/request_permission',params:{options:[{kind:'reject_once',optionId:'no'},{kind:'allow_once',optionId:'yes'}]}});
+    channel.onFrame?.({method:'session/update',params:{sessionId:'s1',update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Hello'}}}});
+    channel.onFrame?.({id:7,method:'session/request_permission',params:{sessionId:'s1',options:[{kind:'reject_once',optionId:'no'},{kind:'allow_once',optionId:'yes'}]}});
     if(cancel)return new Promise(resolve=>{finishPrompt=resolve;});
     return {stopReason:'end_turn'};
    }
@@ -63,6 +63,26 @@ test('ACP cancellation sends a protocol notification and waits for the active pr
  while(!mock.calls.some(call=>call.method==='session/prompt'))await new Promise(resolve=>setTimeout(resolve,1));
  controller.abort();await mock.cancel();await rejected;
  assert.equal(mock.calls.at(-1).method,'session/cancel');assert.ok(!mock.calls.some(call=>call.method==='session/close'));
+});
+
+test('ACP ignores foreign session text and tool receipts and declines its permission requests',async()=>{
+  const messages:any[]=[],evidence:any[]=[],replies:any[]=[],channel:AcpChannel={
+    async request(method){
+      if(method==='initialize')return {protocolVersion:1};if(method==='session/new')return {sessionId:'owned'};
+      if(method==='session/prompt'){
+        for(const sessionId of ['foreign','owned']){
+          channel.onFrame!({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:sessionId}}}});
+          for(const status of ['in_progress','completed'])channel.onFrame!({method:'session/update',params:{sessionId,update:{sessionUpdate:'tool_call',toolCallId:'tool',kind:'execute',status,rawInput:{}}}});
+          channel.onFrame!({id:sessionId,method:'session/request_permission',params:{sessionId,options:[{kind:'allow_once',optionId:'allow'}]}});
+        }
+        return {stopReason:'end_turn'};
+      }
+      return {};
+    },async send(){},async reply(id,result){replies.push({id,result});}
+  };
+  await runAcp({channel,workspace:resolve('.'),model:'',prompt:'fixture',mcpServers:[],signal:new AbortController().signal,emit:item=>messages.push(item),onNativeEvidence:item=>evidence.push(item),setCancel(){},onError(error){throw error;}});
+  assert.deepEqual(messages.filter(item=>item.type==='text').map(item=>item.text),['owned']);assert.equal(evidence.length,2);assert.ok(evidence.every(item=>item.sessionId==='owned'));
+  assert.equal(replies.find(item=>item.id==='foreign').result.outcome.outcome,'cancelled');assert.equal(replies.find(item=>item.id==='owned').result.outcome.outcome,'selected');
 });
 test('chat sessions keep cwd stable while new task snapshots and configuration changes get separate scopes',()=>{
  const agent=agentSchema.parse({id:'dsh',name:'DSH',provider:'deepseek'}),run={id:'run1',roomId:'room1',agentId:agent.id} as Run;
