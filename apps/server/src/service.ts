@@ -196,6 +196,25 @@ export class RoomService {
         const roomId = this.requireRoom(command), run = this.store.get<Run>('runs', z.string().parse(p.runId));
         if (!run || run.roomId !== roomId) throw new ProtocolError('not_found', '运行不存在', 404); this.cancel(run); return { runId: run.id, status: run.status };
       }
+      case 'run.retry': {
+        const roomId = this.requireRoom(command), input = payloadSchemas['run.retry'].parse(p), previous = this.store.get<Run>('runs', input.runId);
+        if (!previous || previous.roomId !== roomId) throw new ProtocolError('not_found', '运行不存在', 404);
+        if (!['failed', 'canceled', 'interrupted', 'unknown'].includes(previous.status)) throw new ProtocolError('run_not_retryable', '只有失败、取消、中断或状态待核实的运行可以重试', 409);
+        const agent = this.checkAgent(roomId, previous.agentId);
+        if (agent.connectionMode === 'external') throw new ProtocolError('external_agent', '外部会话的运行不能由服务端重试，请在原会话中处理', 409);
+        if (this.store.list<Run>('runs', roomId).some(run => run.id !== previous.id && run.agentId === previous.agentId && !terminalStates.has(run.status))) throw new ProtocolError('run_active', '该成员仍有进行中的运行，请先等待或停止', 409);
+        if (previous.taskId) {
+          const task = this.store.get<Task>('tasks', previous.taskId);
+          if (!task || task.roomId !== roomId) throw new ProtocolError('not_found', '任务不存在', 404);
+          if (task.version !== previous.taskVersion) throw new ProtocolError('stale_task_version', '任务已改版，请从任务卡重新发起', 409);
+          if (!['failed', 'queued', 'canceled', 'interrupted', 'unknown'].includes(task.status)) throw new ProtocolError('task_not_retryable', '只有失败、取消、中断或排队中的任务可以重试', 409);
+          if (task.status !== 'queued') { task.status = 'queued'; this.store.event(roomId, 'task.updated', actor, { task }, command.commandId); }
+          const next = this.enqueue(roomId, previous.agentId, previous.prompt, this.store.room(roomId)!.seq, { taskId: task.id, taskVersion: task.version });
+          return { runId: next.id, previousRunId: previous.id };
+        }
+        const next = this.enqueue(roomId, previous.agentId, previous.prompt, this.store.room(roomId)!.seq);
+        return { runId: next.id, previousRunId: previous.id };
+      }
       case 'run.input': {
         const roomId = this.requireRoom(command), input = z.object({ runId: z.string(), text: z.string().trim().min(1).max(16000) }).parse(p);
         const run = this.store.get<Run>('runs', input.runId); if (!run || run.roomId !== roomId || run.status !== 'waiting_input') throw new ProtocolError('not_waiting', '运行未等待输入', 409);

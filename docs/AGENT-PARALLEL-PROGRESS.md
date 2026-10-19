@@ -96,7 +96,7 @@
 
 ## 增量：审计导出与 UI 体验
 
-- 新增 owner-only `GET /api/rooms/:id/audit/export`：按事件原样输出 NDJSON（事件 id、seq、type、actor、payload 等），并设置 `application/x-ndjson` 与附件下载名；房间头部新增「导出审计日志」按钮。测试覆盖 owner 下载、未认证 401、NDJSON 可解析与事件字段；自动测试 196/196。
+- 新增 owner-only `GET /api/rooms/:id/audit/export`：按事件原样输出 NDJSON（事件 id、seq、type、actor、payload 等），并设置 `application/x-ndjson` 与附件下载名；房间头部新增「导出审计日志」按钮。测试覆盖 owner 下载、未认证 401、NDJSON 可解析与事件字段；自动测试 198/198。
 - UI 体验：运行用量改为紧凑的两行（用量未返回时不再重复三个“未知”），任务卡操作下拉改为紧凑样式并补 aria-label，房间头部显示“N 进行中”，owner 页脚提高对比度；新增“当前房间 id 写入 URL 查询参数 + 浏览器标签标题显示房间名”的持久化，刷新后保持所选房间。浏览器 E2E 新增 `room-url-and-title-persistence` 与 `usage-tab` 步骤，全量 37/37 通过。
 - 新增右侧「用量」标签：按房间汇总输入/输出 Token、费用估值、已上报/未知运行数，并按 Agent 列出用量；未知提供方不会被当作 0。该面板不强制预算，只提供可解释的成本可见性。
 - 仓库与 CI：`git init -b main` 首个提交 `ced6da3` 纳入全部基线；新增 `.github/workflows/ci.yml`（typecheck、密钥扫描、单元测试、replay 契约、production build，Windows runner）；本地未实际触发 GitHub Actions。
@@ -106,7 +106,14 @@
 - `executionSettingsSchema` 新增 `tokenBudget` 与 `costBudgetUsd`（0=不限），入队时冻结到 `Run.limits`；修改全局设置不影响既有运行。
 - Worker 在每次 usage 上报后按 `usageByGeneration` 汇总已上报 Token/费用，超过冻结预算即以 `BudgetExceeded` 失败结束并保留错误原文；未知用量既不会误触发也不会被当作满足预算。预算检查不依赖 SQLite 回滚，原生进程由现有取消/生成器清理路径处理。
 - 运行设置对话框新增两个上限字段；任务卡与用量面板显示预算；未知提供方仍显示未知。
-- 测试：新增 3 项 `budgetError` 单元测试和 1 项真实 Worker 集成测试（报告超预算后运行 failed、聊天消息不发布）；`npm test` **196/196** 通过，浏览器 E2E 37/37 通过并验证设置对话框存在预算字段。
+- 测试：新增 3 项 `budgetError` 单元测试和 1 项真实 Worker 集成测试（报告超预算后运行 failed、聊天消息不发布）；`npm test` **198/198** 通过，浏览器 E2E 37/37 通过并验证设置对话框存在预算字段。
+
+## 增量：显式失败重试入口
+
+- 新增 owner 命令 `run.retry`：只允许对 failed/canceled/interrupted/unknown 运行重试；外部会话运行拒绝，任务版本必须未变且任务处于 failed/queued/canceled/interrupted/unknown，成员没有其他活动运行；重试创建新运行并保留原运行，明确不会撤销未知外部副作用。
+- 聊天运行按原 prompt 与当前房间水位重新入队；失败任务会被重新置为 queued 并复用同一 task version。
+- 运行错误卡片新增「重试」按钮，带副作用提示文案；命令失败会通过现有 toast 展示。
+- 测试：`tests/run-retry.test.ts` 覆盖聊天重试、活动运行拒绝、任务失败重试与同版本复用；`npm test` **198/198**。
 
 ## 原计划逐项剩余工作
 
@@ -114,7 +121,7 @@ P0 尚未完成：
 
 1. 把可恢复副作用的操作记录扩展到适配器内部的命令执行，区分可证明幂等与结果未知的原生工作；Room 工具 fencing 与账本已完成，不能替代内部 Shell/网络副作用的验收。
 2. 带 generation/租约的崩溃恢复与安全自动重入队。中断标记、generation 撤销与显式重入队事件已具备；必须先解决外部命令副作用不受 SQLite 回滚保护的问题，当前仍不盲目重试状态不明的写运行。
-3. 更多 seq 边界的随机故障注入与并发冲突门禁，并把完整故障与 UI 不变量纳入 CI；本地 CI 配置已添加（`.github/workflows/ci.yml`：typecheck、密钥扫描、196 项测试、replay 契约、构建），尚未在远端实际执行。
+3. 更多 seq 边界的随机故障注入与并发冲突门禁，并把完整故障与 UI 不变量纳入 CI；本地 CI 配置已添加（`.github/workflows/ci.yml`：typecheck、密钥扫描、198 项测试、replay 契约、构建），尚未在远端实际执行。
 
 P1 尚未完成：
 
@@ -122,7 +129,7 @@ P1 尚未完成：
 2. 分桶 EWMA 窗口、quorum、absent/late、partial 超时降级与公平性压测。
 3. 每 Agent 有界增量 inbox、房间待办上限、工具输出上限；大规模基线和上下文的分段/引用，避免重复内联造成日志膨胀。
 4. 时长上限已由 timeout 控制；单次运行 Token/费用硬预算与房间成本看板已实现（未知用量不按 0 计）。入口预算熔断（启动前按历史/房间预算拒绝）仍待实现。
-5. 来源/信任级、工具前策略校验和注入测试，以及可解释错误与重试入口；JSONL 审计导出已实现（`GET /api/rooms/:id/audit/export` + 房间头部下载按钮，192 项测试覆盖），但信任级/注入防护仍未实现。
+5. 来源/信任级、工具前策略校验和注入测试，以及更完整的失败解释与重试入口；JSONL 审计导出与显式 `run.retry` 已实现（198 项测试覆盖），但信任级/注入防护与自动重试策略仍未实现。
 6. 真实 CLI 的混合快慢场景验收仍须与无模型测试分开，不能用模拟结果替代。
 
 P2 尚未完成：

@@ -77,6 +77,7 @@ export const payloadSchemas={
   'task.release':z.object({taskId:idSchema}).strict(),
   'settings.update':executionSettingsSchema.extend({contextPolicy:contextPolicySchema.optional()}),
   'run.cancel':z.object({runId:idSchema}).strict(),
+  'run.retry':z.object({runId:idSchema}).strict(),
   'run.input':z.object({runId:idSchema,text:z.string().trim().min(1).max(16000)}).strict(),
   'decision.propose':z.object({text:title}).strict(),
   'decision.accept':z.object({decisionId:idSchema}).strict(),

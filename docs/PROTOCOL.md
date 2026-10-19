@@ -47,7 +47,7 @@ JSON Schema 是命令形状的权威来源：`packages/protocol/schema/*.schema.
 - `task.accept`：taskId、可选 projectPath，仅人类确认 proposed 任务；确认不额外递增版本。
 - `task.handoff`：taskId、agentId、可选 note，仅人类；把任务转交给同房间另一个已启用 Agent，递增该任务及全部下游版本、取消旧运行并标记旧发言，再重新排队已接受任务；未接受提案不自动执行。Agent 侧可用 `task_propose` 携带 `dependencies` 提议后继任务（仍需人类确认）。
 - `settings.update`：完整运行设置 concurrency、memoryMb、maxProcesses、taskTimeoutMs、chatTimeoutMs、taskLeaseMs、tokenBudget、costBudgetUsd。仅人类可修改；缺省值由 Schema 给定，属于替换语义。`taskLeaseMs` 控制外部任务认领的租约时长（默认 600000ms），过期且无托管运行的任务会被回收为开放任务。`tokenBudget`/`costBudgetUsd` 为单次运行的硬预算，0 表示不限，创建运行时冻结到 Run.limits。
-- `run.cancel`：runId；`run.input`：runId、text，只用于 waiting_input 状态。
+- `run.cancel`：runId；`run.input`：runId、text，只用于 waiting_input 状态；`run.retry`：runId，只允许 owner 对 failed/canceled/interrupted/unknown 运行显式创建新运行，任务必须仍为同一版本且处于 failed/queued/canceled/interrupted/unknown，且该成员没有其他活动运行。重试不会撤销原运行已产生的外部副作用。
 - `decision.propose`：text；`decision.accept`：decisionId，人类确认后才进入后续授权上下文。
 - `agent.save`：完整 AgentDescriptor，不含密钥值。`connectionMode` 默认为 `managed`；设为 `external` 后，提及只记录 `agent.wake.requested`，分派任务等待外部成员主动认领，不创建托管 Run。外部成员只能 managed=false 认领同房间开放任务，或明确分给自己的 queued 任务；依赖必须已完成。当前自动讨论不支持外部成员。
 - `artifact.apply`：artifactId，人类显式应用当前已完成版本的 patch。旧版本返回 409 stale_artifact，依赖版本或完成状态变化返回 409 stale_dependency，运行未成功结束返回 409 run_not_completed，已应用返回 409 already_applied。相同 commandId 的成功重试返回原回执，不再次写文件。
@@ -109,7 +109,7 @@ JSON Schema 是命令形状的权威来源：`packages/protocol/schema/*.schema.
 
 普通消息仅进入历史。人类 mentions 唤醒被点名的启用成员。Agent 的 mentions 可表达协作意图，不直接产生无限级联；有界讨论由调度器按共同快照安排下一轮。每个 room/agent 会话串行，全局默认并发 2。Agent 提议的任务等人类确认。
 
-Run：queued → running → completed/failed；可进入 waiting_input，再由 run.input 回到 running。取消运行先进入 cancel_requested；确认 Job 无活动进程或远程任务明确 CANCELED 后才进入 canceled。远程 API 断流可能仍在计算，使用 interrupted 并说明不确定性；失去沙箱进程退出证明使用 unknown。终态不会被普通重试重新执行。
+Run：queued → running → completed/failed；可进入 waiting_input，再由 run.input 回到 running。取消运行先进入 cancel_requested；确认 Job 无活动进程或远程任务明确 CANCELED 后才进入 canceled。远程 API 断流可能仍在计算，使用 interrupted 并说明不确定性；失去沙箱进程退出证明使用 unknown。终态不会被隐式重试；owner 可显式 `run.retry` 创建新运行，但这不会自动重做状态未知的外部副作用。
 
 同一轮必须所有参与者完成，才安排下一轮；任一失败则停止讨论。响应、轮次或时间任一达到用户选择的上限即结束。任务依赖未完成时不启动；失败依赖阻断下游。修改目标会递增该任务及受影响下游的 taskVersion，取消旧运行；已确认任务重新排队，提议保持待确认。旧版本输出保留但不能应用。
 
