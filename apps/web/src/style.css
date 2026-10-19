@@ -103,3 +103,16 @@
 .room-search::placeholder{color:#5d6c54}
 .room-search:focus{border-color:#52683f;outline:none}
 .room-search-empty{font-size:9px;color:#6e7c64;padding:6px 8px}
+/* Mobile collaboration panel: desktop uses the right rail, narrow screens use this modal. */
+.mobile-only{display:none}
+@media(max-width:900px){.mobile-only{display:inline-flex}}
+.mobile-details{display:flex;flex-direction:column;gap:14px;max-height:62vh;overflow:auto;padding-right:3px;min-width:min(420px,76vw)}
+.mobile-details section{border-bottom:1px solid #2a3425;padding-bottom:10px}
+.mobile-details h3{font-size:11px;font-weight:500;color:#c8d6bd;margin:0 0 8px;display:flex;justify-content:space-between}
+.mobile-details h3 small{font-size:9px;color:#778769;font-weight:400}
+.mobile-members{display:flex;flex-wrap:wrap;gap:8px}
+.mobile-members>span{display:flex;align-items:center;gap:5px;font-size:10px;color:#aebb9f}
+.mobile-members .avatar{width:22px;height:22px;font-size:8px;border-radius:6px}
+.mobile-row{display:flex;align-items:center;gap:7px;padding:5px 0;font-size:10px;color:#b9c8ad;min-width:0}
+.mobile-row strong{font-weight:400;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mobile-row small{font-size:8px;color:#718264;white-space:nowrap}

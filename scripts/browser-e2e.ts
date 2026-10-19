@@ -606,6 +606,17 @@ try {
     if (mobileState.detailsDisplay !== 'none') fail('移动端仍显示右侧详情面板');
     if (!mobileState.composer) fail('移动端缺少消息输入框');
     if (mobileState.overflow) fail('移动端出现水平溢出');
+    const mobilePanelOpened = await evaluate("(()=>{const button=document.querySelector('button[aria-label=\"打开协作面板\"]');if(!button)return false;button.click();return true;})()");
+    if (!mobilePanelOpened) fail('找不到移动端协作面板入口');
+    await waitFor('移动端协作面板', async () => { const text = await bodyText(); return text.includes('协作面板') && text.includes('交付物'); }, 10000);
+    const mobilePanelShot = await send('Page.captureScreenshot', {format: 'png'}, sessionId);
+    const mobilePanelShotPath = join(runDir, 'ui-mobile-panel.png');
+    writeFileSync(mobilePanelShotPath, Buffer.from(mobilePanelShot.data, 'base64'));
+    report.screenshots.push(mobilePanelShotPath);
+    await evaluate("(()=>{const button=[...document.querySelectorAll('dialog.modal button')].find(item=>(item.textContent??'').trim()==='关闭');if(button)button.click();return !!button;})()");
+    await waitFor('关闭移动端协作面板', async () => !(await bodyText()).includes('移动端的任务、成果、讨论和用量'), 10000);
+    step('mobile-collaboration-panel', {path: mobilePanelShotPath});
+
     const mobileShot = await send('Page.captureScreenshot', {format: 'png'}, sessionId);
     const mobileShotPath = join(runDir, 'ui-mobile.png');
     writeFileSync(mobileShotPath, Buffer.from(mobileShot.data, 'base64'));

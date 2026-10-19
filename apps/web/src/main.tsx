@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RoomClient } from '../../../packages/client/src/index.ts';
-import { VERSION,agentSchema,executionSettingsSchema,classifyFailure, type AgentDescriptor, type Artifact, type Diagnostic, type Discussion, type ExecutionSettings,type Message, type Room, type RoomSnapshot, type Run, type ToolOperation, terminalStates } from '../../../packages/protocol/src/index.ts';
+import { VERSION,agentSchema,executionSettingsSchema,classifyFailure, type AgentDescriptor, type Artifact, type Diagnostic, type Discussion, type Task, type ExecutionSettings,type Message, type Room, type RoomSnapshot, type Run, type ToolOperation, terminalStates } from '../../../packages/protocol/src/index.ts';
 import './style.css';
 import './settings.css';
 import {runDrafts,appendDraftStream,type DraftStream} from './run-drafts.ts';
@@ -43,6 +43,7 @@ function App(){
  const [runDetailId,setRunDetailId]=useState<string>();
  const [discussionDetailId,setDiscussionDetailId]=useState<string>();
  const [helpOpen,setHelpOpen]=useState(false);
+ const [mobileDetailsOpen,setMobileDetailsOpen]=useState(false);
  const [roomQuery,setRoomQuery]=useState('');
  const [streaming,setStreaming]=useState<Record<string,DraftStream>>({}),[sandbox,setSandbox]=useState<Diagnostic>(),[probing,setProbing]=useState(false);
  const messagesEnd=useRef<HTMLDivElement>(null),fileInput=useRef<HTMLInputElement>(null),textarea=useRef<HTMLTextAreaElement>(null),generation=useRef(0),pendingSend=useRef<{body:string;id:string}|undefined>(undefined);
@@ -101,7 +102,7 @@ function App(){
    <footer className="owner"><Avatar human/><div><strong>我的工作空间</strong><small>仅本机可访问</small></div><span className={`tiny-dot ${connected?'online':''}`}/></footer>
   </aside>
   <main className="room-main">
-   <header className="room-header"><div className="room-title"><span className="room-icon"><Icon name="chat" size={21}/></span><div><h1>{snapshot?.room.name??'正在打开房间'}</h1><p>{snapshot?.room.description||'人和 Agent 的共同工作空间'}</p></div></div><div className="header-actions">{activeRuns.length>0&&<span className="header-activity" title="当前有排队或运行中的 Agent 工作"><span className="tiny-dot working"/>{activeRuns.length} 进行中</span>}<span className="connection"><span className={`tiny-dot ${connected?'online':''}`}/>{connected?'实时连接':hasConnected?'重新连接中':'正在连接'}</span><button className="icon-button" aria-label="导出审计日志" title="导出本房间事件日志（JSONL）" onClick={()=>void exportAudit()}><Icon name="download" size={17}/></button><button className="icon-button" aria-label="房间设置" onClick={()=>setDialog('room-settings')}><Icon name="settings"/></button></div></header>
+   <header className="room-header"><div className="room-title"><span className="room-icon"><Icon name="chat" size={21}/></span><div><h1>{snapshot?.room.name??'正在打开房间'}</h1><p>{snapshot?.room.description||'人和 Agent 的共同工作空间'}</p></div></div><div className="header-actions">{activeRuns.length>0&&<span className="header-activity" title="当前有排队或运行中的 Agent 工作"><span className="tiny-dot working"/>{activeRuns.length} 进行中</span>}<span className="connection"><span className={`tiny-dot ${connected?'online':''}`}/>{connected?'实时连接':hasConnected?'重新连接中':'正在连接'}</span><button className="icon-button mobile-only" aria-label="打开协作面板" onClick={()=>setMobileDetailsOpen(true)}><Icon name="grid" size={17}/></button><button className="icon-button" aria-label="导出审计日志" title="导出本房间事件日志（JSONL）" onClick={()=>void exportAudit()}><Icon name="download" size={17}/></button><button className="icon-button" aria-label="房间设置" onClick={()=>setDialog('room-settings')}><Icon name="settings"/></button></div></header>
    <div className="room-toolbar"><div className="member-stack">{agents.slice(0,4).map(a=><Avatar key={a.id} agent={a}/>)}<span>{agents.length} 位 Agent · 你</span></div><div className="toolbar-actions"><button className="button small" onClick={()=>setDialog('task')}><Icon name="plus" size={15}/>创建任务</button><button className="button primary small" onClick={()=>setDialog('discussion')}><Icon name="play" size={14}/>开启讨论</button></div></div>
    {discussion&&<div className="discussion-banner"><span className="pulse"/><span>讨论进行中 <strong>{discussion.round} / {discussion.rounds} 轮</strong>{discussion.quorum<discussion.participants.length&&<small className="discussion-quorum">Quorum {discussion.quorum}/{discussion.participants.length}</small>}{discussion.absent?.length?<small className="discussion-quorum">缺席 {discussion.absent.map(id=>agents.find(agent=>agent.id===id)?.name??id).join("、")}</small>:null}</span><span className="discussion-goal">{discussion.goal}</span><button onClick={()=>void command('discussion.stop',{discussionId:discussion.id}).catch(e=>notify(e.message))}><Icon name="stop" size={13}/>停止</button></div>}
    <section className="message-list" aria-label="群聊消息" aria-live="polite">
@@ -139,6 +140,7 @@ function App(){
   {dialog==='execution'&&settings&&<ExecutionForm settings={settings} onClose={()=>setDialog(null)} onSave={async value=>{try{await command('settings.update',value);setSettings(value);setDialog(null);notify('运行设置已保存；资源与超时用于新建运行');}catch(error){notify((error as Error).message);}}}/>}
   {preview&&<Modal title={preview.artifact.name} subtitle={`${preview.artifact.kind==='patch'?'代码差异':'交付物'} · ${(preview.artifact.size/1024).toFixed(1)} KB`} onClose={()=>setPreview(undefined)}><div className="artifact-preview">{preview.text!==null?<pre>{preview.text}</pre>:<p>此文件不提供文本预览，可下载查看。</p>}</div><div className="modal-actions"><a className="button" href={`/api/artifacts/${preview.artifact.id}`} download><Icon name="download" size={15}/>下载</a>{preview.artifact.kind==='patch'&&!preview.artifact.applied&&<button className="button primary" onClick={()=>void command('artifact.apply',{artifactId:preview.artifact.id}).then(()=>{setPreview(undefined);notify('成果已应用到原项目');}).catch(e=>notify(e.message))}><Icon name="check" size={15}/>应用到原项目</button>}</div></Modal>}
   {helpOpen&&<Modal title="快捷键与使用提示" subtitle="键盘优先，也可以随时用鼠标操作。" onClose={()=>setHelpOpen(false)}><div className="shortcut-list"><div><kbd>Enter</kbd><span>发送消息</span></div><div><kbd>Shift</kbd><kbd>Enter</kbd><span>换行</span></div><div><kbd>Ctrl/⌘</kbd><kbd>K</kbd><span>聚焦消息输入框</span></div><div><kbd>Ctrl/⌘</kbd><kbd>/</kbd><span>打开本帮助</span></div><div><kbd>Esc</kbd><span>关闭弹窗或提及菜单</span></div><div><kbd>?</kbd><span>在非输入状态打开帮助</span></div></div><p className="form-note">快捷键不会绕过权限、预算或确认流程；所有实际操作仍受房间设置与安全策略约束。</p><div className="modal-actions"><button className="button primary" onClick={()=>setHelpOpen(false)}>知道了</button></div></Modal>}
+  {mobileDetailsOpen&&<MobileDetailsModal agents={agents} tasks={tasks} artifacts={artifacts} runs={runs} discussions={discussions} settings={settings} onClose={()=>setMobileDetailsOpen(false)}/>}
   {discussionDetail&&<DiscussionDetailModal discussion={discussionDetail} agents={agents} runs={runs} messages={messages} onClose={()=>setDiscussionDetailId(undefined)}/>}
   {runDetail&&<RunDetailModal run={runDetail} agents={agents} onClose={()=>setRunDetailId(undefined)} onRetry={()=>void command('run.retry',{runId:runDetail.id}).then(()=>{setRunDetailId(undefined);notify('已创建重试运行');}).catch(error=>notify((error as Error).message))} onCancel={()=>void command('run.cancel',{runId:runDetail.id}).catch(error=>notify((error as Error).message))}/>}
  </div>;
@@ -164,6 +166,18 @@ function RunDetailModal({run,agents,onClose,onRetry,onCancel}:{run:Run;agents:Ag
    <div className="run-detail-block"><div className="form-section-title"><strong>Room 工具操作</strong><small>{operations===null?'读取中…':`${operations.length} 条`}</small></div>{operations?.length?<div className="run-operations">{operations.map(operation=><div key={operation.operationId}><code>{operation.name}</code><span className={`status ${operationStatus(operation.status)}`}>{operation.status}</span><small>{new Date(operation.createdAt).toLocaleTimeString('zh-CN')}</small></div>)}</div>:<p className="muted">{operations===null?'读取中…':'本次运行没有 Room 写工具操作记录。'}</p>}</div>
   </div>
   <div className="modal-actions"><button className="button" onClick={onClose}>关闭</button>{active&&<button className="button" onClick={onCancel}>停止运行</button>}{retryable&&<button className="button primary" onClick={onRetry}>重试运行</button>}</div>
+ </Modal>;
+}
+function MobileDetailsModal({agents,tasks,artifacts,runs,discussions,settings,onClose}:{agents:AgentDescriptor[];tasks:Task[];artifacts:Artifact[];runs:Run[];discussions:Discussion[];settings?:ExecutionSettings;onClose:()=>void}){
+ return <Modal title="协作面板" subtitle="移动端的任务、成果、讨论和用量" onClose={onClose}>
+  <div className="mobile-details">
+   <section><h3>成员 <small>{agents.length}</small></h3><div className="mobile-members">{agents.map(agent=><span key={agent.id}><Avatar agent={agent}/>{agent.name}</span>)}</div></section>
+   <section><h3>任务 <small>{tasks.length}</small></h3>{tasks.length?tasks.slice(-8).reverse().map(task=><div className="mobile-row" key={task.id}><span className={`status ${task.status}`}>{statusLabels[task.status]??task.status}</span><strong>{task.title}</strong><small>v{task.version}</small></div>):<p className="muted">还没有任务。</p>}</section>
+   <section><h3>交付物 <small>{artifacts.length}</small></h3>{artifacts.length?artifacts.slice(-8).reverse().map(artifact=><div className="mobile-row" key={artifact.id}><strong>{artifact.name}</strong><small>{artifact.kind} · {(artifact.size/1024).toFixed(1)} KB</small></div>):<p className="muted">还没有交付物。</p>}</section>
+   <section><h3>讨论 <small>{discussions.length}</small></h3>{discussions.length?discussions.slice(-5).reverse().map(item=><div className="mobile-row" key={item.id}><strong>{item.goal}</strong><small>{item.round}/{item.rounds} 轮 · Quorum {item.quorum}/{item.participants.length}</small></div>):<p className="muted">还没有讨论。</p>}</section>
+   <section><h3>用量</h3><UsagePanel runs={runs} agents={agents} settings={settings}/></section>
+  </div>
+  <div className="modal-actions"><button className="button" onClick={onClose}>关闭</button></div>
  </Modal>;
 }
 function DiscussionDetailModal({discussion,agents,runs,messages,onClose}:{discussion:Discussion;agents:AgentDescriptor[];runs:Run[];messages:Message[];onClose:()=>void}){
