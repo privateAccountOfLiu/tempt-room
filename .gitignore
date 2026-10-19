@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.state/
+.cache/
+*.tsbuildinfo
+sandbox/**/bin/
+sandbox/**/obj/
+packages/*/dist/
+.env
+.env.*
+!.env.example
+
+# Local Claude Code project MCP config contains a room-scoped token
+.mcp.json
+.claude/

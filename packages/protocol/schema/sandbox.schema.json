@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "windows-appcontainer"
+    },
+    "network": {
+      "type": "string",
+      "const": "public-only"
+    },
+    "memoryMb": {
+      "type": "integer",
+      "minimum": 256,
+      "maximum": 16384
+    },
+    "maxProcesses": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 128
+    },
+    "timeoutMs": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 7200000
+    },
+    "relaxedTools": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "kind",
+    "network",
+    "memoryMb",
+    "maxProcesses",
+    "timeoutMs",
+    "relaxedTools"
+  ],
+  "additionalProperties": false
+}

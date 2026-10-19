@@ -1,0 +1,489 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "run": {
+      "type": "object",
+      "properties": {
+        "usageByGeneration": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "inputTokens": {
+                "type": "number",
+                "minimum": 0
+              },
+              "outputTokens": {
+                "type": "number",
+                "minimum": 0
+              },
+              "costUsd": {
+                "type": "number",
+                "minimum": 0
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "run",
+                  "last-request",
+                  "session-total"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "contextPolicy": {
+          "type": "object",
+          "properties": {
+            "maxLag": {
+              "default": 64,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000
+            },
+            "maxRounds": {
+              "default": 3,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 12
+            },
+            "maxDeltaBytes": {
+              "default": 262144,
+              "type": "integer",
+              "minimum": 4096,
+              "maximum": 1048576
+            }
+          },
+          "required": [
+            "maxLag",
+            "maxRounds",
+            "maxDeltaBytes"
+          ],
+          "additionalProperties": false
+        },
+        "contextSeq": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "deltaContextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "contextRound": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "contextPending": {
+          "type": "boolean"
+        },
+        "contextConfirmedSeq": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "lifecycleVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "partial": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "messageId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 65536,
+              "x-maxUtf8Bytes": 65536
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "streamIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "supersedes": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "truncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "messageId",
+            "text",
+            "createdAt",
+            "streamIndex",
+            "truncated"
+          ],
+          "additionalProperties": false
+        },
+        "finalMessageId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "stopReason": {
+          "type": "string",
+          "enum": [
+            "superseded",
+            "user_cancel"
+          ]
+        },
+        "generation": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "executionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "leaseUntil": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "roomId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "agentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "status": {
+          "type": "string",
+          "const": "superseded"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "basedOnSeq": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "memoryMb": {
+              "type": "integer",
+              "minimum": 256,
+              "maximum": 16384
+            },
+            "maxProcesses": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 128
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 7200000
+            }
+          },
+          "required": [
+            "memoryMb",
+            "maxProcesses",
+            "timeoutMs"
+          ],
+          "additionalProperties": false
+        },
+        "inputArtifacts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          }
+        },
+        "dependencyVersions": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "taskId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "discussionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "round": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "taskVersion": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "nativeSessionId": {
+          "type": "string"
+        },
+        "codex": {
+          "type": "object",
+          "properties": {
+            "binding": {
+              "type": "object",
+              "properties": {
+                "transport": {
+                  "type": "string",
+                  "enum": [
+                    "websocket",
+                    "control-socket"
+                  ]
+                },
+                "endpoint": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                },
+                "credentialEnv": {
+                  "default": "",
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[A-Z][A-Z0-9_]*$"
+                    },
+                    {
+                      "type": "string",
+                      "const": ""
+                    }
+                  ]
+                },
+                "threadId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[a-zA-Z0-9_-]+$"
+                },
+                "expectedCwd": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1500
+                }
+              },
+              "required": [
+                "transport",
+                "endpoint",
+                "credentialEnv",
+                "threadId",
+                "expectedCwd"
+              ],
+              "additionalProperties": false
+            },
+            "version": {
+              "type": "string"
+            },
+            "executable": {
+              "type": "string"
+            },
+            "clientUserMessageId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "queuedSubmissionId": {
+              "type": "string"
+            },
+            "nativeTurnId": {
+              "type": "string"
+            },
+            "nativeStatus": {
+              "type": "string",
+              "enum": [
+                "inProgress",
+                "completed",
+                "failed",
+                "interrupted"
+              ]
+            },
+            "phase": {
+              "type": "string",
+              "enum": [
+                "prepared",
+                "queued",
+                "running",
+                "uncertain",
+                "completed",
+                "canceled"
+              ]
+            }
+          },
+          "required": [
+            "binding",
+            "clientUserMessageId",
+            "phase"
+          ],
+          "additionalProperties": false
+        },
+        "remoteTaskId": {
+          "type": "string"
+        },
+        "sandbox": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "windows-appcontainer"
+            },
+            "network": {
+              "type": "string",
+              "const": "public-only"
+            },
+            "memoryMb": {
+              "type": "integer",
+              "minimum": 256,
+              "maximum": 16384
+            },
+            "maxProcesses": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 128
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 7200000
+            },
+            "relaxedTools": {
+              "type": "boolean"
+            },
+            "verifiedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            }
+          },
+          "required": [
+            "kind",
+            "network",
+            "memoryMb",
+            "maxProcesses",
+            "timeoutMs",
+            "relaxedTools",
+            "verifiedAt"
+          ],
+          "additionalProperties": false
+        },
+        "error": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        },
+        "usage": {
+          "type": "object",
+          "properties": {
+            "inputTokens": {
+              "type": "number",
+              "minimum": 0
+            },
+            "outputTokens": {
+              "type": "number",
+              "minimum": 0
+            },
+            "costUsd": {
+              "type": "number",
+              "minimum": 0
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "run",
+                "last-request",
+                "session-total"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "roomId",
+        "agentId",
+        "status",
+        "prompt",
+        "basedOnSeq",
+        "createdAt",
+        "updatedAt"
+      ],
+      "additionalProperties": {}
+    }
+  },
+  "required": [
+    "run"
+  ],
+  "additionalProperties": {}
+}

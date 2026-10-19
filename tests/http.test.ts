@@ -1,0 +1,83 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdirSync,mkdtempSync,rmSync } from 'node:fs';
+import { resolve,join } from 'node:path';
+import { createApp } from '../apps/server/src/app.ts';
+import { RoomClient } from '../packages/client/src/index.ts';
+
+test('local HTTP enforces origin, host, auth, version and server-owned identity',async t=>{
+ const base=resolve('.state/test-data');mkdirSync(base,{recursive:true});const root=mkdtempSync(join(base,'http-'));
+ const {app,store}=await createApp({root,token:'test-token',startWorker:false});t.after(async()=>{await app.close();assert.ok(root.startsWith(base));rmSync(root,{recursive:true,force:true});});
+ const headers={host:'127.0.0.1:4317',authorization:'Bearer test-token','room-protocol-version':'0.1'};
+ assert.equal((await app.inject({url:'/api/rooms',headers:{host:headers.host}})).statusCode,401);
+ assert.equal((await app.inject({url:'/api/rooms',headers:{...headers,host:'evil.example'}})).statusCode,403);
+ assert.equal((await app.inject({url:'/api/rooms',headers:{...headers,origin:'https://evil.example'}})).statusCode,403);
+ assert.equal((await app.inject({url:'/api/rooms',headers:{...headers,'room-protocol-version':'0.3'}})).statusCode,426);
+ const rooms=await app.inject({url:'/api/rooms',headers});assert.equal(rooms.statusCode,200);const roomId=rooms.json()[0].id;
+ const capabilities=await app.inject({url:'/api/capabilities',headers:{...headers,'room-client-type':'sdk'}});assert.equal(capabilities.statusCode,200);assert.equal(capabilities.json().actor.id,'owner');assert.ok(capabilities.json().commands.includes('task.accept'));
+ assert.equal((await app.inject({url:'/api/capabilities',headers:{...headers,'room-client-type':'agent'}})).statusCode,400);
+ const command={version:'0.1',commandId:'message1',roomId,type:'message.send',payload:{text:'Hello'}};
+ const created=await app.inject({method:'POST',url:'/api/commands',headers,payload:command});assert.equal(created.statusCode,200);
+ const snapshot=(await app.inject({url:`/api/rooms/${roomId}`,headers})).json();assert.equal(snapshot.messages.at(-1).actor.id,'owner');
+ const forged=await app.inject({method:'POST',url:'/api/commands',headers,payload:{...command,commandId:'forged',actor:{id:'codex',kind:'agent'}}});assert.equal(forged.statusCode,400);
+ const session=await app.inject({method:'POST',url:'/api/session',headers:{host:headers.host,origin:'http://127.0.0.1:4317'},payload:{token:'test-token'}});assert.equal(session.statusCode,200);assert.match(String(session.headers['set-cookie']),/HttpOnly/);assert.match(String(session.headers['set-cookie']),/SameSite=Strict/);assert.match(String(session.headers['set-cookie']),/Max-Age=2592000/);
+});
+test('demo workers produce persistent messages and finish a bounded discussion',async t=>{
+ const base=resolve('.state/test-data');mkdirSync(base,{recursive:true});const root=mkdtempSync(join(base,'worker-'));
+ const {app,store,service}=await createApp({root,token:'test'});t.after(async()=>{await app.close();assert.ok(root.startsWith(base));rmSync(root,{recursive:true,force:true});});
+ const roomId=store.rooms()[0].id;service.execute({version:'0.1',commandId:'discussion1',roomId,type:'discussion.start',payload:{goal:'demo',participants:['demo-planner','demo-reviewer'],rounds:1}});
+ const deadline=Date.now()+15000;while(Date.now()<deadline&&store.list<any>('discussions')[0].status==='active')await new Promise(r=>setTimeout(r,50));
+ assert.equal(store.list<any>('discussions')[0].status,'completed');assert.equal(store.list<any>('runs').length,2);assert.ok(store.list<any>('messages').some(m=>m.actor.kind==='agent'));assert.ok(store.list<any>('messages').every(m=>m.actor.kind!=='agent'||m.text.includes('确定性演示')));
+});
+
+test('independent local instances keep distinct HTTP and WebSocket cookies, including after a restart',async t=>{
+ const base=resolve('.state/test-data');mkdirSync(base,{recursive:true});const root=mkdtempSync(join(base,'sessions-'));
+ const firstRoot=join(root,'first'),secondRoot=join(root,'second');
+ const first=await createApp({root:firstRoot,token:'first-token',startWorker:false}),second=await createApp({root:secondRoot,token:'second-token',startWorker:false});
+ let restarted:Awaited<ReturnType<typeof createApp>>|undefined,firstClosed=false;const connections:any[]=[];
+ t.after(async()=>{for(const socket of connections)socket.terminate();if(!firstClosed)await first.app.close();await second.app.close();await restarted?.app.close();assert.ok(root.startsWith(base));rmSync(root,{recursive:true,force:true});});
+ const a={host:'127.0.0.1:4317','room-protocol-version':'0.1'},b={host:'127.0.0.1:4318','room-protocol-version':'0.1'};
+ const loginA=await first.app.inject({method:'POST',url:'/api/session',headers:a,payload:{token:'first-token'}});
+ const loginB=await second.app.inject({url:'/enter/second-token',headers:b});
+ const cookieA=String(loginA.headers['set-cookie']).split(';')[0],cookieB=String(loginB.headers['set-cookie']).split(';')[0];
+ assert.equal(loginA.statusCode,200);assert.equal(loginB.statusCode,302);assert.notEqual(cookieA.split('=')[0],cookieB.split('=')[0]);
+ const jar=cookieA+'; '+cookieB;
+ assert.equal((await first.app.inject({url:'/api/rooms',headers:{...a,cookie:jar}})).statusCode,200);
+ assert.equal((await second.app.inject({url:'/api/rooms',headers:{...b,cookie:jar}})).statusCode,200);
+ assert.equal((await first.app.inject({url:'/api/rooms',headers:{...a,cookie:cookieB}})).statusCode,401);
+ assert.equal((await first.app.inject({url:'/api/rooms',headers:{...a,cookie:'room_session=first-token'}})).statusCode,401);
+ await first.app.ready();const socket=await first.app.injectWS('/api/events',{headers:{...a,cookie:jar,'sec-websocket-protocol':'room.v0.1'}});connections.push(socket);
+ const frames:any[]=[];socket.on('message',raw=>frames.push(JSON.parse(raw.toString())));socket.send(JSON.stringify({version:'0.1',roomId:first.store.rooms()[0].id,after:0}));
+ const end=Date.now()+2000;while(!frames.some(frame=>frame.type==='subscribed')&&Date.now()<end)await new Promise(done=>setTimeout(done,10));
+ assert.equal(frames.at(-1)?.type,'subscribed');socket.terminate();
+ await first.app.close();firstClosed=true;restarted=await createApp({root:firstRoot,token:'rotated-token',startWorker:false});
+ assert.equal((await restarted.app.inject({url:'/api/rooms',headers:{...a,cookie:jar}})).statusCode,401);
+ const loginAgain=await restarted.app.inject({method:'POST',url:'/api/session',headers:a,payload:{token:'rotated-token'}}),newCookie=String(loginAgain.headers['set-cookie']).split(';')[0];
+ assert.equal(newCookie.split('=')[0],cookieA.split('=')[0]);
+ const updatedJar=newCookie+'; '+cookieB;
+ assert.equal((await restarted.app.inject({url:'/api/rooms',headers:{...a,cookie:updatedJar}})).statusCode,200);
+ assert.equal((await second.app.inject({url:'/api/rooms',headers:{...b,cookie:updatedJar}})).statusCode,200);
+});
+test('WebSocket replays a contiguous cursor and authenticates external SDK clients',async t=>{
+ const base=resolve('.state/test-data');mkdirSync(base,{recursive:true});const root=mkdtempSync(join(base,'ws-'));
+ const {app,store,service}=await createApp({root,token:'ws-token',startWorker:false});await app.ready();
+ const connections:any[]=[];t.after(async()=>{for(const ws of connections)ws.terminate();await app.close();assert.ok(root.startsWith(base));rmSync(root,{recursive:true,force:true});});
+ const roomId=store.rooms()[0].id,cursor=store.room(roomId)!.seq;
+ service.execute({version:'0.1',commandId:'ws_message',roomId,type:'message.send',payload:{text:'after disconnect'}});
+ const ws=await app.injectWS('/api/events',{headers:{host:'127.0.0.1:4317','sec-websocket-protocol':'room.v0.1, room-token.ws-token'}});connections.push(ws);
+ const frames:any[]=[];ws.on('message',raw=>frames.push(JSON.parse(raw.toString())));ws.send(JSON.stringify({version:'0.1',roomId,after:cursor}));
+ const end=Date.now()+2000;while(!frames.some(f=>f.type==='subscribed')&&Date.now()<end)await new Promise(r=>setTimeout(r,10));
+ assert.equal(frames[0].seq,cursor+1);assert.equal(frames[0].payload.message.text,'after disconnect');assert.equal(frames.at(-1).type,'subscribed');
+ service.execute({version:'0.1',commandId:'live_message',roomId,type:'message.send',payload:{text:'live'}});
+ await new Promise(r=>setTimeout(r,20));assert.equal(frames.at(-1).seq,cursor+2);
+});
+test('trusted SDK retries reuse a receipt and binary downloads retain session authentication',async t=>{
+ const base=resolve('.state/test-data');mkdirSync(base,{recursive:true});const root=mkdtempSync(join(base,'sdk-'));
+ const {app,store}=await createApp({root,token:'sdk-token',startWorker:false});t.after(async()=>{await app.close();assert.ok(root.startsWith(base));rmSync(root,{recursive:true,force:true});});
+ const client=new RoomClient('http://127.0.0.1:4317',{token:'sdk-token',fetch:(async(input:any,init:any)=>{const url=new URL(String(input));const result=await app.inject({method:init?.method??'GET',url:url.pathname+url.search,headers:{host:url.host,...init.headers},payload:init?.body});return new Response(result.body,{status:result.statusCode,headers:{'content-type':'application/json'}});}) as typeof fetch});
+ const negotiated=await client.capabilities();assert.equal(negotiated.clientType,'sdk');assert.equal(negotiated.version,'0.1');assert.deepEqual(negotiated.actor,{id:'owner',kind:'human'});
+ const room=(await client.rooms())[0];const a=await client.command('message.send',{text:'from SDK'},room.id,'sdk_same');const b=await client.command('message.send',{text:'from SDK'},room.id,'sdk_same');assert.deepEqual(a,b);
+ const events=await client.events(room.id);assert.equal(events.at(-1)?.actor.id,'owner');
+ const boundary='room-test-boundary';const upload=await app.inject({method:'POST',url:`/api/rooms/${room.id}/attachments`,headers:{host:'127.0.0.1:4317',authorization:'Bearer sdk-token','room-protocol-version':'0.1','content-type':`multipart/form-data; boundary=${boundary}`},payload:`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="notes.txt"\r\nContent-Type: text/plain\r\n\r\nattachment text\r\n--${boundary}--\r\n`});assert.equal(upload.statusCode,200);
+ const artifact=upload.json();const download=await app.inject({url:`/api/artifacts/${artifact.id}`,headers:{host:'127.0.0.1:4317',authorization:'Bearer sdk-token'}});assert.equal(download.statusCode,200);assert.equal(download.body,'attachment text');assert.equal((await app.inject({url:`/api/artifacts/${artifact.id}`,headers:{host:'127.0.0.1:4317'}})).statusCode,401);
+});

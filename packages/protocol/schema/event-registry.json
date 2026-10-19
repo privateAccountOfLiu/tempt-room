@@ -1,0 +1,699 @@
+[
+  {
+    "type": "room.created",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "room",
+    "schemaVersion": 1,
+    "kinds": [
+      "room.state"
+    ]
+  },
+  {
+    "type": "room.updated",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "room",
+    "schemaVersion": 1,
+    "kinds": [
+      "room.state"
+    ]
+  },
+  {
+    "type": "room.members.updated",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "room",
+    "schemaVersion": 1,
+    "kinds": [
+      "room.members"
+    ]
+  },
+  {
+    "type": "chat.message.created",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "message",
+    "schemaVersion": 1,
+    "kinds": [
+      "message.posted"
+    ]
+  },
+  {
+    "type": "message.posted",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "message",
+    "schemaVersion": 1,
+    "kinds": [
+      "message.posted"
+    ]
+  },
+  {
+    "type": "task.created",
+    "durability": "durable",
+    "aggregate": "task",
+    "projector": "task",
+    "schemaVersion": 1,
+    "kinds": [
+      "task.created"
+    ]
+  },
+  {
+    "type": "task.updated",
+    "durability": "durable",
+    "aggregate": "task",
+    "projector": "task",
+    "schemaVersion": 1,
+    "kinds": [
+      "task.state"
+    ]
+  },
+  {
+    "type": "task.accepted",
+    "durability": "durable",
+    "aggregate": "task",
+    "projector": "task",
+    "schemaVersion": 1,
+    "kinds": [
+      "task.state"
+    ]
+  },
+  {
+    "type": "task.completed",
+    "durability": "durable",
+    "aggregate": "task",
+    "projector": "task",
+    "schemaVersion": 1,
+    "kinds": [
+      "task.state"
+    ]
+  },
+  {
+    "type": "task.state",
+    "durability": "durable",
+    "aggregate": "task",
+    "projector": "task",
+    "schemaVersion": 1,
+    "kinds": [
+      "task.state"
+    ]
+  },
+  {
+    "type": "task.revised",
+    "durability": "durable",
+    "aggregate": "task",
+    "projector": "task",
+    "schemaVersion": 1,
+    "kinds": [
+      "task.version"
+    ]
+  },
+  {
+    "type": "task.version",
+    "durability": "durable",
+    "aggregate": "task",
+    "projector": "task",
+    "schemaVersion": 1,
+    "kinds": [
+      "task.version"
+    ]
+  },
+  {
+    "type": "task.handoff",
+    "durability": "durable",
+    "aggregate": "task",
+    "projector": "task",
+    "schemaVersion": 1,
+    "kinds": [
+      "task.handoff"
+    ]
+  },
+  {
+    "type": "task.claimed",
+    "durability": "durable",
+    "aggregate": "task",
+    "projector": "task",
+    "schemaVersion": 1,
+    "kinds": [
+      "task.claim"
+    ]
+  },
+  {
+    "type": "task.claim",
+    "durability": "durable",
+    "aggregate": "task",
+    "projector": "task",
+    "schemaVersion": 1,
+    "kinds": [
+      "task.claim"
+    ]
+  },
+  {
+    "type": "task.lease_expired",
+    "durability": "durable",
+    "aggregate": "task",
+    "projector": "task",
+    "schemaVersion": 1,
+    "kinds": [
+      "task.lease"
+    ]
+  },
+  {
+    "type": "task.released",
+    "durability": "durable",
+    "aggregate": "task",
+    "projector": "task",
+    "schemaVersion": 1,
+    "kinds": [
+      "task.lease"
+    ]
+  },
+  {
+    "type": "task.lease.renewed",
+    "durability": "durable",
+    "aggregate": "task",
+    "projector": "task",
+    "schemaVersion": 1,
+    "kinds": [
+      "task.lease"
+    ]
+  },
+  {
+    "type": "task.lease",
+    "durability": "durable",
+    "aggregate": "task",
+    "projector": "task",
+    "schemaVersion": 1,
+    "kinds": [
+      "task.lease"
+    ]
+  },
+  {
+    "type": "run.created",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "run",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.queued"
+    ]
+  },
+  {
+    "type": "run.queued",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "run",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.queued"
+    ]
+  },
+  {
+    "type": "run.updated",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "run",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.queued",
+      "run.started",
+      "run.blocked",
+      "run.cancel.requested",
+      "run.completed",
+      "run.failed",
+      "run.cancelled",
+      "run.superseded",
+      "run.interrupted",
+      "run.unknown"
+    ]
+  },
+  {
+    "type": "run.started",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "run",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.started"
+    ]
+  },
+  {
+    "type": "run.blocked",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "run",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.blocked"
+    ]
+  },
+  {
+    "type": "run.completed",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "run",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.completed"
+    ]
+  },
+  {
+    "type": "run.failed",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "run",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.failed"
+    ]
+  },
+  {
+    "type": "run.cancelled",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "run",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.cancelled"
+    ]
+  },
+  {
+    "type": "run.superseded",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "run",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.superseded"
+    ]
+  },
+  {
+    "type": "run.interrupted",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "run",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.interrupted"
+    ]
+  },
+  {
+    "type": "run.unknown",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "run",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.unknown"
+    ]
+  },
+  {
+    "type": "run.cancel.requested",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "run",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.cancel.requested"
+    ]
+  },
+  {
+    "type": "run.recovered",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "run",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.queued",
+      "run.started",
+      "run.blocked",
+      "run.cancel.requested",
+      "run.completed",
+      "run.failed",
+      "run.cancelled",
+      "run.superseded",
+      "run.interrupted",
+      "run.unknown"
+    ]
+  },
+  {
+    "type": "run.requeued",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "run",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.queued"
+    ]
+  },
+  {
+    "type": "run.reconciled",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "run",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.queued",
+      "run.started",
+      "run.blocked",
+      "run.cancel.requested",
+      "run.completed",
+      "run.failed",
+      "run.cancelled",
+      "run.superseded",
+      "run.interrupted",
+      "run.unknown"
+    ]
+  },
+  {
+    "type": "run.partial",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "partial",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.partial"
+    ]
+  },
+  {
+    "type": "run.finalized",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "final",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.finalized"
+    ]
+  },
+  {
+    "type": "run.context.advanced",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "run",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.context.advanced"
+    ]
+  },
+  {
+    "type": "run.context.confirmed",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "context-confirmed",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.context.confirmed"
+    ]
+  },
+  {
+    "type": "run.lease.renewed",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "run",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.lease"
+    ]
+  },
+  {
+    "type": "operation.started",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "operation",
+    "schemaVersion": 1,
+    "kinds": [
+      "operation.started"
+    ]
+  },
+  {
+    "type": "operation.completed",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "operation",
+    "schemaVersion": 1,
+    "kinds": [
+      "operation.completed"
+    ]
+  },
+  {
+    "type": "operation.unknown",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "operation",
+    "schemaVersion": 1,
+    "kinds": [
+      "operation.unknown"
+    ]
+  },
+  {
+    "type": "artifact.created",
+    "durability": "durable",
+    "aggregate": "artifact",
+    "projector": "artifact",
+    "schemaVersion": 1,
+    "kinds": [
+      "artifact.published"
+    ]
+  },
+  {
+    "type": "artifact.published",
+    "durability": "durable",
+    "aggregate": "artifact",
+    "projector": "artifact",
+    "schemaVersion": 1,
+    "kinds": [
+      "artifact.published"
+    ]
+  },
+  {
+    "type": "artifact.applied",
+    "durability": "durable",
+    "aggregate": "artifact",
+    "projector": "artifact",
+    "schemaVersion": 1,
+    "kinds": [
+      "artifact.applied"
+    ]
+  },
+  {
+    "type": "discussion.started",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "discussion",
+    "schemaVersion": 1,
+    "kinds": [
+      "discussion.state"
+    ]
+  },
+  {
+    "type": "discussion.round",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "discussion",
+    "schemaVersion": 1,
+    "kinds": [
+      "discussion.state"
+    ]
+  },
+  {
+    "type": "discussion.scheduled",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "discussion",
+    "schemaVersion": 1,
+    "kinds": [
+      "discussion.state"
+    ]
+  },
+  {
+    "type": "discussion.completed",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "discussion",
+    "schemaVersion": 1,
+    "kinds": [
+      "discussion.state"
+    ]
+  },
+  {
+    "type": "discussion.stopped",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "discussion",
+    "schemaVersion": 1,
+    "kinds": [
+      "discussion.state"
+    ]
+  },
+  {
+    "type": "decision.proposed",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "decision",
+    "schemaVersion": 1,
+    "kinds": [
+      "decision.state"
+    ]
+  },
+  {
+    "type": "decision.accepted",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "decision",
+    "schemaVersion": 1,
+    "kinds": [
+      "decision.state"
+    ]
+  },
+  {
+    "type": "settings.updated",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "settings",
+    "schemaVersion": 1,
+    "kinds": [
+      "settings.updated"
+    ]
+  },
+  {
+    "type": "sandbox.verified",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "sandbox",
+    "schemaVersion": 1,
+    "kinds": [
+      "run.sandbox"
+    ]
+  },
+  {
+    "type": "agent.wake.requested",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "audit",
+    "schemaVersion": 1,
+    "kinds": [
+      "agent.wake.requested"
+    ]
+  },
+  {
+    "type": "agent.configured",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "audit",
+    "schemaVersion": 1,
+    "kinds": [
+      "agent.configured"
+    ]
+  },
+  {
+    "type": "run.tool.completed",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "audit",
+    "schemaVersion": 1,
+    "kinds": [
+      "audit.recorded"
+    ]
+  },
+  {
+    "type": "agent.tool.called",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "audit",
+    "schemaVersion": 1,
+    "kinds": [
+      "audit.recorded"
+    ]
+  },
+  {
+    "type": "room.git.checkpoint",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "audit",
+    "schemaVersion": 1,
+    "kinds": [
+      "audit.recorded"
+    ]
+  },
+  {
+    "type": "audit.recorded",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "audit",
+    "schemaVersion": 1,
+    "kinds": [
+      "audit.recorded"
+    ]
+  },
+  {
+    "type": "projection.checkpoint",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "checkpoint",
+    "schemaVersion": 1,
+    "kinds": [
+      "projection.checkpoint"
+    ]
+  },
+  {
+    "type": "context.captured",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "context",
+    "schemaVersion": 1,
+    "kinds": [
+      "context.captured"
+    ]
+  },
+  {
+    "type": "token.delta",
+    "durability": "ephemeral",
+    "aggregate": "room",
+    "projector": null,
+    "schemaVersion": 1,
+    "kinds": [
+      "token.delta"
+    ]
+  },
+  {
+    "type": "message.delta",
+    "durability": "ephemeral",
+    "aggregate": "room",
+    "projector": null,
+    "schemaVersion": 1,
+    "kinds": [
+      "message.delta"
+    ]
+  },
+  {
+    "type": "typing",
+    "durability": "ephemeral",
+    "aggregate": "room",
+    "projector": null,
+    "schemaVersion": 1,
+    "kinds": [
+      "typing"
+    ]
+  },
+  {
+    "type": "presence",
+    "durability": "ephemeral",
+    "aggregate": "room",
+    "projector": null,
+    "schemaVersion": 1,
+    "kinds": [
+      "presence"
+    ]
+  },
+  {
+    "type": "ack",
+    "durability": "ephemeral",
+    "aggregate": "room",
+    "projector": null,
+    "schemaVersion": 1,
+    "kinds": [
+      "ack"
+    ]
+  }
+]

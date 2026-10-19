@@ -1,0 +1,211 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="1160" viewBox="0 0 1480 1160">
+<rect width="100%" height="100%" fill="#fff"/>
+<text x="40" y="52" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="27" font-weight="600" fill="#172B45">Tempt Room · 当前项目架构</text>
+<text x="40" y="90" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="400" fill="#64748B">以本地源码为准 · Node.js 模块化单体 + 独立 Windows 沙箱宿主  |  2026-10-18 20:30 CST</text>
+<rect x="20" y="120" width="340" height="380" rx="9" fill="#F8FAFC" stroke="#DCE3EC" stroke-width="1.2"/>
+<text x="34" y="144" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="600" fill="#52637B">交互与外部接入</text>
+<rect x="380" y="120" width="700" height="620" rx="9" fill="#F8FAFC" stroke="#DCE3EC" stroke-width="1.2"/>
+<text x="394" y="144" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="600" fill="#52637B">Node.js 24 / Fastify · 同一个应用进程</text>
+<rect x="1100" y="120" width="340" height="620" rx="9" fill="#F8FAFC" stroke="#DCE3EC" stroke-width="1.2"/>
+<text x="1114" y="144" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="600" fill="#52637B">本地状态与文件</text>
+<rect x="20" y="560" width="340" height="180" rx="9" fill="#F8FAFC" stroke="#DCE3EC" stroke-width="1.2"/>
+<text x="34" y="584" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="600" fill="#52637B">公共契约与发布包</text>
+<rect x="380" y="780" width="1060" height="300" rx="9" fill="#F8FAFC" stroke="#DCE3EC" stroke-width="1.2"/>
+<text x="394" y="804" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="600" fill="#52637B">进程与远程系统边界</text>
+<polyline points="180,190 220,190" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="220.0,190.0 212.8,193.5 212.8,186.5" fill="#60738A"/>
+<polyline points="290,220 290,280" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="290.0,280.0 286.5,272.8 293.5,272.8" fill="#60738A"/>
+<polyline points="360,310 380,310 380,190 400,190" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="400.0,190.0 392.8,193.5 392.8,186.5" fill="#60738A"/>
+<polyline points="540,190 580,190" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="580.0,190.0 572.8,193.5 572.8,186.5" fill="#60738A"/>
+<polyline points="720,190 940,190" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="940.0,190.0 932.8,193.5 932.8,186.5" fill="#60738A"/>
+<polyline points="1080,190 1120,190" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1120.0,190.0 1112.8,193.5 1112.8,186.5" fill="#60738A"/>
+<polyline points="650,220 650,280" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="650.0,280.0 646.5,272.8 653.5,272.8" fill="#60738A"/>
+<polyline points="650,340 650,400" fill="none" stroke="#60738A" stroke-width="1.4" stroke-dasharray="5 4"/>
+<polygon points="650.0,400.0 646.5,392.8 653.5,392.8" fill="#60738A"/>
+<polyline points="1010,220 1010,240 740,240 740,430 720,430" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="720.0,430.0 727.2,426.5 727.2,433.5" fill="#60738A"/>
+<polygon points="1010.0,220.0 1013.5,227.2 1006.5,227.2" fill="#60738A"/>
+<polyline points="1010,220 1010,260 470,260 470,280" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="470.0,280.0 466.5,272.8 473.5,272.8" fill="#60738A"/>
+<polyline points="580,430 560,430 560,360 470,360 470,340" fill="none" stroke="#60738A" stroke-width="1.4" stroke-dasharray="5 4"/>
+<polygon points="470.0,340.0 473.5,347.2 466.5,347.2" fill="#60738A"/>
+<polyline points="400,310 360,310" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="360.0,310.0 367.2,306.5 367.2,313.5" fill="#60738A"/>
+<polyline points="180,430 220,430" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="220.0,430.0 212.8,433.5 212.8,426.5" fill="#60738A"/>
+<polyline points="360,430 400,430" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="400.0,430.0 392.8,433.5 392.8,426.5" fill="#60738A"/>
+<polyline points="540,430 580,430" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="580.0,430.0 572.8,433.5 572.8,426.5" fill="#60738A"/>
+<polyline points="720,430 940,430" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="940.0,430.0 932.8,433.5 932.8,426.5" fill="#60738A"/>
+<polyline points="1080,430 1120,430" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1120.0,430.0 1112.8,433.5 1112.8,426.5" fill="#60738A"/>
+<polyline points="1010,460 1010,480 1370,480 1370,460" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1370.0,460.0 1373.5,467.2 1366.5,467.2" fill="#60738A"/>
+<polyline points="650,460 650,640" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="650.0,640.0 646.5,632.8 653.5,632.8" fill="#60738A"/>
+<polyline points="650,460 650,480 920,480 920,670 940,670" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="940.0,670.0 932.8,673.5 932.8,666.5" fill="#60738A"/>
+<polyline points="650,700 650,880" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="650.0,880.0 646.5,872.8 653.5,872.8" fill="#60738A"/>
+<polyline points="720,670 740,670 740,860 830,860 830,880" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="830.0,880.0 826.5,872.8 833.5,872.8" fill="#60738A"/>
+<polyline points="650,940 650,1000" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="650.0,1000.0 646.5,992.8 653.5,992.8" fill="#60738A"/>
+<polyline points="830,940 830,1030 720,1030" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="720.0,1030.0 727.2,1026.5 727.2,1033.5" fill="#60738A"/>
+<polyline points="720,1030 740,1030 740,960 1190,960 1190,940" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1190.0,940.0 1193.5,947.2 1186.5,947.2" fill="#60738A"/>
+<polyline points="1010,700 1010,860 1190,860 1190,880" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1190.0,880.0 1186.5,872.8 1193.5,872.8" fill="#60738A"/>
+<polyline points="180,670 220,670" fill="none" stroke="#60738A" stroke-width="1.4" stroke-dasharray="5 4"/>
+<polygon points="220.0,670.0 212.8,673.5 212.8,666.5" fill="#60738A"/>
+<rect x="40" y="160" width="140" height="60" rx="8" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.2"/>
+<text x="110.0" y="186.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">用户</text>
+<text x="110.0" y="202.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">一个人类 / 多个房间</text>
+<rect x="220" y="160" width="140" height="60" rx="8" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.2"/>
+<text x="290.0" y="186.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">React 19 + Vite</text>
+<text x="290.0" y="202.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">时间线 / 任务 / 设置</text>
+<rect x="220" y="280" width="140" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="290.0" y="298.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">RoomClient</text>
+<text x="290.0" y="314.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">HTTP 命令与查询</text>
+<text x="290.0" y="330.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">WS 游标恢复</text>
+<rect x="40" y="400" width="140" height="60" rx="8" fill="#EDF8F4" stroke="#568B78" stroke-width="1.2"/>
+<text x="110.0" y="417.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#172B45">外部 Agent 会话</text>
+<text x="110.0" y="433.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#172B45">Codex / Claude / DSH</text>
+<text x="110.0" y="449.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#172B45">自行管理进程与登录</text>
+<rect x="220" y="400" width="140" height="60" rx="8" fill="#EDF8F4" stroke="#568B78" stroke-width="1.2"/>
+<text x="290.0" y="418.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">room-agent-mcp</text>
+<text x="290.0" y="434.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">MCP stdio → HTTP</text>
+<text x="290.0" y="450.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">可选 runner 值守</text>
+<rect x="400" y="160" width="140" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="470.0" y="178.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">Fastify HTTP</text>
+<text x="470.0" y="194.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">认证 / 来源 / 版本</text>
+<text x="470.0" y="210.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">app.ts</text>
+<rect x="400" y="280" width="140" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="470.0" y="298.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">WebSocket /events</text>
+<text x="470.0" y="314.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">持久事件 + 临时 delta</text>
+<text x="470.0" y="330.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">app.ts</text>
+<rect x="400" y="400" width="140" height="60" rx="8" fill="#EDF8F4" stroke="#568B78" stroke-width="1.2"/>
+<text x="470.0" y="418.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">房间工具入口</text>
+<text x="470.0" y="434.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">/api/agent/tool</text>
+<text x="470.0" y="450.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">Agent + 房间绑定</text>
+<rect x="580" y="160" width="140" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="650.0" y="178.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">RoomService</text>
+<text x="650.0" y="194.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">命令 / 讨论 / 任务</text>
+<text x="650.0" y="210.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">版本与幂等</text>
+<rect x="580" y="280" width="140" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="650.0" y="297.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#172B45">上下文 / 原生会话</text>
+<text x="650.0" y="313.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#172B45">context.ts / sessions.ts</text>
+<text x="650.0" y="329.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#172B45">seq 快照与恢复绑定</text>
+<rect x="580" y="400" width="140" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="650.0" y="418.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">Worker</text>
+<text x="650.0" y="434.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">250 ms 调度 / 并发</text>
+<text x="650.0" y="450.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">取消 / 工具 / 成果</text>
+<rect x="940" y="160" width="140" height="60" rx="8" fill="#F3F4F6" stroke="#8B96A5" stroke-width="1.2"/>
+<text x="1010.0" y="178.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">Store</text>
+<text x="1010.0" y="194.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">事务 / 事件日志</text>
+<text x="1010.0" y="210.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">提交后发布通知</text>
+<rect x="940" y="400" width="140" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="1010.0" y="418.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">Workspaces</text>
+<text x="1010.0" y="434.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">快照 / 差异 / 应用</text>
+<text x="1010.0" y="450.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">基线与路径检查</text>
+<rect x="580" y="640" width="140" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="650.0" y="657.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#172B45">本地 Agent 适配器</text>
+<text x="650.0" y="673.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#172B45">Codex / Claude / DSH</text>
+<text x="650.0" y="689.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#172B45">adapters.ts</text>
+<rect x="940" y="640" width="140" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="1010.0" y="658.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">API / A2A 适配器</text>
+<text x="1010.0" y="674.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">HTTPS / SSE / 轮询</text>
+<text x="1010.0" y="690.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">adapters + network</text>
+<rect x="1120" y="160" width="140" height="60" rx="8" fill="#F3F4F6" stroke="#8B96A5" stroke-width="1.2"/>
+<ellipse cx="1190.0" cy="167" rx="70.0" ry="7" fill="#F3F4F6" stroke="#8B96A5"/>
+<text x="1190.0" y="186.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">SQLite WAL</text>
+<text x="1190.0" y="202.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">room.sqlite</text>
+<rect x="1300" y="160" width="140" height="60" rx="8" fill="#F3F4F6" stroke="#8B96A5" stroke-width="1.2"/>
+<text x="1370.0" y="178.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">启动会话凭据</text>
+<text x="1370.0" y="194.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">owner-session.token</text>
+<text x="1370.0" y="210.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">重启复用 / 显式轮换</text>
+<rect x="1120" y="400" width="140" height="60" rx="8" fill="#F3F4F6" stroke="#8B96A5" stroke-width="1.2"/>
+<text x="1190.0" y="418.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">工作与运行目录</text>
+<text x="1190.0" y="434.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">sandboxes / homes</text>
+<text x="1190.0" y="450.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">runtimes</text>
+<rect x="1300" y="400" width="140" height="60" rx="8" fill="#F3F4F6" stroke="#8B96A5" stroke-width="1.2"/>
+<text x="1370.0" y="418.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">成果 / 基线 / 日志</text>
+<text x="1370.0" y="434.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">artifacts / manifests</text>
+<text x="1370.0" y="450.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">apply</text>
+<rect x="40" y="640" width="140" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="110.0" y="658.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">Room Protocol 0.1</text>
+<text x="110.0" y="674.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">类型 / Zod / Schema</text>
+<text x="110.0" y="690.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">packages/protocol</text>
+<rect x="220" y="640" width="140" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="290.0" y="658.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">TypeScript 客户端</text>
+<text x="290.0" y="674.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">RoomClient</text>
+<text x="290.0" y="690.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">RoomAgentClient</text>
+<rect x="580" y="880" width="140" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="650.0" y="897.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#172B45">RoomSandbox .NET 10</text>
+<text x="650.0" y="913.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#172B45">AppContainer + ACL</text>
+<text x="650.0" y="929.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#172B45">Job Object</text>
+<rect x="760" y="880" width="140" height="60" rx="8" fill="#FFF7E8" stroke="#B88A3D" stroke-width="1.2"/>
+<text x="830.0" y="897.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#172B45">本机直连 HostChannel</text>
+<text x="830.0" y="913.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#172B45">当前用户权限</text>
+<text x="830.0" y="929.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#172B45">HostRoomPipe</text>
+<rect x="580" y="1000" width="140" height="60" rx="8" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.2"/>
+<text x="650.0" y="1018.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">原生 Agent CLI</text>
+<text x="650.0" y="1034.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">stdin / stdout</text>
+<text x="650.0" y="1050.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">进程树与原生会话</text>
+<rect x="1120" y="880" width="140" height="60" rx="8" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.2"/>
+<text x="1190.0" y="898.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">公网服务</text>
+<text x="1190.0" y="914.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">模型 API / 远程 A2A</text>
+<text x="1190.0" y="930.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">独立远程端点</text>
+<rect x="360.0" y="241.0" width="40.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="380.0" y="254.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">HTTP</text>
+<rect x="543.0" y="181.0" width="34.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="560.0" y="194.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">命令</text>
+<rect x="802.0" y="181.0" width="56.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="830.0" y="194.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">事务写入</text>
+<rect x="633.0" y="241.0" width="34.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="650.0" y="254.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">固化</text>
+<rect x="829.5" y="231.0" width="91.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="875.0" y="244.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">Run 队列 / 状态</text>
+<rect x="706.5" y="251.0" width="67.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="740.0" y="264.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">已提交事件</text>
+<rect x="492.5" y="351.0" width="45.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="515.0" y="364.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">流片段</text>
+<rect x="352.0" y="421.0" width="56.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="380.0" y="434.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">房间令牌</text>
+<rect x="796.5" y="421.0" width="67.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="830.0" y="434.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">快照 / 差异</text>
+<rect x="622.0" y="541.0" width="56.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="650.0" y="554.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">本地执行</text>
+<rect x="757.0" y="471.0" width="56.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="785.0" y="484.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">远程执行</text>
+<rect x="605.5" y="781.0" width="89.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="650.0" y="794.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">stdio JSON IPC</text>
+<rect x="697.5" y="756.0" width="85.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="740.0" y="769.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">显式 host 模式</text>
+<rect x="916.5" y="951.0" width="97.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="965.0" y="964.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">CLI 自行访问模型</text>
+<rect x="1064.5" y="851.0" width="71.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="1100.0" y="864.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">公网 HTTPS</text>
+<text x="40" y="816" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" font-weight="600" fill="#52637B">边界说明</text>
+<text x="40" y="848" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="400" fill="#52637B">实线：调用、执行或状态流</text>
+<text x="40" y="870" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="400" fill="#52637B">虚线：上下文依赖或临时流片段</text>
+<text x="40" y="892" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="400" fill="#52637B">服务模块同进程；没有消息中间件。</text>
+<text x="40" y="914" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="400" fill="#52637B">SQLite 的 runs 表就是持久队列。</text>
+<text x="40" y="961" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" font-weight="600" fill="#52637B">执行模式必须区分</text>
+<text x="40" y="993" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="400" fill="#52637B">沙箱：隔离工作区，审阅后应用。</text>
+<text x="40" y="1015" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="400" fill="#52637B">host：可直接修改真实项目。</text>
+<text x="40" y="1037" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="400" fill="#52637B">external：房间服务不管理其进程。</text>
+<text x="1120" y="553" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="400" fill="#52637B">数据库保存索引、实体与事件；</text>
+<text x="1120" y="575" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="400" fill="#52637B">大文件正文保存在状态目录。</text>
+<text x="1120" y="597" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="400" fill="#52637B">密钥通过环境变量引用注入。</text>
+<text x="400" y="1118" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="400" fill="#52637B">Room Protocol 是应用契约；MCP 是工具接入；ACP / App Server / A2A 分别适配 Agent 原生接口。</text>
+</svg>

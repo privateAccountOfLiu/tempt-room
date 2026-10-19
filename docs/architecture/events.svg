@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="1110" viewBox="0 0 1480 1110">
+<rect width="100%" height="100%" fill="#fff"/>
+<text x="40" y="52" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="27" font-weight="600" fill="#172B45">命令、调度与可靠事件流</text>
+<text x="40" y="90" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="400" fill="#64748B">普通消息 / 点名 / 讨论 / 任务均由应用协议调度；Agent 之间没有直连群聊总线  |  2026-10-18 20:30 CST</text>
+<rect x="20" y="120" width="1420" height="620" rx="9" fill="#F8FAFC" stroke="#DCE3EC" stroke-width="1.2"/>
+<text x="34" y="144" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="600" fill="#52637B">一次托管请求：写入、执行与反馈</text>
+<rect x="20" y="780" width="1420" height="240" rx="9" fill="#F8FAFC" stroke="#DCE3EC" stroke-width="1.2"/>
+<text x="34" y="804" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="600" fill="#52637B">目标变化与成果保护</text>
+<polyline points="180,190 220,190" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="220.0,190.0 212.8,193.5 212.8,186.5" fill="#60738A"/>
+<polyline points="360,190 400,190" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="400.0,190.0 392.8,193.5 392.8,186.5" fill="#60738A"/>
+<polyline points="540,190 580,190" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="580.0,190.0 572.8,193.5 572.8,186.5" fill="#60738A"/>
+<polyline points="720,190 760,190" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="760.0,190.0 752.8,193.5 752.8,186.5" fill="#60738A"/>
+<polyline points="900,190 940,190" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="940.0,190.0 932.8,193.5 932.8,186.5" fill="#60738A"/>
+<polyline points="1080,190 1120,190" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1120.0,190.0 1112.8,193.5 1112.8,186.5" fill="#60738A"/>
+<polyline points="1190,220 1190,400" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1190.0,400.0 1186.5,392.8 1193.5,392.8" fill="#60738A"/>
+<polyline points="1190,220 1190,380 1010,380 1010,400" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1010.0,400.0 1006.5,392.8 1013.5,392.8" fill="#60738A"/>
+<polyline points="940,430 720,430" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="720.0,430.0 727.2,426.5 727.2,433.5" fill="#60738A"/>
+<polyline points="580,430 540,430" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="540.0,430.0 547.2,426.5 547.2,433.5" fill="#60738A"/>
+<polyline points="400,430 360,430" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="360.0,430.0 367.2,426.5 367.2,433.5" fill="#60738A"/>
+<polyline points="220,430 180,430" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="180.0,430.0 187.2,426.5 187.2,433.5" fill="#60738A"/>
+<polyline points="180,910 400,910" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="400.0,910.0 392.8,913.5 392.8,906.5" fill="#60738A"/>
+<polyline points="540,910 760,910" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="760.0,910.0 752.8,913.5 752.8,906.5" fill="#60738A"/>
+<polyline points="900,910 1120,910" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1120.0,910.0 1112.8,913.5 1112.8,906.5" fill="#60738A"/>
+<polyline points="1190,460 1190,480 470,480 470,460" fill="none" stroke="#60738A" stroke-width="1.4" stroke-dasharray="5 4"/>
+<polygon points="470.0,460.0 473.5,467.2 466.5,467.2" fill="#60738A"/>
+<rect x="40" y="160" width="140" height="60" rx="8" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.2"/>
+<text x="110.0" y="186.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">React / TS 客户端</text>
+<text x="110.0" y="202.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">commandId / v0.1</text>
+<rect x="220" y="160" width="140" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="290.0" y="186.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">HTTP 接入检查</text>
+<text x="290.0" y="202.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">会话 / 来源 / 协议</text>
+<rect x="400" y="160" width="140" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="470.0" y="178.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">RoomService.execute</text>
+<text x="470.0" y="194.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">身份与命令校验</text>
+<text x="470.0" y="210.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">同 ID 返回同 Receipt</text>
+<rect x="580" y="160" width="140" height="60" rx="8" fill="#F3F4F6" stroke="#8B96A5" stroke-width="1.2"/>
+<text x="650.0" y="178.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">Store.atomic</text>
+<text x="650.0" y="194.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">BEGIN IMMEDIATE</text>
+<text x="650.0" y="210.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">状态 + 事件 + 回执</text>
+<rect x="760" y="160" width="140" height="60" rx="8" fill="#F3F4F6" stroke="#8B96A5" stroke-width="1.2"/>
+<text x="830.0" y="178.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">queued Run</text>
+<text x="830.0" y="194.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">任务版本 / limits</text>
+<text x="830.0" y="210.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">共享上下文 contextId</text>
+<rect x="940" y="160" width="140" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="1010.0" y="178.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">Worker.tick · 250 ms</text>
+<text x="1010.0" y="194.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">并发 / 会话串行</text>
+<text x="1010.0" y="210.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">依赖与租约检查</text>
+<rect x="1120" y="160" width="140" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="1190.0" y="178.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">runAdapter</text>
+<text x="1190.0" y="194.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">原生 / API / A2A</text>
+<text x="1190.0" y="210.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">统一输出与中断</text>
+<rect x="1120" y="400" width="140" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="1190.0" y="418.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">message.delta</text>
+<text x="1190.0" y="434.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">messageId + index</text>
+<text x="1190.0" y="450.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">临时流片段</text>
+<rect x="940" y="400" width="140" height="60" rx="8" fill="#F3F4F6" stroke="#8B96A5" stroke-width="1.2"/>
+<text x="1010.0" y="418.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">持久化最终结果</text>
+<text x="1010.0" y="434.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">消息 / 状态 / 成果</text>
+<text x="1010.0" y="450.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">事件 seq 递增</text>
+<rect x="580" y="400" width="140" height="60" rx="8" fill="#F3F4F6" stroke="#8B96A5" stroke-width="1.2"/>
+<text x="650.0" y="418.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">事务成功后通知</text>
+<text x="650.0" y="434.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">Store.listeners</text>
+<text x="650.0" y="450.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">不广播回滚事件</text>
+<rect x="400" y="400" width="140" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="470.0" y="417.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#172B45">WebSocket /api/events</text>
+<text x="470.0" y="433.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#172B45">after 游标补发 + 订阅</text>
+<text x="470.0" y="449.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#172B45">流片段不承担可靠历史</text>
+<rect x="220" y="400" width="140" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="290.0" y="418.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">客户端事件订阅</text>
+<text x="290.0" y="434.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">seq 去重 / 缺口重连</text>
+<text x="290.0" y="450.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">按上次游标恢复</text>
+<rect x="40" y="400" width="140" height="60" rx="8" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.2"/>
+<text x="110.0" y="418.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">React 时间线</text>
+<text x="110.0" y="434.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">独立流式消息</text>
+<text x="110.0" y="450.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">完成后清理临时片段</text>
+<rect x="40" y="880" width="140" height="60" rx="8" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.2"/>
+<text x="110.0" y="906.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">任务 v1</text>
+<text x="110.0" y="922.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">可有依赖下游任务</text>
+<rect x="400" y="880" width="140" height="60" rx="8" fill="#FFF7E8" stroke="#B88A3D" stroke-width="1.2"/>
+<text x="470.0" y="898.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">revise / handoff</text>
+<text x="470.0" y="914.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">递增任务版本</text>
+<text x="470.0" y="930.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">取消受影响旧运行</text>
+<rect x="760" y="880" width="140" height="60" rx="8" fill="#FFF7E8" stroke="#B88A3D" stroke-width="1.2"/>
+<text x="830.0" y="898.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">标记旧结果 stale</text>
+<text x="830.0" y="914.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">传播依赖版本变化</text>
+<text x="830.0" y="930.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">新要求冻结新快照</text>
+<rect x="1120" y="880" width="140" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="1190.0" y="898.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">应用成果前核对</text>
+<text x="1190.0" y="914.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">任务/依赖版本 + 基线</text>
+<text x="1190.0" y="930.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">冲突则停止写入</text>
+<rect x="723.0" y="181.0" width="34.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="740.0" y="194.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">原子</text>
+<rect x="903.0" y="181.0" width="34.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="920.0" y="194.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">轮询</text>
+<rect x="1173.0" y="301.0" width="34.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="1190.0" y="314.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">流式</text>
+<rect x="1083.0" y="371.0" width="34.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="1100.0" y="384.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">结束</text>
+<rect x="807.5" y="421.0" width="45.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="830.0" y="434.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">提交后</text>
+<rect x="543.0" y="421.0" width="34.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="560.0" y="434.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">事件</text>
+<rect x="262.0" y="901.0" width="56.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="290.0" y="914.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">修改目标</text>
+<rect x="982.0" y="901.0" width="56.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="1010.0" y="914.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">沙箱成果</text>
+<rect x="802.0" y="471.0" width="56.0" height="20" rx="3" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.2"/>
+<text x="830.0" y="484.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#465B73">临时推送</text>
+<text x="40" y="566" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" font-weight="600" fill="#52637B">唤醒规则</text>
+<text x="40" y="599" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="400" fill="#52637B">普通消息只保存；人类 @ 托管成员才入队。外部成员收到 agent.wake.requested，由其自身或 runner 响应。</text>
+<text x="40" y="646" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="16" font-weight="600" fill="#52637B">自动讨论</text>
+<text x="40" y="679" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="400" fill="#52637B">每轮共享快照；本轮全部成功后才进入下一轮。轮次、响应数或截止时间到达即结束。</text>
+<text x="40" y="1068" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="400" fill="#52637B">应用重启：保留历史和排队任务；活动运行标记 interrupted，活动讨论停止，不盲目重跑正在写文件的请求。</text>
+</svg>

@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-zA-Z0-9_-]+$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60
+    },
+    "provider": {
+      "type": "string",
+      "enum": [
+        "codex",
+        "claude",
+        "deepseek",
+        "api",
+        "a2a",
+        "demo"
+      ]
+    },
+    "role": {
+      "default": "协作助手",
+      "type": "string",
+      "maxLength": 300
+    },
+    "color": {
+      "default": "blue",
+      "type": "string",
+      "enum": [
+        "blue",
+        "green",
+        "orange",
+        "purple",
+        "teal"
+      ]
+    },
+    "enabled": {
+      "default": false,
+      "type": "boolean"
+    },
+    "executable": {
+      "default": "",
+      "type": "string",
+      "maxLength": 1000
+    },
+    "endpoint": {
+      "default": "",
+      "type": "string",
+      "maxLength": 2000
+    },
+    "model": {
+      "default": "",
+      "type": "string",
+      "maxLength": 200
+    },
+    "credentialEnv": {
+      "default": "",
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$"
+        },
+        {
+          "type": "string",
+          "const": ""
+        }
+      ]
+    },
+    "version": {
+      "default": "",
+      "type": "string",
+      "maxLength": 100
+    },
+    "runtimeDirectory": {
+      "default": "",
+      "type": "string",
+      "maxLength": 1500
+    },
+    "connectionMode": {
+      "default": "managed",
+      "type": "string",
+      "enum": [
+        "managed",
+        "external",
+        "attach"
+      ]
+    },
+    "codexBinding": {
+      "type": "object",
+      "properties": {
+        "transport": {
+          "type": "string",
+          "enum": [
+            "websocket",
+            "control-socket"
+          ]
+        },
+        "endpoint": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "credentialEnv": {
+          "default": "",
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]*$"
+            },
+            {
+              "type": "string",
+              "const": ""
+            }
+          ]
+        },
+        "threadId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "expectedCwd": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1500
+        }
+      },
+      "required": [
+        "transport",
+        "endpoint",
+        "credentialEnv",
+        "threadId",
+        "expectedCwd"
+      ],
+      "additionalProperties": false
+    },
+    "executionMode": {
+      "default": "sandbox",
+      "type": "string",
+      "enum": [
+        "sandbox",
+        "host"
+      ]
+    },
+    "responseFormat": {
+      "default": "text",
+      "type": "string",
+      "enum": [
+        "text",
+        "room-json"
+      ]
+    },
+    "capabilities": {
+      "type": "object",
+      "properties": {
+        "streaming": {
+          "type": "boolean"
+        },
+        "resume": {
+          "type": "boolean"
+        },
+        "cancel": {
+          "type": "boolean"
+        },
+        "execute": {
+          "type": "boolean"
+        },
+        "artifacts": {
+          "type": "boolean"
+        },
+        "input": {
+          "type": "boolean"
+        },
+        "usage": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "streaming",
+        "resume",
+        "cancel",
+        "execute",
+        "artifacts",
+        "input",
+        "usage"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "provider",
+    "role",
+    "color",
+    "enabled",
+    "executable",
+    "endpoint",
+    "model",
+    "credentialEnv",
+    "version",
+    "runtimeDirectory",
+    "connectionMode",
+    "executionMode",
+    "responseFormat"
+  ],
+  "additionalProperties": false
+}

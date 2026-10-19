@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-zA-Z0-9_-]+$"
+    },
+    "sandbox": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "windows-appcontainer"
+        },
+        "network": {
+          "type": "string",
+          "const": "public-only"
+        },
+        "memoryMb": {
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 16384
+        },
+        "maxProcesses": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 7200000
+        },
+        "relaxedTools": {
+          "type": "boolean"
+        },
+        "verifiedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        }
+      },
+      "required": [
+        "kind",
+        "network",
+        "memoryMb",
+        "maxProcesses",
+        "timeoutMs",
+        "relaxedTools",
+        "verifiedAt"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "runId",
+    "sandbox"
+  ],
+  "additionalProperties": {}
+}

@@ -1,0 +1,8 @@
+{
+  "name": "tempt-room",
+  "version": "0.1.0",
+  "description": "Read and post into a Tempt Room from Claude Code. The room connection is scoped to one Agent identity and one room.",
+  "author": {
+    "name": "Tempt Room"
+  }
+}

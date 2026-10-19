@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1540" height="1140" viewBox="0 0 1540 1140">
+<rect width="100%" height="100%" fill="#fff"/>
+<text x="40" y="52" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="27" font-weight="600" fill="#172B45">执行路径与成果落地</text>
+<text x="40" y="90" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="400" fill="#64748B">四条代码路径分别展示 · 不把本机直连和外部会话画成沙箱  |  2026-10-18 20:30 CST</text>
+<rect x="180" y="120" width="220" height="920" rx="9" fill="#F8FAFC" stroke="#DCE3EC" stroke-width="1.2"/>
+<text x="194" y="144" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="600" fill="#52637B">托管 · AppContainer 沙箱</text>
+<rect x="540" y="120" width="220" height="920" rx="9" fill="#F8FAFC" stroke="#DCE3EC" stroke-width="1.2"/>
+<text x="554" y="144" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="600" fill="#52637B">托管 · 本机直连 host</text>
+<rect x="900" y="120" width="220" height="920" rx="9" fill="#F8FAFC" stroke="#DCE3EC" stroke-width="1.2"/>
+<text x="914" y="144" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="600" fill="#52637B">外部会话 / MCP</text>
+<rect x="1260" y="120" width="220" height="920" rx="9" fill="#F8FAFC" stroke="#DCE3EC" stroke-width="1.2"/>
+<text x="1274" y="144" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="600" fill="#52637B">托管 · API / A2A</text>
+<polyline points="290,220 290,280" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="290.0,280.0 286.5,272.8 293.5,272.8" fill="#60738A"/>
+<polyline points="290,340 290,400" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="290.0,400.0 286.5,392.8 293.5,392.8" fill="#60738A"/>
+<polyline points="290,460 290,520" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="290.0,520.0 286.5,512.8 293.5,512.8" fill="#60738A"/>
+<polyline points="290,580 290,640" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="290.0,640.0 286.5,632.8 293.5,632.8" fill="#60738A"/>
+<polyline points="290,700 290,760" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="290.0,760.0 286.5,752.8 293.5,752.8" fill="#60738A"/>
+<polyline points="290,820 290,880" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="290.0,880.0 286.5,872.8 293.5,872.8" fill="#60738A"/>
+<polyline points="650,220 650,280" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="650.0,280.0 646.5,272.8 653.5,272.8" fill="#60738A"/>
+<polyline points="650,340 650,400" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="650.0,400.0 646.5,392.8 653.5,392.8" fill="#60738A"/>
+<polyline points="650,460 650,520" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="650.0,520.0 646.5,512.8 653.5,512.8" fill="#60738A"/>
+<polyline points="650,580 650,640" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="650.0,640.0 646.5,632.8 653.5,632.8" fill="#60738A"/>
+<polyline points="650,700 650,760" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="650.0,760.0 646.5,752.8 653.5,752.8" fill="#60738A"/>
+<polyline points="650,820 650,880" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="650.0,880.0 646.5,872.8 653.5,872.8" fill="#60738A"/>
+<polyline points="1010,220 1010,280" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1010.0,280.0 1006.5,272.8 1013.5,272.8" fill="#60738A"/>
+<polyline points="1010,340 1010,400" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1010.0,400.0 1006.5,392.8 1013.5,392.8" fill="#60738A"/>
+<polyline points="1010,460 1010,520" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1010.0,520.0 1006.5,512.8 1013.5,512.8" fill="#60738A"/>
+<polyline points="1010,580 1010,640" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1010.0,640.0 1006.5,632.8 1013.5,632.8" fill="#60738A"/>
+<polyline points="1010,700 1010,760" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1010.0,760.0 1006.5,752.8 1013.5,752.8" fill="#60738A"/>
+<polyline points="1010,820 1010,880" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1010.0,880.0 1006.5,872.8 1013.5,872.8" fill="#60738A"/>
+<polyline points="1370,220 1370,280" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1370.0,280.0 1366.5,272.8 1373.5,272.8" fill="#60738A"/>
+<polyline points="1370,340 1370,400" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1370.0,400.0 1366.5,392.8 1373.5,392.8" fill="#60738A"/>
+<polyline points="1370,460 1370,520" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1370.0,520.0 1366.5,512.8 1373.5,512.8" fill="#60738A"/>
+<polyline points="1370,580 1370,640" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1370.0,640.0 1366.5,632.8 1373.5,632.8" fill="#60738A"/>
+<polyline points="1370,700 1370,760" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1370.0,760.0 1366.5,752.8 1373.5,752.8" fill="#60738A"/>
+<polyline points="1370,820 1370,880" fill="none" stroke="#60738A" stroke-width="1.4"/>
+<polygon points="1370.0,880.0 1366.5,872.8 1373.5,872.8" fill="#60738A"/>
+<rect x="210" y="160" width="160" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="290.0" y="186.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">Worker 管理 Run</text>
+<text x="290.0" y="202.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">同房间同 Agent 串行</text>
+<rect x="210" y="280" width="160" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="290.0" y="298.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">任务：独立快照</text>
+<text x="290.0" y="314.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">聊天：成员独立目录</text>
+<text x="290.0" y="330.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">隔离 home / 只读工具</text>
+<rect x="210" y="400" width="160" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="290.0" y="426.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">C# 沙箱宿主</text>
+<text x="290.0" y="442.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">验证 AppContainer / Job</text>
+<rect x="210" y="520" width="160" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="290.0" y="546.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">Codex / Claude / DSH</text>
+<text x="290.0" y="562.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">原生流式协议</text>
+<rect x="210" y="640" width="160" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="290.0" y="666.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">room-bridge / MCP</text>
+<text x="290.0" y="682.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">LOCAL 管道回到 Worker</text>
+<rect x="210" y="760" width="160" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="290.0" y="786.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">任务：Patch / 报告</text>
+<text x="290.0" y="802.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">记录基线与任务版本</text>
+<rect x="210" y="880" width="160" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="290.0" y="906.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">用户审阅并应用</text>
+<text x="290.0" y="922.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">冲突检查 / 应用日志</text>
+<rect x="570" y="160" width="160" height="60" rx="8" fill="#FFF7E8" stroke="#B88A3D" stroke-width="1.2"/>
+<text x="650.0" y="186.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">Worker 管理 Run</text>
+<text x="650.0" y="202.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">显式选择 host 模式</text>
+<rect x="570" y="280" width="160" height="60" rx="8" fill="#FFF7E8" stroke="#B88A3D" stroke-width="1.2"/>
+<text x="650.0" y="306.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">任务：真实项目目录</text>
+<text x="650.0" y="322.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">聊天：房间共享目录</text>
+<rect x="570" y="400" width="160" height="60" rx="8" fill="#FFF7E8" stroke="#B88A3D" stroke-width="1.2"/>
+<text x="650.0" y="426.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">HostChannel 启动 CLI</text>
+<text x="650.0" y="442.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">使用当前用户权限</text>
+<rect x="570" y="520" width="160" height="60" rx="8" fill="#FFF7E8" stroke="#B88A3D" stroke-width="1.2"/>
+<text x="650.0" y="546.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">Codex / Claude / DSH</text>
+<text x="650.0" y="562.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">原生流式协议</text>
+<rect x="570" y="640" width="160" height="60" rx="8" fill="#FFF7E8" stroke="#B88A3D" stroke-width="1.2"/>
+<text x="650.0" y="666.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">HostRoomPipe + MCP</text>
+<text x="650.0" y="682.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">工具仍绑定房间与运行</text>
+<rect x="570" y="760" width="160" height="60" rx="8" fill="#FFF7E8" stroke="#B88A3D" stroke-width="1.2"/>
+<text x="650.0" y="786.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">任务：Git 变更报告</text>
+<text x="650.0" y="802.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">聊天：共享仓库提交</text>
+<rect x="570" y="880" width="160" height="60" rx="8" fill="#FFF7E8" stroke="#B88A3D" stroke-width="1.2"/>
+<text x="650.0" y="906.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">真实文件已经修改</text>
+<text x="650.0" y="922.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">不经过 Patch 应用步骤</text>
+<rect x="930" y="160" width="160" height="60" rx="8" fill="#EDF8F4" stroke="#568B78" stroke-width="1.2"/>
+<text x="1010.0" y="186.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">用户自己的 Agent 进程</text>
+<text x="1010.0" y="202.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">或当前 Codex 会话</text>
+<rect x="930" y="280" width="160" height="60" rx="8" fill="#EDF8F4" stroke="#568B78" stroke-width="1.2"/>
+<text x="1010.0" y="306.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">MCP stdio / TS SDK</text>
+<text x="1010.0" y="322.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">可选 runner 自动值守</text>
+<rect x="930" y="400" width="160" height="60" rx="8" fill="#EDF8F4" stroke="#568B78" stroke-width="1.2"/>
+<text x="1010.0" y="426.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">HTTP /api/agent/tool</text>
+<text x="1010.0" y="442.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">Agent + 房间专用令牌</text>
+<rect x="930" y="520" width="160" height="60" rx="8" fill="#EDF8F4" stroke="#568B78" stroke-width="1.2"/>
+<text x="1010.0" y="546.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">Worker.agentTool</text>
+<text x="1010.0" y="562.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">幂等 / 成员 / 版本检查</text>
+<rect x="930" y="640" width="160" height="60" rx="8" fill="#EDF8F4" stroke="#568B78" stroke-width="1.2"/>
+<text x="1010.0" y="666.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">外部 Agent 自行执行</text>
+<text x="1010.0" y="682.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">认领任务与心跳续租</text>
+<rect x="930" y="760" width="160" height="60" rx="8" fill="#EDF8F4" stroke="#568B78" stroke-width="1.2"/>
+<text x="1010.0" y="786.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">task_complete / 报告</text>
+<text x="1010.0" y="802.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">租约失效则回收任务</text>
+<rect x="930" y="880" width="160" height="60" rx="8" fill="#EDF8F4" stroke="#568B78" stroke-width="1.2"/>
+<text x="1010.0" y="906.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">公开消息与交付物</text>
+<text x="1010.0" y="922.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">服务不创建托管 Run</text>
+<rect x="1290" y="160" width="160" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="1370.0" y="186.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">Worker 管理 Run</text>
+<text x="1370.0" y="202.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">统一状态与超时</text>
+<rect x="1290" y="280" width="160" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="1370.0" y="306.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">network.ts</text>
+<text x="1370.0" y="322.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">HTTPS / DNS 公网过滤</text>
+<rect x="1290" y="400" width="160" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="1370.0" y="426.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">API：Chat Completions</text>
+<text x="1370.0" y="442.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">A2A：Agent Card 1.0</text>
+<rect x="1290" y="520" width="160" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="1370.0" y="546.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">API：SSE / JSON 回复</text>
+<text x="1370.0" y="562.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">A2A：任务轮询 / 取消</text>
+<rect x="1290" y="640" width="160" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="1370.0" y="666.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">归一化 AgentOutput</text>
+<text x="1370.0" y="682.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">text / usage / artifact</text>
+<rect x="1290" y="760" width="160" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="1370.0" y="786.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">Worker 保存并发布</text>
+<text x="1370.0" y="802.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">Store + WebSocket</text>
+<rect x="1290" y="880" width="160" height="60" rx="8" fill="#EFF6FF" stroke="#5B80AD" stroke-width="1.2"/>
+<text x="1370.0" y="906.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">讨论 / 结构化交付物</text>
+<text x="1370.0" y="922.0" text-anchor="middle" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#172B45">API 无本地执行 Harness</text>
+<text x="40" y="159" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="600" fill="#52637B">入口</text>
+<text x="40" y="279" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="600" fill="#52637B">目录 / 传输</text>
+<text x="40" y="399" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="600" fill="#52637B">边界</text>
+<text x="40" y="519" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="600" fill="#52637B">运行</text>
+<text x="40" y="639" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="600" fill="#52637B">交互 / 输出</text>
+<text x="40" y="759" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="600" fill="#52637B">成果</text>
+<text x="40" y="879" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="600" fill="#52637B">落地</text>
+<text x="190" y="1001" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#52637B">取消：Job Object 终止进程树</text>
+<text x="550" y="1001" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#52637B">同一真实项目任务串行执行</text>
+<text x="910" y="1001" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#52637B">普通 Agent 发言不自动唤醒同伴</text>
+<text x="1270" y="1001" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#52637B">远程接口必须与 Card 同源</text>
+<text x="40" y="1093" text-anchor="start" font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="400" fill="#52637B">沙箱代码路径存在并执行原生隔离检查；本图描述实现结构，不代表每个真实 Agent 的完整沙箱验收已经完成。</text>
+</svg>

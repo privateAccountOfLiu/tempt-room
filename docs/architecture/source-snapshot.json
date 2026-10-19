@@ -1,0 +1,140 @@
+{
+  "generatedAtShanghai": "2026-10-18 20:30",
+  "scope": "local source, not a deployment or acceptance claim",
+  "sources": [
+    {
+      "path": "apps/web/src/main.tsx",
+      "sha256": "9841519c46cb33b594898c3ba6b1042a5ea0be257ef0add5ad576db771430bcc"
+    },
+    {
+      "path": "apps/server/src/main.ts",
+      "sha256": "01ef88a0d2ec4fe09ad1e1828cd86aaec371131353462fb505e99f501449c40e"
+    },
+    {
+      "path": "apps/server/src/app.ts",
+      "sha256": "2295d2b704a53ca75a6a059ca5c139e1afe5d7dff300e8eb2f8509ee27c844e2"
+    },
+    {
+      "path": "apps/server/src/service.ts",
+      "sha256": "4df668ad0fa1dc0e1e965a5b47d25a661cc51e05b865809a7a1882358d2947a9"
+    },
+    {
+      "path": "apps/server/src/store.ts",
+      "sha256": "251287d3eeac7c769057548cfd845436295076ae696dfc79f9631caca4ce7101"
+    },
+    {
+      "path": "apps/server/src/worker.ts",
+      "sha256": "d64c9b73a438c4840a2c58662d151044bb8a8fabc7f1c4a2c0bfc1052e0db6bc"
+    },
+    {
+      "path": "apps/server/src/adapters.ts",
+      "sha256": "24e23c65af2fabbb7c7ae4e26ff556b82981d4de0f3714cb6c24d2eb0be3666c"
+    },
+    {
+      "path": "apps/server/src/acp.ts",
+      "sha256": "2cc76db1fc9743dd63b1e17c51eb77fc3654dfd51a7f55099462f91811ccd62a"
+    },
+    {
+      "path": "apps/server/src/host.ts",
+      "sha256": "f025248066981a1c17374353761191183f985c62dbdcd7bb44d6840477f9d006"
+    },
+    {
+      "path": "apps/server/src/sandbox.ts",
+      "sha256": "e857f1a516ff2b4dd05377b17786bdd9547fe41eae54da66c80e716a9ce93442"
+    },
+    {
+      "path": "apps/server/src/runtime.ts",
+      "sha256": "adcd17fef33195eff10edd25117639b8295a8f6987bfd986c10f01a2b9d764d7"
+    },
+    {
+      "path": "apps/server/src/toolchain.ts",
+      "sha256": "1c34fc94cf2d9b9692688ac7f9780671821ab7498a4362aab3dd80856017d056"
+    },
+    {
+      "path": "apps/server/src/context.ts",
+      "sha256": "e68c5b8bc498f85180b7ffe700d309ee48adeecfb7fb507c89ecbff4930aaa07"
+    },
+    {
+      "path": "apps/server/src/sessions.ts",
+      "sha256": "186e6c4e9e770da7db0f29d4d0a437c43b98757191343fd20d9be7bda3990dee"
+    },
+    {
+      "path": "apps/server/src/workspaces.ts",
+      "sha256": "c14c59e3d02b6a5825f25940c7ea3747daacf062e0f1ab88ab8e1ab32b151f1a"
+    },
+    {
+      "path": "apps/server/src/network.ts",
+      "sha256": "2c3b5b6c17a5fdc6824a1cd7c2011c56e39d80c8b5aa6654a09b86cb054884b5"
+    },
+    {
+      "path": "apps/server/src/agent-tokens.ts",
+      "sha256": "3aa80ff28747899914ef0b5da3ddc5b2a60f8759bb87b71b1f13b83b513f9596"
+    },
+    {
+      "path": "apps/server/src/session-token.ts",
+      "sha256": "c40c9e00149a00a68a28c984945686090ba8183a8e58ac7bbc94caa413c16020"
+    },
+    {
+      "path": "packages/client/src/index.ts",
+      "sha256": "fea60def666b3cc00178e1643bc688f1dadd6de32fa0431c938f34f1d219181d"
+    },
+    {
+      "path": "packages/protocol/src/index.ts",
+      "sha256": "2c578a74dbb740d27f6f799af3b7283f5f6e6c5eedd987cc22f703d5718169fa"
+    },
+    {
+      "path": "packages/protocol/src/models.ts",
+      "sha256": "084e911a3085c5546f9760eb5376b633337cfc4e1d25fe2563cb12a9f67c7fc0"
+    },
+    {
+      "path": "scripts/room-agent-mcp.mjs",
+      "sha256": "e0eee04b430d0326273b4f7a6ff66b5e14b824fdedd5b4d24e265cfb5c4b2cb3"
+    },
+    {
+      "path": "scripts/room-agent-runner.mjs",
+      "sha256": "a8b7ad39a4194ab42c9a8be5c99bbfec0550cd309d33ac53efaf2912f94e3e8b"
+    },
+    {
+      "path": "scripts/room-bridge.mjs",
+      "sha256": "16648f08ef75cdd1a627c544421a1a2dd5c2dd1841eb0a1da6baf2dbbd62667c"
+    },
+    {
+      "path": "sandbox/RoomSandbox/Program.cs",
+      "sha256": "1beacd7c064b0446df48444f932faeed238bd9fe48fcef1c679c06b393669eae"
+    },
+    {
+      "path": "sandbox/RoomSandbox/SandboxProcess.cs",
+      "sha256": "ed9bdf2a7075a3d1a36b75b7640aa0030cc1d28e33bb5ab9c5e0411766fc293f"
+    },
+    {
+      "path": "sandbox/RoomSandbox/RoomPipe.cs",
+      "sha256": "881f7eab633b3efa1f879fffca9db79fb0bddd4deebf6636d460495326b38b7b"
+    }
+  ],
+  "pages": [
+    {
+      "id": "overview",
+      "title": "Tempt Room · 当前项目架构",
+      "nodes": 25,
+      "edges": 27,
+      "width": 1480,
+      "height": 1160
+    },
+    {
+      "id": "execution",
+      "title": "执行路径与成果落地",
+      "nodes": 28,
+      "edges": 24,
+      "width": 1540,
+      "height": 1140
+    },
+    {
+      "id": "events",
+      "title": "命令、调度与可靠事件流",
+      "nodes": 17,
+      "edges": 16,
+      "width": 1480,
+      "height": 1110
+    }
+  ]
+}

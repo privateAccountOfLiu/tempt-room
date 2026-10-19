@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "commandId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-zA-Z0-9_-]+$"
+    },
+    "roomId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-zA-Z0-9_-]+$"
+    },
+    "name": {
+      "type": "string",
+      "enum": [
+        "room_read",
+        "room_post",
+        "task_propose",
+        "task_claim",
+        "task_complete",
+        "task_heartbeat",
+        "artifact_publish",
+        "room_status",
+        "room_wait"
+      ]
+    },
+    "arguments": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    }
+  },
+  "required": [
+    "commandId",
+    "roomId",
+    "name",
+    "arguments"
+  ],
+  "additionalProperties": false
+}

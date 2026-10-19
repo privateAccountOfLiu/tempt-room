@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "contextPolicy": {
+      "default": {
+        "maxLag": 64,
+        "maxRounds": 3,
+        "maxDeltaBytes": 262144
+      },
+      "type": "object",
+      "properties": {
+        "maxLag": {
+          "default": 64,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "maxRounds": {
+          "default": 3,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 12
+        },
+        "maxDeltaBytes": {
+          "default": 262144,
+          "type": "integer",
+          "minimum": 4096,
+          "maximum": 1048576
+        }
+      },
+      "required": [
+        "maxLag",
+        "maxRounds",
+        "maxDeltaBytes"
+      ],
+      "additionalProperties": false
+    },
+    "concurrency": {
+      "default": 2,
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8
+    },
+    "memoryMb": {
+      "default": 4096,
+      "type": "integer",
+      "minimum": 256,
+      "maximum": 16384
+    },
+    "maxProcesses": {
+      "default": 64,
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 128
+    },
+    "taskTimeoutMs": {
+      "default": 1800000,
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 7200000
+    },
+    "chatTimeoutMs": {
+      "default": 300000,
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 7200000
+    },
+    "taskLeaseMs": {
+      "default": 600000,
+      "type": "integer",
+      "minimum": 5000,
+      "maximum": 86400000
+    }
+  },
+  "required": [
+    "contextPolicy",
+    "concurrency",
+    "memoryMb",
+    "maxProcesses",
+    "taskTimeoutMs",
+    "chatTimeoutMs",
+    "taskLeaseMs"
+  ],
+  "additionalProperties": false
+}

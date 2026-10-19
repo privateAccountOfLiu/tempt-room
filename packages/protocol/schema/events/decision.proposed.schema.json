@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "decision": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "roomId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "text": {
+          "type": "string"
+        },
+        "accepted": {
+          "type": "boolean"
+        },
+        "actor": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "human",
+                "agent",
+                "system"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "kind"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "accepted",
+        "actor"
+      ],
+      "additionalProperties": {}
+    }
+  },
+  "required": [
+    "decision"
+  ],
+  "additionalProperties": {}
+}
