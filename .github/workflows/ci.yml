@@ -28,6 +28,8 @@ jobs:
         run: npm run typecheck
       - name: Secret scan
         run: npm run check:secrets
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
       - name: Unit and contract tests
         run: npm test
       - name: Event replay / fencing / partial / context contract tests
