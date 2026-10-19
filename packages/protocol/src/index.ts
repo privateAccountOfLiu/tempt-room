@@ -6,6 +6,7 @@ export { codexBindingSchema, codexRunStateSchema, type CodexBinding, type CodexR
 export { executionSettingsSchema,runLimitsSchema,defaultExecutionSettings,budgetError,roomBudgetError,type ExecutionSettings,type RunLimits,type BudgetUsage,type RoomBudgetRun } from './settings.ts';
 export { actorSchema,sandboxProfileSchema,messageSchema,taskSchema,runSchema,artifactSchema } from './models.ts';
 export { runFenceSchema,toolOperationSchema,sameRunFence,type RunFence,type ToolOperation } from './execution.ts';
+export { classifyFailure, type FailureInfo, type FailureKind } from './failure.ts';
 export {contextPolicySchema,contextDeltaSchema,contextSeqOf,type ContextPolicy,type ContextDelta} from './reconciliation.ts';
 import {contextPolicySchema,type ContextPolicy} from './reconciliation.ts';
 export {runStatusSchema,terminalStates,runPartialSchema,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,validateRunTransition,type RunStatus,type RunPartial} from './run-state.ts';

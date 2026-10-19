@@ -74,3 +74,10 @@
 /* Source trust marker: external/remote text is data, never tool authorization. */
 .trust-badge{font-family:'IBM Plex Mono',Consolas,monospace;font-size:7px;border:1px solid #5d4b2f;color:#c6a875;background:#241d12;border-radius:3px;padding:2px 4px;letter-spacing:.2px}
 .trust-badge.remote{border-color:#4a4058;color:#b2a3c8;background:#1e1924}
+/* Failure classification in run error cards. */
+.failure-hint{display:flex;align-items:baseline;gap:7px;margin:5px 0 2px;flex-wrap:wrap}
+.failure-label{font-size:8px;font-family:'IBM Plex Mono',Consolas,monospace;border:1px solid #5a4a32;color:#d1b787;background:#241d12;border-radius:3px;padding:2px 5px;white-space:nowrap}
+.failure-label.timeout,.failure-label.budget{border-color:#5e4630;color:#d9b28a}
+.failure-label.auth,.failure-label.network{border-color:#5a3a35;color:#d7a39a}
+.failure-label.context{border-color:#4a4058;color:#b7a6ce}
+.failure-hint small{font-size:9px;line-height:1.6;color:#8b9a7f}

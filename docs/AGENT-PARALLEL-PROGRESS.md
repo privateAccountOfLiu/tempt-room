@@ -121,7 +121,7 @@
 - `discussion.start` 新增可选 `quorum`（默认等于参与者数）；拒绝 quorum 超过参与人数、或 maxResponses 小于 quorum 的不可达配置。
 - 每轮成功响应达到 quorum 即推进下一轮：未完成成员记入 `Discussion.absent` 并以 `superseded` 取消，避免慢成员阻塞本轮；若所有运行终止仍未达 quorum 则停止讨论。默认 quorum 为全员，保留原语义。
 - 讨论横幅显示 Quorum 与缺席成员；创建讨论表单增加 quorum 字段（0=全部）。
-- 测试：`tests/discussion-quorum.test.ts` 覆盖提前推进、缺席记录、迟到取消、quorum 不可达拒绝；`npm test` **211/211**。
+- 测试：`tests/discussion-quorum.test.ts` 覆盖提前推进、缺席记录、迟到取消、quorum 不可达拒绝；`npm test` **212/212**。
 
 ## 增量：房间 / 成员待处理运行上限
 
@@ -165,13 +165,19 @@
 - 新增超时降级测试：假适配器先产出文本再阻塞，1 秒超时后运行以 canceled 结束并保留持久 partial draft，不会把草稿当作最终回复发布。
 - 测试：`tests/partial-timeout.test.ts` 1 项；`npm test` **211/211**，浏览器 E2E 39/39。
 
+## 增量：失败分类与可解释建议
+
+- 新增共享 `classifyFailure(error,status)`：区分预算、超时、上下文、认证、网络、依赖、工具、提供方、取消/状态未知等类别，返回中文标签、是否可重试与建议。
+- 运行错误卡片与运行详情弹窗显示分类标签和建议；不会改写运行状态，也不会自动重试。
+- 测试：`tests/failure.test.ts` 覆盖各类错误的分类与未知兜底；`npm test` **212/212**。
+
 ## 原计划逐项剩余工作
 
 P0 尚未完成：
 
 1. 把可恢复副作用的操作记录扩展到适配器内部的命令执行，区分可证明幂等与结果未知的原生工作；Room 工具 fencing 与账本已完成，不能替代内部 Shell/网络副作用的验收。
 2. 带 generation/租约的崩溃恢复与安全自动重入队。中断标记、generation 撤销与显式重入队事件已具备；必须先解决外部命令副作用不受 SQLite 回滚保护的问题，当前仍不盲目重试状态不明的写运行。
-3. 更多 seq 边界的随机故障注入与并发冲突门禁，并把完整故障与 UI 不变量纳入 CI；本地 CI 配置已添加（`.github/workflows/ci.yml`：typecheck、密钥扫描、211 项测试、replay 契约、构建），尚未在远端实际执行。
+3. 更多 seq 边界的随机故障注入与并发冲突门禁，并把完整故障与 UI 不变量纳入 CI；本地 CI 配置已添加（`.github/workflows/ci.yml`：typecheck、密钥扫描、212 项测试、replay 契约、构建），尚未在远端实际执行。
 
 P1 尚未完成：
 
@@ -179,7 +185,7 @@ P1 尚未完成：
 2. quorum/absent/late、分桶 EWMA 自适应超时与超时草稿降级测试已实现（第六/八/十二批）；按轮公平性压测与加权 WFQ 仍待实现。
 3. 每 Agent/房间待处理运行上限已实现（`maxQueuedRunsPerAgent`/`maxQueuedRunsPerRoom`，入队前 429 原子失败）；工具输出上限、每 Agent 增量 inbox 与大规模上下文分段/引用仍待实现。
 4. 单次运行 Token/费用硬预算、房间累计用量上限与入队前熔断、房间成本看板均已实现（未知用量不按 0 计）；时长上限由 timeout 控制。
-5. 消息 trust 来源级、上下文内不可信标注、JSONL 审计导出与显式 `run.retry` 已实现；工具前策略校验、注入攻击测试与自动重试策略仍待实现。
+5. 消息 trust 来源级、上下文内不可信标注、JSONL 审计导出、显式 `run.retry` 与失败分类建议已实现；工具前策略校验、注入攻击测试与自动重试策略仍待实现。
 6. 真实 CLI 的混合快慢场景验收仍须与无模型测试分开，不能用模拟结果替代。
 
 P2 尚未完成：
