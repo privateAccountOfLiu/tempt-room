@@ -4,12 +4,13 @@ import type { Store } from './store.ts';
 
 /** Reconstruct at an event cursor, never from mutable current message rows. */
 export function captureContext(store:Store,roomId:string,throughSeq:number):RunContext {
+  const maxMessages=store.settings().maxContextMessages;
   const messages:{seq:number;message:Message}[]=[],decisions=new Map<string,Decision>(),runs=new Map<string,Pick<Run,'taskId'|'taskVersion'>>();let cursor=0;
   while(cursor<throughSeq){
     const page=store.events(roomId,cursor,1000).filter(event=>event.seq<=throughSeq);if(!page.length)break;
     for(const event of page){
       if(event.type==='chat.message.created'){
-        messages.push({seq:event.seq,message:structuredClone(event.payload.message as Message)});if(messages.length>40)messages.shift();
+        messages.push({seq:event.seq,message:structuredClone(event.payload.message as Message)});if(messages.length>maxMessages)messages.shift();
       } else if(event.type==='decision.accepted'){const decision=event.payload.decision as Decision;decisions.set(decision.id,structuredClone(decision));}
       else if(event.type==='run.created'||event.type==='run.updated'){const run=event.payload.run as Run;runs.set(run.id,{taskId:run.taskId,taskVersion:run.taskVersion});}
       else if(event.type==='task.revised'||event.type==='task.handoff'){

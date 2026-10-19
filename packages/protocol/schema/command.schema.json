@@ -967,6 +967,12 @@
               "minimum": 65536,
               "maximum": 8388608
             },
+            "maxContextMessages": {
+              "default": 40,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            },
             "autoRetryChatRuns": {
               "default": false,
               "type": "boolean"
@@ -1007,6 +1013,7 @@
             "maxQueuedRunsPerRoom",
             "maxAgentRunsPerMinute",
             "maxToolResultBytes",
+            "maxContextMessages",
             "autoRetryChatRuns",
             "maxAutoRetries",
             "adaptiveTimeouts",
