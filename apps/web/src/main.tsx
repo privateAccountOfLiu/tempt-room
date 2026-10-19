@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RoomClient } from '../../../packages/client/src/index.ts';
-import { VERSION,agentSchema,executionSettingsSchema,classifyFailure, roomToolNames,type AgentDescriptor, type Artifact, type Diagnostic, type Discussion, type Task, type ExecutionSettings,type Message, type Room, type RoomSnapshot, type Run, type ToolOperation, terminalStates } from '../../../packages/protocol/src/index.ts';
+import { VERSION,agentSchema,executionSettingsSchema,classifyFailure,defaultDiscussionResponses, roomToolNames,type AgentDescriptor, type Artifact, type Diagnostic, type Discussion, type Task, type ExecutionSettings,type Message, type Room, type RoomSnapshot, type Run, type ToolOperation, terminalStates } from '../../../packages/protocol/src/index.ts';
 import './style.css';
 import './settings.css';
 import './workbench.css';
@@ -12,7 +12,13 @@ const client = new RoomClient();
 const statusLabels:Record<string,string>={queued:'排队中',running:'工作中',waiting_input:'等待输入',cancel_requested:'正在停止',completed:'已完成',failed:'未完成',canceled:'已取消',superseded:'已被新目标替代',interrupted:'已中断',unknown:'状态待核实',proposed:'待你确认'};
 const discussionEndLabels:Record<string,string>={converged:'全体已确认，讨论已收敛',round_limit:'已到轮次上限',response_limit:'已到响应次数上限',time_limit:'已到时间上限',no_quorum:'成功响应不足',user_stop:'用户停止',restart:'服务重启',scheduling_failed:'后续调度失败'};
 const discussionRounds=(d:Discussion)=>d.stopOnConvergence?`第 ${d.round} 轮 · 收敛后结束`:`${d.round}/${d.rounds} 轮`;
-const discussionStatus=(d:Discussion)=>d.summary?.status==='queued'?'总结中':d.status==='active'?'进行中':d.endReason==='converged'?'已收敛':d.status==='completed'?'已完成':'已停止';
+const discussionStatus=(d:Discussion)=>{
+ if(d.summary?.status==='queued')return '总结中';
+ if(d.status==='active')return '进行中';
+ if(d.endReason==='converged')return '已收敛';
+ if(d.stopOnConvergence)return `${d.endReason?discussionEndLabels[d.endReason]+' · ':''}未收敛`;
+ return d.status==='completed'?'已完成':'已停止';
+};
 const roomToolLabels:Record<string,string>={room_read:'读取房间',room_status:'房间状态',room_inbox:'增量读取',room_post:'发言',task_propose:'提议任务',task_claim:'领取任务',task_context:'核对任务上下文',task_complete:'完成任务',task_heartbeat:'任务心跳',artifact_publish:'发布交付物'};
 const providerLabels:Record<string,string>={codex:'Codex App Server',claude:'Claude Code CLI',deepseek:'DeepSeek Harness · ACP',api:'自建模型 API',a2a:'A2A 1.0',demo:'确定性演示'};
 const marks:Record<string,string>={codex:'Cx',claude:'Cl',deepseek:'Ds',api:'Ai',a2a:'A2',demo:'De'};
@@ -297,15 +303,18 @@ function RoomForm({existing,agents,onClose,onSubmit}:{existing?:Room;agents:Agen
  return <Modal title={existing?'房间设置':'创建一个共同工作的地方'} subtitle="围绕一个项目或话题，保留讨论和成果。" onClose={onClose}><form className="form" onSubmit={e=>{e.preventDefault();setBusy(true);void onSubmit({name,description,members}).finally(()=>setBusy(false));}}><label>房间名称<input required maxLength={80} data-initial-focus placeholder="例如：下一版产品" value={name} onChange={e=>setName(e.target.value)}/></label><label>一句话描述<input maxLength={300} placeholder="这个房间想共同完成什么？" value={description} onChange={e=>setDescription(e.target.value)}/></label><fieldset><legend>邀请 Agent</legend>{agents.map(agent=><label className="checkbox-label" key={agent.id}><input type="checkbox" checked={members.includes(agent.id)} onChange={e=>setMembers(m=>e.target.checked?[...m,agent.id]:m.filter(id=>id!==agent.id))}/><span>{agent.name}</span><small className="muted">{agent.enabled?'已启用':'待配置'}</small></label>)}</fieldset><div className="modal-actions"><button className="button" type="button" onClick={onClose}>取消</button><button className="button primary" disabled={busy}>{existing?'保存设置':'创建房间'}</button></div></form></Modal>;
 }
 function DiscussionForm({agents,onClose,onSubmit}:{agents:AgentDescriptor[];onClose:()=>void;onSubmit:(payload:any)=>Promise<void>}){
- const [goal,setGoal]=useState(''),[participants,setParticipants]=useState(agents.slice(0,3).map(a=>a.id)),[rounds,setRounds]=useState(3),[maxResponses,setMaxResponses]=useState(9),[quorum,setQuorum]=useState(0),[minutes,setMinutes]=useState(10),[stopOnConvergence,setStopOnConvergence]=useState(false),[summarizerId,setSummarizerId]=useState(''),[busy,setBusy]=useState(false);
+ const [goal,setGoal]=useState(''),[participants,setParticipants]=useState(agents.slice(0,3).map(a=>a.id)),[rounds,setRounds]=useState(3),[responseLimit,setResponseLimit]=useState<number>(),[quorum,setQuorum]=useState(0),[minutes,setMinutes]=useState(10),[stopOnConvergence,setStopOnConvergence]=useState(false),[summarizerId,setSummarizerId]=useState(''),[busy,setBusy]=useState(false);
+ const maxResponses=responseLimit??defaultDiscussionResponses(participants.length,stopOnConvergence),fullRounds=participants.length?Math.floor(maxResponses/participants.length):0;
  return <Modal title="让不同的视角碰一碰" subtitle="设定目标和边界，成员会分轮回应彼此。" onClose={onClose}><form className="form" onSubmit={event=>{event.preventDefault();setBusy(true);void onSubmit({goal,participants,rounds,maxResponses,maxDurationMs:minutes*60000,stopOnConvergence,...(summarizerId?{summarizerId}:{}),...(quorum>0?{quorum}:{})}).finally(()=>setBusy(false));}}>
   <label>这场讨论要解决什么？<textarea required data-initial-focus rows={3} placeholder="例如：讨论这个功能的实现方案，并提出验收条件。" value={goal} onChange={event=>setGoal(event.target.value)}/></label>
   <fieldset><legend>参与成员（最多 20 位）</legend>{agents.map(agent=><label className="checkbox-label" key={agent.id}><input type="checkbox" checked={participants.includes(agent.id)} disabled={!participants.includes(agent.id)&&participants.length>=20} onChange={event=>setParticipants(previous=>event.target.checked?[...previous,agent.id]:previous.filter(id=>id!==agent.id))}/><Avatar agent={agent}/><span>{agent.name}</span></label>)}</fieldset>
   <label className="checkbox-label"><input type="checkbox" checked={stopOnConvergence} onChange={e=>setStopOnConvergence(e.target.checked)}/><span>收敛后自动结束</span></label>
+  {stopOnConvergence&&<><p className="form-note" data-discussion-budget>全体确认同一结论后结束；最多安排 {maxResponses} 次成员响应或运行 {minutes} 分钟。当前 {participants.length} 位成员，每个完整轮次需要 {participants.length} 次响应，可安排 {fullRounds} 个完整轮次；未用完额度也可提前收敛。可在下方「讨论边界」调整。</p>{participants.length>0&&fullRounds<=3&&<p className="form-note warning-text" role="status">当前响应额度只够 {fullRounds} 个完整轮次，可能在收敛前用尽；需要更充分讨论时请提高上限。</p>}</>}
   <label>总结人（可选）<select value={summarizerId} onChange={e=>setSummarizerId(e.target.value)}><option value="">不指定，不生成交付物</option>{agents.map(agent=><option key={agent.id} value={agent.id}>{agent.name}</option>)}</select></label>
   <p className="form-note">讨论结束后，总结人会整理整场讨论并生成一份交付物。总结额外占用一次运行，不计入讨论响应上限，使用单次运行的超时和预算。</p>
   <details className="form-advanced"><summary>讨论边界 · {stopOnConvergence?'不限轮次':`${rounds} 轮`} / {maxResponses} 次响应 / {minutes} 分钟</summary>
-  <div className="form-grid"><label>讨论轮次<input type="number" required disabled={stopOnConvergence} min={1} max={20} value={rounds} onChange={event=>setRounds(Number(event.target.value))}/></label><label>最多响应次数<input type="number" required min={1} max={100} value={maxResponses} onChange={event=>setMaxResponses(Number(event.target.value))}/></label><label>最长时间（分钟）<input type="number" required min={1} max={120} value={minutes} onChange={event=>setMinutes(Number(event.target.value))}/></label><label>推进所需成功响应（0=全部）<input type="number" required min={0} max={20} value={quorum} onChange={event=>setQuorum(Number(event.target.value))}/></label></div>
+  <div className="form-grid"><label>讨论轮次<input type="number" required disabled={stopOnConvergence} min={1} max={20} value={rounds} onChange={event=>setRounds(Number(event.target.value))}/></label><label>最多响应次数<input type="number" required min={1} max={100} value={maxResponses} onChange={event=>setResponseLimit(Number(event.target.value))}/></label><label>最长时间（分钟）<input type="number" required min={1} max={120} value={minutes} onChange={event=>setMinutes(Number(event.target.value))}/></label><label>推进所需成功响应（0=全部）<input type="number" required min={0} max={20} value={quorum} onChange={event=>setQuorum(Number(event.target.value))}/></label></div>
+  {responseLimit!==undefined&&<button type="button" className="text-button" onClick={()=>setResponseLimit(undefined)}>恢复默认响应上限</button>}
   <p className="form-note">{stopOnConvergence?'不限轮次，全体成员明确确认同一候选结论后结束；响应次数或时间达到上限仍会结束，并标记未收敛。收敛模式等待全体成员完成本轮，缺席不算同意。':'轮次、响应次数或时间任一达到上限即结束。'}每位成员每轮最多回应一次。{stopOnConvergence?'成功响应不足 quorum 会停止；收敛始终需要全体确认。':'quorum 为每轮推进所需的最少成功响应，未达 quorum 会停止，达到后未完成的成员记为缺席。'}真实成员的响应可能产生模型费用。</p>
   </details>
   <div className="modal-actions"><button className="button" type="button" onClick={onClose}>取消</button><button className="button primary" disabled={busy||!participants.length}><Icon name="play" size={14}/>开始讨论</button></div>

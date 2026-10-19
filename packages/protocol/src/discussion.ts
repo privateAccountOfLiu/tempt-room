@@ -1,6 +1,10 @@
 import {z} from 'zod';
 
 const id=z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/);
+/** Suggested form budget; the v0.1 wire default stays stable for existing receipts. */
+export function defaultDiscussionResponses(participantCount:number,stopOnConvergence=false):number{
+  return stopOnConvergence?Math.min(100,Math.max(30,participantCount*10)):9;
+}
 /** A ballot confirms one frozen proposal, never a natural-language similarity score. */
 export const discussionBallotSchema=z.object({
   proposalId:id.nullable(),agree:z.boolean(),proposal:z.string().trim().min(1).max(12000)

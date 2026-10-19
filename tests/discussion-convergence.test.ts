@@ -6,7 +6,7 @@ import {Store,SYSTEM,uid,DATABASE_VERSION} from '../apps/server/src/store.ts';
 import {RoomService} from '../apps/server/src/service.ts';
 import {Worker} from '../apps/server/src/worker.ts';
 import {discussionSummaryPrompt} from '../apps/server/src/discussions.ts';
-import {parseDiscussionReply,commandSchema,type Discussion,type Run,type Artifact,type AgentDescriptor,type Message} from '../packages/protocol/src/index.ts';
+import {parseDiscussionReply,commandSchema,defaultDiscussionResponses,type Discussion,type Run,type Artifact,type AgentDescriptor,type Message} from '../packages/protocol/src/index.ts';
 import type {AdapterContext} from '../apps/server/src/adapters.ts';
 
 function fixture(t:TestContext,adapter?:(ctx:AdapterContext)=>AsyncIterable<any>){
@@ -33,6 +33,26 @@ test('convergence ignores round limit and waits for unanimous explicit confirmat
   const d=f.discussion(id);assert.equal(d.endReason,'converged');assert.equal(d.status,'completed');assert.equal(d.responses,4);assert.equal(d.consensus?.agreedBy.length,2);assert.equal(d.summary,undefined);assert.equal(f.store.list('artifacts').length,0);
   assert.ok(f.store.list<Message>('messages').every(m=>!m.text.includes('room-consensus')));
   const bytes=f.store.projectionBytes(f.roomId);f.store.rebuildProjections(f.roomId);assert.equal(f.store.projectionBytes(f.roomId),bytes);
+});
+
+test('convergence form budgets allow longer discussion while keeping bounded and legacy defaults',()=>{
+  assert.equal(defaultDiscussionResponses(3,true),30);
+  assert.equal(defaultDiscussionResponses(20,true),100);
+  assert.equal(defaultDiscussionResponses(3,false),9);
+  const parsed=commandSchema.parse({version:'0.1',commandId:'legacy_budget',roomId:'room_1',type:'discussion.start',payload:{goal:'Goal',participants:['demo-planner'],stopOnConvergence:true}});
+  assert.equal(parsed.payload.maxResponses,9,'wire normalization must keep existing receipt hashes stable');
+});
+
+for(const explicitLowLimit of [false,true])test(explicitLowLimit?'an explicit nine-response budget still ends three-agent discussion at round three':'the new three-agent convergence budget continues beyond round three and converges at round four',t=>{
+  const f=fixture(t),third={...f.store.get<AgentDescriptor>('agents','demo-planner')!,id:'demo-third',name:'Third participant'};
+  f.command('agent.save',third);f.command('room.members.set',{members:[...f.store.room(f.roomId)!.members,third.id]});
+  const participants=['demo-planner','demo-reviewer',third.id];
+  const id=f.start({participants,rounds:3,maxResponses:explicitLowLimit?9:defaultDiscussionResponses(participants.length,true)});
+  for(let round=1;round<=3;round++)for(const run of f.round(id))f.finish(run,f.ballot(id,false,`Revised proposal ${round}`));
+  if(explicitLowLimit){assert.equal(f.discussion(id).round,3);assert.equal(f.discussion(id).endReason,'response_limit');assert.equal(f.discussion(id).responses,9);return;}
+  assert.equal(f.discussion(id).status,'active');assert.equal(f.discussion(id).round,4);assert.equal(f.discussion(id).endReason,undefined);
+  for(const run of f.round(id))f.finish(run,f.ballot(id,true));
+  assert.equal(f.discussion(id).endReason,'converged');assert.equal(f.discussion(id).responses,12);assert.equal(f.discussion(id).consensus?.agreedBy.length,3);
 });
 
 test('dissent replaces the candidate; old IDs, changed text and unstructured agreement do not converge',t=>{

@@ -12,7 +12,7 @@ import {contextPolicySchema,type ContextPolicy,type TaskContext} from './reconci
 export {runStatusSchema,terminalStates,runPartialSchema,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,validateRunTransition,type RunStatus,type RunPartial} from './run-state.ts';
 import type {RunStatus,RunPartial} from './run-state.ts';
 
-export {discussionSchema,discussionBallotSchema,parseDiscussionReply,type DiscussionBallot} from './discussion.ts';
+export {discussionSchema,discussionBallotSchema,parseDiscussionReply,defaultDiscussionResponses,type DiscussionBallot} from './discussion.ts';
 import type {DiscussionBallot} from './discussion.ts';
 
 export const VERSION = '0.1' as const;
