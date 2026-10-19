@@ -5,7 +5,7 @@ import {assertContextCurrent} from './context-reconciliation.ts';
 
 /** Reservations commit before side effects. An uncertain operation is never rerun. */
 export class ToolOperations {
-  constructor(private store:Store){}
+  constructor(private store:Store,private maxResultBytes:()=>number=()=>2**21){}
   execute(fence:RunFence,operationId:string,name:string,args:unknown,action:()=>unknown):any {
     idSchema.parse(operationId);
     const hash=digest({name,args}),id='op_'+digest([fence.runId,fence.agentId,fence.generation,operationId]);
@@ -31,7 +31,7 @@ export class ToolOperations {
         const result=action();
         if(result&&typeof (result as any).then==='function')throw new Error('Tool operation must finish synchronously inside its commit');
         // Persist exactly what the transport can acknowledge, not a mutable object.
-        const wire=JSON.stringify(result??null);if(Buffer.byteLength(wire)>2**21)throw new Error('Tool result exceeds 2 MiB');
+        const wire=JSON.stringify(result??null);const limit=this.maxResultBytes();if(Buffer.byteLength(wire)>limit)throw new Error('Tool result exceeds configured limit');
         operation.status='completed';operation.result=JSON.parse(wire);operation.updatedAt=now();
         this.store.event(fence.roomId,'operation.completed',SYSTEM,{operation},null,fence.runId);
         return structuredClone(operation.result);

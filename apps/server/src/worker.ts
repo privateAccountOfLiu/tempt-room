@@ -95,7 +95,7 @@ export class Worker {
   private fairServed = new Map<string,number>();
   readonly streamListeners = new Set<(delta: StreamDelta) => void>();
   constructor(public store: Store, public service: RoomService, public root: string,private options:{adapter?:typeof runAdapter}={}) {
-    this.operations=new ToolOperations(store);
+    this.operations=new ToolOperations(store,()=>store.settings().maxToolResultBytes);
     this.host = new SandboxHost(root, resolve('sandbox/RoomSandbox/bin/Release/net10.0-windows/RoomSandbox.exe'));
     this.workspaces = new Workspaces(root);
     service.onCancel = id => this.active.get(id)?.abort(new Error('用户取消'));
