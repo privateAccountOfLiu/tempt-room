@@ -27,5 +27,7 @@ jobs:
         run: npm test
       - name: Event replay / fencing / partial / context contract tests
         run: npm run test:replay
+      - name: Seeded fault-injection replay suite
+        run: npm run test:faults
       - name: Production build
         run: npm run build

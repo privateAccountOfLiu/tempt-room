@@ -118,9 +118,10 @@ T03 已完成重启后的真实复测：当前 Codex 会话以外部成员接入
 
 2026-10-19（Asia/Shanghai）完成**Git 基线、审计导出、CI 配置与 UI/UX 优化**：
 - `git init -b main`，首个提交 `ced6da3` 纳入 289 个源码/文档/测试文件（`.state`、node_modules、dist、`.mcp.json` 均按 `.gitignore` 排除，密钥扫描 0 发现）；新增 `.gitattributes` 统一行尾。
-- 新增 owner-only `GET /api/rooms/:id/audit/export`，按事件原样输出 NDJSON 附件；房间头部新增「导出审计日志」按钮。新增 `tests/audit-export.test.ts` 覆盖认证、401、NDJSON 字段与附件头；`npm test` 215/215。
-- 运行级 Token/费用硬预算：设置新增 `tokenBudget`/`costBudgetUsd`（0=不限），入队冻结到 Run.limits；Worker 按 provider 上报用量检查，超预算以 `failed` 结束且不发布聊天结果；未知用量不误判。`tests/budget.test.ts` 3 项 + `tests/budget-worker.test.ts` 真实 Worker 集成 1 项，`npm test` 215/215；设置对话框与用量面板显示预算。
+- 新增 owner-only `GET /api/rooms/:id/audit/export`，按事件原样输出 NDJSON 附件；房间头部新增「导出审计日志」按钮。新增 `tests/audit-export.test.ts` 覆盖认证、401、NDJSON 字段与附件头；`npm test` 216/216。
+- 运行级 Token/费用硬预算：设置新增 `tokenBudget`/`costBudgetUsd`（0=不限），入队冻结到 Run.limits；Worker 按 provider 上报用量检查，超预算以 `failed` 结束且不发布聊天结果；未知用量不误判。`tests/budget.test.ts` 3 项 + `tests/budget-worker.test.ts` 真实 Worker 集成 1 项，`npm test` 216/216；设置对话框与用量面板显示预算。
 - 新增讨论 quorum：`discussion.start` 可选每轮最少成功响应（默认全员）；达到 quorum 即推进并记录缺席成员，未达则停止；UI 显示 Quorum/缺席并可在创建表单设置。`tests/discussion-quorum.test.ts` 2 项，测试总数 200/200。
+- 新增种子化随机 seq 故障注入：40 条随机命令后在 30 个水位重建，投影字节与房间游标保持一致；`npm run test:faults` 已加入 CI 配置，测试总数 216/216。
 - 新增公平性压力测试与移动端布局：20 Agent × 5 运行的公平调度 100 次无饥饿；浏览器 E2E 390×844 验证详情面板隐藏、输入框可用且无水平溢出。截图 `docs/screenshots/ui-mobile-20261019.png`，浏览器 E2E 41/41，测试总数 215/215。
 - 新增上下文序列化测试与讨论历史：`formatContextMessage` 统一 trust/截断并覆盖注入文本作为数据；右侧「讨论记录」可打开只读详情（关联运行与发言）。浏览器 E2E `discussion-history`，全量 40/40，测试总数 214/214。
 - 新增失败分类与可解释建议：`classifyFailure` 区分预算/超时/上下文/认证/网络/依赖/工具/提供方等类别，在错误卡片与运行详情显示标签、是否可重试和下一步建议；`tests/failure.test.ts` 1 项，测试总数 212/212。

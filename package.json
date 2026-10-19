@@ -52,7 +52,8 @@
     "backup": "node scripts/backup-state.mjs",
     "restore": "node scripts/restore-state.mjs",
     "dev:open": "node scripts/dev-open.mjs",
-    "test:sandbox-handoff": "tsx scripts/smoke-sandbox-handoff.ts"
+    "test:sandbox-handoff": "tsx scripts/smoke-sandbox-handoff.ts",
+    "test:faults": "tsx --test tests/fault-injection.test.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
