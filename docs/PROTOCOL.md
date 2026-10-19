@@ -37,7 +37,7 @@ JSON Schema 是命令形状的权威来源：`packages/protocol/schema/*.schema.
 - `room.create`：name、description、members；无需 roomId。
 - `room.update`：name、description；`room.members.set`：members。
 - `message.send`：text、mentions、replyTo、attachments。引用与附件必须属于同房间。
-- `discussion.start`：goal、participants（1–20）、rounds（默认 3，最多 20）、maxResponses（默认 9，最多 100）、maxDurationMs（默认 600000，最多 7200000）；`discussion.stop`：discussionId。
+- `discussion.start`：goal、participants（1–20）、rounds（默认 3，最多 20）、maxResponses（默认 9，最多 100）、maxDurationMs（默认 600000，最多 7200000）、可选 quorum（默认等于参与者数，不能超过参与者数且不能大于 maxResponses）；`discussion.stop`：discussionId。
 - `task.create`：title、可选 agentId、projectPath、dependencies、open。Agent 只能提出待人类确认的任务；`open: true`（仅人类）创建无人认领的开放任务，此时不指定 agentId。
 - `task.claim`：taskId、可选 managed（默认 true）；仅 Agent。认领同房间的开放任务（需 enabled 且为成员），分配给自己、递增版本。`managed: true` 由 Tempt Room 排队一次托管运行；`managed: false`（外部连接器）不触发托管运行，任务进入 running，由该 Agent 自己执行后调 `task.complete`。
 - `task.complete`：taskId、taskVersion、可选 generation、ok（默认 true）、summary；仅 Agent，只能结束分配给自己、版本一致且租约未过期的外部 running 任务，不能代替托管运行完成。设置 completed/failed，记录 `task.completed` 事件，非空 summary 作为该 Agent 的房间消息发布。
@@ -111,7 +111,7 @@ JSON Schema 是命令形状的权威来源：`packages/protocol/schema/*.schema.
 
 Run：queued → running → completed/failed；可进入 waiting_input，再由 run.input 回到 running。取消运行先进入 cancel_requested；确认 Job 无活动进程或远程任务明确 CANCELED 后才进入 canceled。远程 API 断流可能仍在计算，使用 interrupted 并说明不确定性；失去沙箱进程退出证明使用 unknown。终态不会被隐式重试；owner 可显式 `run.retry` 创建新运行，但这不会自动重做状态未知的外部副作用。
 
-同一轮必须所有参与者完成，才安排下一轮；任一失败则停止讨论。响应、轮次或时间任一达到用户选择的上限即结束。任务依赖未完成时不启动；失败依赖阻断下游。修改目标会递增该任务及受影响下游的 taskVersion，取消旧运行；已确认任务重新排队，提议保持待确认。旧版本输出保留但不能应用。
+每轮达到 quorum 个成功响应即可安排下一轮，未完成成员记为 absent 并被取消为 superseded；全部终止但仍低于 quorum 则停止讨论。默认 quorum 等于参与者数（保持原“全部完成才推进”语义）；quorum 必须不超过参与者数且不超过 maxResponses。响应、轮次或时间任一达到用户选择的上限即结束。任务依赖未完成时不启动；失败依赖阻断下游。修改目标会递增该任务及受影响下游的 taskVersion，取消旧运行；已确认任务重新排队，提议保持待确认。旧版本输出保留但不能应用。
 
 每轮上下文在入队事务内固定为 contextId，记录 fromSeq/throughSeq；所有参与者引用同一快照。使用最多最近 40 条消息，提示文本每条展示最多 6000 字符并标明截取；保留全部已接受决策。原始事件不被摘要替代。依赖完成后保存 dependencyVersions 和 inputArtifacts，只纳入同房间、当前已完成版本的交付物。文本附件每份最多展示 16,000 字符，总展示预算 64,000 字符，完整副本供本地 Agent 读取。二进制对 API 只提供描述。原生 room_read 返回该运行绑定的快照，不能读到后续轮次的消息或扩大权限。
 

@@ -86,8 +86,11 @@ export class RoomService {
         const input = payloadSchemas['discussion.start'].parse(p);
         input.participants = [...new Set(input.participants)]; input.participants.forEach(id => {if(this.checkAgent(roomId,id).connectionMode==='external')throw new ProtocolError('external_discussion_unavailable','外部会话需自行在线回应；当前自动轮次仅支持托管成员',409);});
         if (this.store.list<Discussion>('discussions', roomId).some(d => d.status === 'active')) throw new ProtocolError('discussion_active', '请先停止当前讨论', 409);
-        const {maxDurationMs,...fields}=input;
-        const discussion: Discussion = { id: uid('disc'), roomId, ...fields, round: 1, responses: 0, deadline: new Date(Date.now() + maxDurationMs).toISOString(), status: 'active' };
+        if (input.quorum !== undefined && input.quorum > input.participants.length) throw new ProtocolError('quorum_invalid', 'quorum 不能超过参与成员数', 400);
+        const quorum = input.quorum ?? input.participants.length;
+        if (input.maxResponses < quorum) throw new ProtocolError('quorum_unreachable', '最多响应次数小于 quorum，讨论无法推进', 400);
+        const {maxDurationMs,...fields}=input;delete (fields as {quorum?:number}).quorum;
+        const discussion: Discussion = { id: uid('disc'), roomId, ...fields, participants: input.participants, quorum, round: 1, responses: 0, deadline: new Date(Date.now() + maxDurationMs).toISOString(), status: 'active' };
          const event = this.store.event(roomId, 'discussion.started', actor, { discussion });
         this.scheduleRound(discussion, event.seq); return { discussionId: discussion.id };
       }
@@ -292,16 +295,28 @@ export class RoomService {
   }
   settleDiscussion(run: Run) {
     if (!run.discussionId) return;
+    const late: Run[] = [];
     this.store.atomic(() => {
       const discussion = this.store.get<Discussion>('discussions', run.discussionId!); if (!discussion || discussion.status !== 'active') return;
       const round = this.store.list<Run>('runs', run.roomId).filter(r => r.discussionId === discussion.id && r.round === discussion.round);
-      if (round.some(r => !terminalStates.has(r.status))) return;
-      if (round.some(r => r.status !== 'completed')) { this.stopDiscussion(discussion, '有成员运行未成功'); return; }
+      if (!round.length) return;
+      const completed = round.filter(r => r.status === 'completed');
+      const quorum = Math.min(discussion.quorum ?? discussion.participants.length, round.length);
+      if (completed.length < quorum) {
+        if (round.some(r => !terminalStates.has(r.status))) return;
+        this.stopDiscussion(discussion, completed.length ? `本轮未达到 quorum（${completed.length}/${quorum}）` : '本轮没有成功响应');
+        return;
+      }
+      const completedAgents = new Set(completed.map(r => r.agentId));
+      discussion.absent = [...new Set(round.filter(r => !completedAgents.has(r.agentId)).map(r => r.agentId))];
+      late.push(...round.filter(r => !terminalStates.has(r.status)));
       if (discussion.round >= discussion.rounds || discussion.responses >= discussion.maxResponses || Date.now() >= Date.parse(discussion.deadline)) {
-        discussion.status = 'completed';  this.store.event(run.roomId, 'discussion.completed', SYSTEM, { discussion }); return;
+        discussion.status = 'completed'; this.store.event(run.roomId, 'discussion.completed', SYSTEM, { discussion }); return;
       }
       discussion.round++; const event = this.store.event(run.roomId, 'discussion.round', SYSTEM, { discussion }); this.scheduleRound(discussion, event.seq);
     });
+    // Quorum already met; unfinished voices from this round are explicitly late.
+    for (const pending of late) this.cancel(pending, 'superseded');
   }
   stopDiscussion(discussion: Discussion, reason: string) {
     discussion.status = 'stopped';  this.store.event(discussion.roomId, 'discussion.stopped', SYSTEM, { discussion, reason });

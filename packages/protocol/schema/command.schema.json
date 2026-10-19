@@ -303,6 +303,11 @@
               "type": "integer",
               "minimum": 1000,
               "maximum": 7200000
+            },
+            "quorum": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
             }
           },
           "required": [

@@ -69,3 +69,5 @@
 .run-operations code{font-size:10px;color:#b7c9aa;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .run-operations small{font-family:'IBM Plex Mono',monospace;font-size:8px;color:#738364}
 .run-detail .run-summary{margin:0;padding:9px 10px;border:1px solid #2c3826;border-radius:5px;background:#151a14}
+/* Discussion quorum / absent marker in the active discussion banner. */
+.discussion-quorum{margin-left:8px;padding:2px 6px;border:1px solid #4b5637;border-radius:3px;color:#b7c99a;font-size:8px;font-weight:400;letter-spacing:.2px}

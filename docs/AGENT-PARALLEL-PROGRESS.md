@@ -73,7 +73,7 @@
 - v2/v3/v4 只读数据副本分别迁至 v5，各 33 个房间逐字节回放一致，1283/1316/1316 条原事件字节不变。证据：`.state/partials-audit/latest.json`。
 - 原生执行管道拒写探测继续通过（无模型调用）；构建通过。最终离线 SDK 验证包括独立 run-partial schema 和 superseded 状态导出：`.state/sdk-probes/run-KxBrRZ/report.json`；生产构建启动与恢复：`.state/production-smoke/run-3vLkZX/report.json`。凭据扫描 0 项发现。完整证据索引：`.state/partials-delivery.json`。日常库仍为 v2，未迁移、未重启。
 
-仍未实现基于 baseSeq 的增量对账、EWMA 发言窗口与 quorum/late；持久检查点不等于这些调度行为已经实现。
+仍未实现基于 baseSeq 的增量对账、EWMA 发言窗口与 quorum/late；持久检查点不等于这些调度行为已经实现。（后续第四批完成 baseSeq 对账、第六批完成 quorum/absent/late；EWMA 与公平排队仍未实现。）
 
 ## 第四批：baseSeq 增量对账与上下文预算
 
@@ -92,11 +92,11 @@
 - v2/v3/v4 只读副本迁移审计：`.state/context-audit/latest.json`。全程未调用模型。
 - 仓库基线已纳入 Git：`git init -b main` 后首个提交 `ced6da3`，包含本批之前的全部实现；后续小改动继续提交。
 
-范围边界：这是“提交前增量对账 + 水位 fencing”，不是分布式共识，也不能撤销旧进程已经产生的外部副作用；有副作用的原生命令仍不盲目自动重跑。P1 的 EWMA 窗口、quorum/late 与公平调度尚未实现。
+范围边界：这是“提交前增量对账 + 水位 fencing”，不是分布式共识，也不能撤销旧进程已经产生的外部副作用；有副作用的原生命令仍不盲目自动重跑。P1 的 EWMA 窗口与公平调度尚未实现（quorum/absent/late 已在第六批补上）。
 
 ## 增量：审计导出与 UI 体验
 
-- 新增 owner-only `GET /api/rooms/:id/audit/export`：按事件原样输出 NDJSON（事件 id、seq、type、actor、payload 等），并设置 `application/x-ndjson` 与附件下载名；房间头部新增「导出审计日志」按钮。测试覆盖 owner 下载、未认证 401、NDJSON 可解析与事件字段；自动测试 198/198。
+- 新增 owner-only `GET /api/rooms/:id/audit/export`：按事件原样输出 NDJSON（事件 id、seq、type、actor、payload 等），并设置 `application/x-ndjson` 与附件下载名；房间头部新增「导出审计日志」按钮。测试覆盖 owner 下载、未认证 401、NDJSON 可解析与事件字段；自动测试 200/200。
 - UI 体验：运行用量改为紧凑的两行（用量未返回时不再重复三个“未知”），任务卡操作下拉改为紧凑样式并补 aria-label，房间头部显示“N 进行中”，owner 页脚提高对比度；新增“当前房间 id 写入 URL 查询参数 + 浏览器标签标题显示房间名”的持久化，刷新后保持所选房间。浏览器 E2E 新增 `room-url-and-title-persistence`、`usage-tab` 与 `run-detail-modal` 步骤，全量 38/38 通过。
 - 新增右侧「用量」标签：按房间汇总输入/输出 Token、费用估值、已上报/未知运行数，并按 Agent 列出用量；未知提供方不会被当作 0。该面板不强制预算，只提供可解释的成本可见性。
 - 新增「运行详情」弹窗：从进行中运行、错误卡片或用量历史打开，展示时间、任务/版本、上下文水位、提示词、错误原文、限额/预算与 Room 工具操作记录；支持停止和显式重试。
@@ -116,18 +116,25 @@
 - 运行错误卡片新增「重试」按钮，带副作用提示文案；命令失败会通过现有 toast 展示。
 - 测试：`tests/run-retry.test.ts` 覆盖聊天重试、活动运行拒绝、任务失败重试与同版本复用；`npm test` **198/198**。
 
+## 增量：讨论 quorum / absent / late
+
+- `discussion.start` 新增可选 `quorum`（默认等于参与者数）；拒绝 quorum 超过参与人数、或 maxResponses 小于 quorum 的不可达配置。
+- 每轮成功响应达到 quorum 即推进下一轮：未完成成员记入 `Discussion.absent` 并以 `superseded` 取消，避免慢成员阻塞本轮；若所有运行终止仍未达 quorum 则停止讨论。默认 quorum 为全员，保留原语义。
+- 讨论横幅显示 Quorum 与缺席成员；创建讨论表单增加 quorum 字段（0=全部）。
+- 测试：`tests/discussion-quorum.test.ts` 覆盖提前推进、缺席记录、迟到取消、quorum 不可达拒绝；`npm test` **200/200**。
+
 ## 原计划逐项剩余工作
 
 P0 尚未完成：
 
 1. 把可恢复副作用的操作记录扩展到适配器内部的命令执行，区分可证明幂等与结果未知的原生工作；Room 工具 fencing 与账本已完成，不能替代内部 Shell/网络副作用的验收。
 2. 带 generation/租约的崩溃恢复与安全自动重入队。中断标记、generation 撤销与显式重入队事件已具备；必须先解决外部命令副作用不受 SQLite 回滚保护的问题，当前仍不盲目重试状态不明的写运行。
-3. 更多 seq 边界的随机故障注入与并发冲突门禁，并把完整故障与 UI 不变量纳入 CI；本地 CI 配置已添加（`.github/workflows/ci.yml`：typecheck、密钥扫描、198 项测试、replay 契约、构建），尚未在远端实际执行。
+3. 更多 seq 边界的随机故障注入与并发冲突门禁，并把完整故障与 UI 不变量纳入 CI；本地 CI 配置已添加（`.github/workflows/ci.yml`：typecheck、密钥扫描、200 项测试、replay 契约、构建），尚未在远端实际执行。
 
 P1 尚未完成：
 
 1. 单一公平仲裁器、房间并发闸门、WFQ/aging、链深与每轮配额。
-2. 分桶 EWMA 窗口、quorum、absent/late、partial 超时降级与公平性压测。
+2. quorum/absent/late 已实现（第六批）；分桶 EWMA 窗口、partial 超时降级与公平性压测仍待实现。
 3. 每 Agent 有界增量 inbox、房间待办上限、工具输出上限；大规模基线和上下文的分段/引用，避免重复内联造成日志膨胀。
 4. 时长上限已由 timeout 控制；单次运行 Token/费用硬预算与房间成本看板已实现（未知用量不按 0 计）。入口预算熔断（启动前按历史/房间预算拒绝）仍待实现。
 5. 来源/信任级、工具前策略校验和注入测试，以及更完整的失败解释与重试入口；JSONL 审计导出与显式 `run.retry` 已实现（198 项测试覆盖），但信任级/注入防护与自动重试策略仍未实现。
