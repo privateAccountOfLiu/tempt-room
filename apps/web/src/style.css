@@ -41,3 +41,15 @@
 .owner strong{font-size:12px;color:#dbe6d4}
 .owner small{color:#8d9b86;font-size:10px}
 @media(max-width:1120px){.header-activity{display:none}}
+/* Usage tab: room-level token and cost summary without inventing unknown values. */
+.usage-panel{padding:2px 0 16px}
+.usage-totals{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:2px 0 13px}
+.usage-totals>div{border:1px solid #2c3826;border-radius:6px;padding:9px;background:#161b14;min-width:0}
+.usage-totals small{display:block;font-size:9px;color:#7e8f74;letter-spacing:.2px}
+.usage-totals strong{display:block;margin-top:5px;font-size:14px;font-weight:500;color:#d6e2ce;overflow-wrap:anywhere}
+.usage-note{font-size:9px;line-height:1.8;color:#738364;margin:0 0 14px}
+.usage-rows{display:grid;gap:11px}
+.usage-row{border-bottom:1px solid #293624;padding-bottom:10px}
+.usage-row strong{font-size:11px;font-weight:500;color:#c7d5bc}
+.usage-row strong small{display:block;margin-top:3px;font-size:9px;font-weight:400;color:#738364}
+.usage-row>span{display:block;margin-top:6px;font-size:9px;line-height:1.8;color:#91a385}

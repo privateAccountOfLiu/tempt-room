@@ -97,7 +97,8 @@
 ## 增量：审计导出与 UI 体验
 
 - 新增 owner-only `GET /api/rooms/:id/audit/export`：按事件原样输出 NDJSON（事件 id、seq、type、actor、payload 等），并设置 `application/x-ndjson` 与附件下载名；房间头部新增「导出审计日志」按钮。测试覆盖 owner 下载、未认证 401、NDJSON 可解析与事件字段；自动测试 192/192。
-- UI 体验：运行用量改为紧凑的两行（用量未返回时不再重复三个“未知”），任务卡操作下拉改为紧凑样式并补 aria-label，房间头部显示“N 进行中”，owner 页脚提高对比度；新增“当前房间 id 写入 URL 查询参数 + 浏览器标签标题显示房间名”的持久化，刷新后保持所选房间。浏览器 E2E 新增 `room-url-and-title-persistence` 并全量通过。
+- UI 体验：运行用量改为紧凑的两行（用量未返回时不再重复三个“未知”），任务卡操作下拉改为紧凑样式并补 aria-label，房间头部显示“N 进行中”，owner 页脚提高对比度；新增“当前房间 id 写入 URL 查询参数 + 浏览器标签标题显示房间名”的持久化，刷新后保持所选房间。浏览器 E2E 新增 `room-url-and-title-persistence` 与 `usage-tab` 步骤，全量 37/37 通过。
+- 新增右侧「用量」标签：按房间汇总输入/输出 Token、费用估值、已上报/未知运行数，并按 Agent 列出用量；未知提供方不会被当作 0。该面板不强制预算，只提供可解释的成本可见性。
 - 仓库与 CI：`git init -b main` 首个提交 `ced6da3` 纳入全部基线；新增 `.github/workflows/ci.yml`（typecheck、密钥扫描、单元测试、replay 契约、production build，Windows runner）；本地未实际触发 GitHub Actions。
 
 ## 原计划逐项剩余工作
@@ -113,7 +114,7 @@ P1 尚未完成：
 1. 单一公平仲裁器、房间并发闸门、WFQ/aging、链深与每轮配额。
 2. 分桶 EWMA 窗口、quorum、absent/late、partial 超时降级与公平性压测。
 3. 每 Agent 有界增量 inbox、房间待办上限、工具输出上限；大规模基线和上下文的分段/引用，避免重复内联造成日志膨胀。
-4. token/费用/时长硬预算、未知用量语义、入口预算熔断，以及 run/agent/房间成本看板。
+4. token/费用/时长硬预算、未知用量语义、入口预算熔断；房间级成本看板已实现（「用量」标签按房间/Agent 汇总 Token、费用、已上报/未知运行，不伪造未知值），硬预算与调度入口熔断仍待实现。
 5. 来源/信任级、工具前策略校验和注入测试，以及可解释错误与重试入口；JSONL 审计导出已实现（`GET /api/rooms/:id/audit/export` + 房间头部下载按钮，192 项测试覆盖），但信任级/注入防护仍未实现。
 6. 真实 CLI 的混合快慢场景验收仍须与无模型测试分开，不能用模拟结果替代。
 

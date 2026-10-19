@@ -11,7 +11,8 @@
 | 房间事件审计导出（NDJSON） | PASS | `npm test`（`tests/audit-export.test.ts`） | 测试输出 |
 | 仓库密钥扫描 | PASS（0 finding） | `npm run check:secrets` | `.state/secret-scan/latest.json` |
 | 预发布全链路 | PASS（9/9） | `npm run test:preflight -- --with-native` | `.state/preflight/run-M2sGyf/report.json` |
-| 浏览器端到端 / URL 与标题恢复 / 草稿与对账 UI | PASS（36/36） | `npm run test:browser` | `.state/browser-e2e/run-fLrCDr/report.json`、`docs/screenshots/ui-polish-20261019.png` |
+| 浏览器端到端 / URL 与标题恢复 / 草稿与对账 UI / 用量看板 | PASS（37/37） | `npm run test:browser` | `.state/browser-e2e/run-1gAYru/report.json`、`docs/screenshots/ui-polish-20261019.png` |
+| 房间用量看板（Token / 费用估值 / 未知用量） | PASS | 浏览器 E2E `usage-tab` 步骤 | 上述报告 |
 | 生产构建 + 重启恢复 + Cookie 保持 | PASS（10/10） | `npm run test:production` | `.state/production-smoke/run-GpvQs7/report.json` |
 | Windows 原生沙箱探测 | PASS（23/23） | `npm run test:sandbox` | `.state/diagnostics/sandbox.json` |
 | 连接器进程树 | PASS（9/9） | `npm run test:connectors` | `.state/connector-probes/` |

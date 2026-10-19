@@ -313,6 +313,10 @@ try {
     await waitFor('改版任务 v3 完成', async () => { const text = await taskCardText(revisedTitle); return text.includes('v3') && text.includes('已完成'); }, 30000);
     await waitFor('旧版本回复被标记', async () => (await bodyText()).includes('基于旧要求'), 15000);
     step('ui-task-revise', {revisedTitle});
+    const usageClicked = await evaluate("(()=>{const button=[...document.querySelectorAll('.detail-tabs button')].find(item=>item.textContent&&item.textContent.includes('用量'));if(!button)return false;button.click();return true;})()");
+    if (!usageClicked) fail('找不到用量标签');
+    await waitFor('用量面板', async () => { const text = await bodyText(); return text.includes('输入 Token') && text.includes('已记录运行'); }, 10000);
+    step('usage-tab');
 
     const newRoomName = `浏览器新房间 ${Date.now()}`;
     if (await clickByText('button', '新建一个房间') !== 'ok') fail('找不到新建房间入口');

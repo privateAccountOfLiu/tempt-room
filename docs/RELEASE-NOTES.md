@@ -57,9 +57,9 @@ npm run open -- --print    # 只输出当前启动地址
 
 必需门禁（`npm run report:readiness` 退出码 0）：
 
-- preflight 9/9（含仓库密钥扫描）、单元/契约测试 192/192、浏览器 E2E 36/36、生产冒烟 10/10
+- preflight 9/9（含仓库密钥扫描）、单元/契约测试 192/192、浏览器 E2E 37/37、生产冒烟 10/10
 - 原生沙箱 23/23、连接器 9/9、Agent 协议预检
-- 房间审计导出、房间 URL/标签页标题恢复、事件/上下文契约（`test:replay` 63/63）
+- 房间审计导出、房间 URL/标签页标题恢复、用量看板、事件/上下文契约（`test:replay` 63/63）
 - Claude 沙箱单项真实轮次、沙箱真实 Agent 成果应用、沙箱两 Agent 任务接力（Claude + DeepSeek）
 - Codex / DeepSeek 本机直连单项真实轮次
 - 外部 Claude Code / Codex 令牌巡检与实际房间发言
