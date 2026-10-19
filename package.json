@@ -63,7 +63,8 @@
     "test:sandbox-handoff": "tsx scripts/smoke-sandbox-handoff.ts",
     "test:faults": "tsx --test tests/fault-injection.test.ts",
     "test:concurrency": "tsx --test tests/concurrency-conflict.test.ts",
-    "verify:collaboration": "tsx scripts/verify-collaboration-baseline.ts"
+    "verify:collaboration": "tsx scripts/verify-collaboration-baseline.ts",
+    "verify:capabilities": "tsx scripts/verify-adapter-capabilities.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 4101beba9571067e04a3c2cd547dab0d69e353c7 (dirty)
+source HEAD: 7176c248c468849a32628478e9489ab8f21b95ba (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-19T15-06-12-988Z-497e88f4/report.json
+report: .state/collaboration-baseline/run-2026-10-19T15-14-14-832Z-c9eca410/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -54,6 +54,19 @@ report: .state/collaboration-baseline/run-2026-10-19T15-06-12-988Z-497e88f4/repo
 - host 任务仍使用真实项目目录（D01a 尚未接入），报告只做内容变化清单，不改写用户工作树
 - 新增 `tests/host-workspace-isolation.test.ts` 3 项；`npm test` **295/295**
 
+### B05a — 能力指纹与三态证据格式（M0 前移切片）
+
+- 新增 `apps/server/src/adapter-capabilities.ts`：
+  - 10 项能力名：streamOutput/nextTurnInput/toolBoundaryInput/steerDuringRun/cancelOwnedTree/cancelRemoteTask/resumeSession/queryOutcome/usageScope/preToolGate
+  - `adapterFingerprint` 绑定 provider、adapter 版本、executable/runtime 版本、connectionMode、executionMode、模型与行为配置摘要；不包含密钥
+  - 三态：verified_supported / verified_unsupported / unverified
+  - 证据带 suiteVersion、testedAt、evidenceHash；指纹不匹配时 `verifiedCapabilityState` 返回 unverified，不降级成“支持”或“实测不支持”
+- 新增 `scripts/verify-adapter-capabilities.ts` + `npm run verify:capabilities`：
+  - 运行 2 个模拟契约并输出报告
+  - 真实 CLI 明确标记 `not_run`，不伪造证据
+- 新增 `tests/adapter-capabilities.test.ts` 3 项：指纹变化、显式契约三态、陈旧指纹与自然语言声明不可路由
+- B05b 才接入持久化、UI 与自动路由；本轮不把空接口接入生产路径
+
 ### A02 — 调度公平与 anti-starvation
 
 - 新增 `ReadyScheduler`：
@@ -81,19 +94,20 @@ report: .state/collaboration-baseline/run-2026-10-19T15-06-12-988Z-497e88f4/repo
 ## 验证结果
 
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
-- `npm test`：295/295
-- `npm run test:preflight -- --with-native`：9/9 通过（`.state/preflight/run-Hh0hAE/report.json`，300.9s）
+- `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
+- `npm test`：298/298
+- `npm run test:preflight -- --with-native`：9/9 通过（`.state/preflight/run-q2uEUe/report.json`，304.9s）
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-m26mbA/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-nMniLX/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-19T15-06-12-988Z-497e88f4/report.json`
-- `.state/collaboration-baseline/run-2026-10-19T15-06-12-988Z-497e88f4/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-19T15-06-12-988Z-497e88f4/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-19T15-06-12-988Z-497e88f4/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T15-14-14-832Z-c9eca410/report.json`
+- `.state/collaboration-baseline/run-2026-10-19T15-14-14-832Z-c9eca410/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T15-14-14-832Z-c9eca410/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T15-14-14-832Z-c9eca410/replay.stdout.txt`
 
 ## 未完成 / 下一波
 
