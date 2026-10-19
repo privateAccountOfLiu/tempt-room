@@ -110,6 +110,8 @@ export class RoomService {
         if (!discussion || discussion.roomId !== roomId) throw new ProtocolError('not_found', '讨论不存在', 404);
         this.stopDiscussion(discussion, '用户停止'); return {};
       }
+      case 'discussion.pause': case 'discussion.resume': case 'subscription.set': case 'input.ack':
+        throw new ProtocolError('not_implemented', '该协作命令的协议已冻结，服务端实现将随 B03/B04 接入', 501);
       case 'task.create': {
         const roomId = this.requireRoom(command);
         const input = z.object({ title: z.string().trim().min(1).max(5000), agentId: z.string().optional(), projectPath: z.string().max(1500).default(''), dependencies: z.array(z.string()).max(20).default([]), open: z.boolean().default(false) }).parse(p);

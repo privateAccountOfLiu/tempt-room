@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 7176c248c468849a32628478e9489ab8f21b95ba (dirty)
+source HEAD: a3c6ed3d4e85886bdcba11151f3058f0e15c72b8 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-19T15-14-14-832Z-c9eca410/report.json
+report: .state/collaboration-baseline/run-2026-10-19T15-23-24-996Z-42d00206/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -53,6 +53,16 @@ report: .state/collaboration-baseline/run-2026-10-19T15-14-14-832Z-c9eca410/repo
 - host 聊天结束后生成「本机对话变更清单」artifact，不替用户提交既有修改
 - host 任务仍使用真实项目目录（D01a 尚未接入），报告只做内容变化清单，不改写用户工作树
 - 新增 `tests/host-workspace-isolation.test.ts` 3 项；`npm test` **295/295**
+
+### B01 — 协作协议对象（B 批起点）
+
+- 新增 `packages/protocol/src/collaboration.ts`：AgentSession、Subscription、InboxDelivery、InputBatch、WakeIntent、CapabilityEvidence，全部 Zod strict schema 为事实源
+- Run 扩展可选追踪字段：`agentSessionId`、`inputBatchId`、`operationScopeId`、`responseSlotId`、`startedAt`、`finishedAt`、`adapterFingerprint`
+- Discussion 扩展可选字段：paused 状态、triggerPolicy、activationLimit、activationsUsed、roundWindowMs、activeRoundId、authorizationRef、lifecycleVersion；endReason 增加 budget_exhausted/activation_limit
+- 新增严格命令 schema：`discussion.pause`、`discussion.resume`、`subscription.set`、`input.ack`；服务端在 B03/B04 前明确返回 501，不假装已实现
+- `scripts/schema.ts` 生成 6 个新 JSON schema 并更新 command/discussion/run schema
+- 新增 `tests/collaboration-protocol.test.ts` 3 项：严格对象、旧 Run/Discussion 兼容、命令 schema 严格性
+- B02 迁移与投影表尚未接入；本轮只冻结协议，不创建新事实源
 
 ### B05a — 能力指纹与三态证据格式（M0 前移切片）
 
@@ -95,19 +105,19 @@ report: .state/collaboration-baseline/run-2026-10-19T15-14-14-832Z-c9eca410/repo
 
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
-- `npm test`：298/298
-- `npm run test:preflight -- --with-native`：9/9 通过（`.state/preflight/run-q2uEUe/report.json`，304.9s）
+- `npm test`：301/301
+- `npm run test:preflight -- --with-native`：9/9 通过（`.state/preflight/run-RSjLF7/report.json`，301.7s）
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-nMniLX/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-X62tW1/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-19T15-14-14-832Z-c9eca410/report.json`
-- `.state/collaboration-baseline/run-2026-10-19T15-14-14-832Z-c9eca410/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-19T15-14-14-832Z-c9eca410/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-19T15-14-14-832Z-c9eca410/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T15-23-24-996Z-42d00206/report.json`
+- `.state/collaboration-baseline/run-2026-10-19T15-23-24-996Z-42d00206/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T15-23-24-996Z-42d00206/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T15-23-24-996Z-42d00206/replay.stdout.txt`
 
 ## 未完成 / 下一波
 
