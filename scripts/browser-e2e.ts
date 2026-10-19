@@ -183,6 +183,12 @@ try {
     const shortcutFocused = await evaluate("(()=>{document.body.focus();window.dispatchEvent(new KeyboardEvent('keydown',{key:'k',ctrlKey:true,bubbles:true}));return document.activeElement===document.querySelector('textarea');})()");
     if (!shortcutFocused) fail('Ctrl+K 未聚焦输入框');
     step('composer-keyboard-shortcut');
+    await evaluate("window.dispatchEvent(new KeyboardEvent('keydown',{key:'/',ctrlKey:true,bubbles:true}))");
+    await waitFor('快捷键帮助', async () => { const text = await bodyText(); return text.includes('快捷键与使用提示') && text.includes('打开本帮助'); }, 10000);
+    await evaluate("(()=>{const button=[...document.querySelectorAll('dialog.modal button')].find(item=>(item.textContent??'').trim()==='知道了');if(button)button.click();return !!button;})()");
+    await waitFor('关闭快捷键帮助', async () => !(await bodyText()).includes('打开本帮助'), 10000);
+    step('shortcut-help');
+
 
     const titleBefore = await waitFor('房间标题', async () => { const title = String(await evaluate("document.querySelector('.room-title h1')?.textContent?.trim() ?? ''")); return title && title !== '正在打开房间' ? title : undefined; }, 15000);
     const roomInUrl = String(await evaluate("new URLSearchParams(location.search).get('room') ?? ''"));

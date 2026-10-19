@@ -93,3 +93,8 @@
 .discussion-messages>div{border-left:2px solid #34462c;padding-left:9px}
 .discussion-messages strong{font-size:9px;color:#c6d4ba;font-weight:500}
 .discussion-messages p{font-size:9px;line-height:1.7;color:#93a487;white-space:pre-wrap;margin-top:3px}
+/* Keyboard help modal. */
+.shortcut-list{display:grid;gap:8px;min-width:min(420px,70vw)}
+.shortcut-list>div{display:flex;align-items:center;gap:8px;font-size:11px;color:#c1d0b5}
+.shortcut-list kbd{font-family:'IBM Plex Mono',Consolas,monospace;font-size:9px;border:1px solid #3d4a35;border-radius:4px;padding:3px 6px;background:#1a2117;color:#d5e4c9;box-shadow:0 1px 0 #0e120c}
+.shortcut-list span{color:#93a487}

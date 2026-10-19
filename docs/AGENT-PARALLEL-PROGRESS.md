@@ -97,7 +97,7 @@
 ## 增量：审计导出与 UI 体验
 
 - 新增 owner-only `GET /api/rooms/:id/audit/export`：按事件原样输出 NDJSON（事件 id、seq、type、actor、payload 等），并设置 `application/x-ndjson` 与附件下载名；房间头部新增「导出审计日志」按钮。测试覆盖 owner 下载、未认证 401、NDJSON 可解析与事件字段；自动测试 202/202。
-- UI 体验：运行用量改为紧凑的两行（用量未返回时不再重复三个“未知”），任务卡操作下拉改为紧凑样式并补 aria-label，房间头部显示“N 进行中”，owner 页脚提高对比度；新增“当前房间 id 写入 URL 查询参数 + 浏览器标签标题显示房间名”的持久化，刷新后保持所选房间。浏览器 E2E 新增 `room-url-and-title-persistence`、`usage-tab`、`run-detail-modal`、`composer-keyboard-shortcut` 与 `mobile-layout` 步骤，全量 41/41 通过。
+- UI 体验：运行用量改为紧凑的两行（用量未返回时不再重复三个“未知”），任务卡操作下拉改为紧凑样式并补 aria-label，房间头部显示“N 进行中”，owner 页脚提高对比度；新增“当前房间 id 写入 URL 查询参数 + 浏览器标签标题显示房间名”的持久化，刷新后保持所选房间。浏览器 E2E 新增 `room-url-and-title-persistence`、`usage-tab`、`run-detail-modal`、`composer-keyboard-shortcut` 与 `mobile-layout` 步骤，全量 42/42 通过。
 - 新增右侧「用量」标签：按房间汇总输入/输出 Token、费用估值、已上报/未知运行数，并按 Agent 列出用量；未知提供方不会被当作 0。该面板不强制预算，只提供可解释的成本可见性。
 - 新增「运行详情」弹窗：从进行中运行、错误卡片或用量历史打开，展示时间、任务/版本、上下文水位、提示词、错误原文、限额/预算与 Room 工具操作记录；支持停止和显式重试。
 - 仓库与 CI：`git init -b main` 首个提交 `ced6da3` 纳入全部基线；新增 `.github/workflows/ci.yml`（typecheck、密钥扫描、单元测试、replay 契约、production build，Windows runner）；本地未实际触发 GitHub Actions。
@@ -180,7 +180,7 @@
 ## 增量：公平性压力测试与移动端布局
 
 - 新增 20 Agent × 5 运行的无模型公平性压力测试：使用公平排序连续调度 100 次，所有 Agent 均被服务 5 次，无饥饿；`npm test` **219/219**。
-- 浏览器 E2E 新增 390×844 移动端步骤：右侧详情面板隐藏、消息输入框可见、无水平溢出；移动端截图 `docs/screenshots/ui-mobile-20261019.png`，全量 **41/41**。
+- 浏览器 E2E 新增 390×844 移动端步骤：右侧详情面板隐藏、消息输入框可见、无水平溢出；移动端截图 `docs/screenshots/ui-mobile-20261019.png`，全量 **42/42**。
 
 ## 增量：随机 seq 故障注入与 CI 门禁
 
@@ -192,7 +192,7 @@
 
 - `AgentDescriptor.schedulerWeight`（0.1–10，默认 1）加入协议与 Agent 设置表单；权重越高，最近服务虚拟时间越小，越容易获得下一次调度机会。
 - `fairOrder(runs, servedAt, weights)` 按 `servedAt / weight` 排序；未配置权重时保持原有行为。Worker 每 tick 读取本地 Agent 权重并传入。
-- 测试：`tests/fair-scheduler.test.ts` 新增静态权重偏好与 12 次调度中高权重获得更多机会的验证；`npm test` **219/219**，浏览器 E2E 41/41。
+- 测试：`tests/fair-scheduler.test.ts` 新增静态权重偏好与 12 次调度中高权重获得更多机会的验证；`npm test` **219/219**，浏览器 E2E 42/42。
 
 ## 增量：双连接并发写入门禁
 
@@ -205,6 +205,11 @@
 - 设置新增 `maxAgentRunsPerMinute`（默认 30）；入队前统计该成员最近 60 秒创建的运行，超限返回 429 `agent_rate_limited` 并原子回滚，防止点名风暴/快速重试打爆模型额度。
 - 设置表单增加「单成员每分钟运行上限」；默认值高于队列上限，保持常规行为。
 - 测试：`tests/rate-limit.test.ts` 1 项；`npm test` **219/219**。
+
+## 增量：快捷键帮助面板
+
+- 新增快捷键帮助弹窗，可在输入框底部「快捷键」按钮、`Ctrl/⌘ + /` 或非输入状态按 `?` 打开；列出 Enter、Shift+Enter、Ctrl/⌘+K、帮助、Esc 等操作，并说明不会绕过权限/预算/确认流程。
+- 浏览器 E2E 新增 `shortcut-help` 步骤；全量 **42/42**。
 
 ## 原计划逐项剩余工作
 

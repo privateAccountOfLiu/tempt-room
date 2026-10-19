@@ -122,10 +122,11 @@ T03 已完成重启后的真实复测：当前 Codex 会话以外部成员接入
 - 运行级 Token/费用硬预算：设置新增 `tokenBudget`/`costBudgetUsd`（0=不限），入队冻结到 Run.limits；Worker 按 provider 上报用量检查，超预算以 `failed` 结束且不发布聊天结果；未知用量不误判。`tests/budget.test.ts` 3 项 + `tests/budget-worker.test.ts` 真实 Worker 集成 1 项，`npm test` 219/219；设置对话框与用量面板显示预算。
 - 新增讨论 quorum：`discussion.start` 可选每轮最少成功响应（默认全员）；达到 quorum 即推进并记录缺席成员，未达则停止；UI 显示 Quorum/缺席并可在创建表单设置。`tests/discussion-quorum.test.ts` 2 项，测试总数 200/200。
 - 新增单成员每分钟运行上限：`maxAgentRunsPerMinute`（默认 30）入队前限流，超限 429 原子失败；`tests/rate-limit.test.ts` 1 项，测试总数 219/219。
+- 新增快捷键帮助弹窗（Ctrl/⌘+/、?、底部按钮打开），列出 Enter/Shift+Enter/Ctrl+K/Esc 等操作并说明不绕过权限/预算；浏览器 E2E `shortcut-help`，全量 42/42。
 - 新增双连接并发写入门禁：两个 SQLite 连接交错写入 40 条消息，验证快照一致、事件连续、任意水位重建字节一致；`tests/concurrency-conflict.test.ts` 1 项，测试总数 218/218。
 - 新增 Agent 调度权重：`AgentDescriptor.schedulerWeight`（0.1–10，默认 1）参与加权公平排序，Agent 设置表单可配置；`tests/fair-scheduler.test.ts` 3 项，测试总数 217/217。
 - 新增种子化随机 seq 故障注入：40 条随机命令后在 30 个水位重建，投影字节与房间游标保持一致；`npm run test:faults` 已加入 CI 配置，测试总数 216/216。
-- 新增公平性压力测试与移动端布局：20 Agent × 5 运行的公平调度 100 次无饥饿；浏览器 E2E 390×844 验证详情面板隐藏、输入框可用且无水平溢出。截图 `docs/screenshots/ui-mobile-20261019.png`，浏览器 E2E 41/41，测试总数 215/215。
+- 新增公平性压力测试与移动端布局：20 Agent × 5 运行的公平调度 100 次无饥饿；浏览器 E2E 390×844 验证详情面板隐藏、输入框可用且无水平溢出。截图 `docs/screenshots/ui-mobile-20261019.png`，浏览器 E2E 42/42，测试总数 215/215。
 - 新增上下文序列化测试与讨论历史：`formatContextMessage` 统一 trust/截断并覆盖注入文本作为数据；右侧「讨论记录」可打开只读详情（关联运行与发言）。浏览器 E2E `discussion-history`，全量 40/40，测试总数 214/214。
 - 新增失败分类与可解释建议：`classifyFailure` 区分预算/超时/上下文/认证/网络/依赖/工具/提供方等类别，在错误卡片与运行详情显示标签、是否可重试和下一步建议；`tests/failure.test.ts` 1 项，测试总数 212/212。
 - 新增键盘快捷入口（Ctrl/⌘+K 聚焦输入、Escape 关闭提及菜单）与超时草稿降级测试：超时前保存的 partial 不被发布为最终回复；`tests/partial-timeout.test.ts` 1 项，浏览器 E2E 39/39，测试总数 211/211。
@@ -136,7 +137,7 @@ T03 已完成重启后的真实复测：当前 Codex 会话以外部成员接入
 - 新增房间/成员待处理运行上限：设置新增 `maxQueuedRunsPerAgent`（默认 5）与 `maxQueuedRunsPerRoom`（默认 20）；入队前超限返回 429 并回滚整个命令，不留下半个运行。`tests/queue-limits.test.ts` 2 项，测试总数 202/202。
 - 新增运行详情弹窗：从进行中运行、错误卡片或用量历史打开，显示时间、任务/版本、上下文水位、提示词、错误原文、限额/预算和 Room 工具操作；支持停止与显式重试。
 - 新增显式失败重试：owner 可对 failed/canceled/interrupted/unknown 运行执行 `run.retry`，创建新运行且不覆盖原记录；拒绝外部会话、活动运行、任务改版与不可重试终态，任务重试复用同一 task version。新增 `tests/run-retry.test.ts` 2 项，运行错误卡片提供「重试」按钮。
-- UI/UX：运行用量改为紧凑格式（不再重复三个未知），任务接力下拉改为紧凑深色样式并补 `aria-label`，房间头部显示“N 进行中”，提高 owner 页脚对比度；当前房间 id 写入 URL 查询参数并同步浏览器标签标题，刷新后保持所选房间；新增右侧「用量」标签，按房间/Agent 汇总 Token、费用估值与已上报/未知运行，未知不按 0 计入。浏览器 E2E 新增 `room-url-and-title-persistence`、`usage-tab`、`run-detail-modal`，全量 41/41 通过，截图 `docs/screenshots/ui-polish-20261019.png`。
+- UI/UX：运行用量改为紧凑格式（不再重复三个未知），任务接力下拉改为紧凑深色样式并补 `aria-label`，房间头部显示“N 进行中”，提高 owner 页脚对比度；当前房间 id 写入 URL 查询参数并同步浏览器标签标题，刷新后保持所选房间；新增右侧「用量」标签，按房间/Agent 汇总 Token、费用估值与已上报/未知运行，未知不按 0 计入。浏览器 E2E 新增 `room-url-and-title-persistence`、`usage-tab`、`run-detail-modal`，全量 42/42 通过，截图 `docs/screenshots/ui-polish-20261019.png`。
 - 新增 `.github/workflows/ci.yml`（Windows runner：typecheck、密钥扫描、单元测试、replay 契约、生产构建）；仅完成本地配置，尚未在远端 CI 实际执行。
 - 计划实施记录已更新：`docs/AGENT-PARALLEL-PROGRESS.md` 增加第四批 baseSeq 上下文对账与第五批审计/UI 记录，并更新剩余工作清单；`PROTOCOL.md`/`RELEASE-NOTES.md` 同步 v6 与已实现/未实现边界。
 
