@@ -955,6 +955,12 @@
               "minimum": 1,
               "maximum": 500
             },
+            "maxAgentRunsPerMinute": {
+              "default": 30,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
             "adaptiveTimeouts": {
               "default": false,
               "type": "boolean"
@@ -983,6 +989,7 @@
             "costBudgetUsd",
             "maxQueuedRunsPerAgent",
             "maxQueuedRunsPerRoom",
+            "maxAgentRunsPerMinute",
             "adaptiveTimeouts",
             "roomTokenBudget",
             "roomCostBudgetUsd"

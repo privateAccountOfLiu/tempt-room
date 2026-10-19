@@ -14,6 +14,7 @@ export const executionSettingsSchema=z.object({
   costBudgetUsd:z.number().min(0).max(1000000).default(0),
   maxQueuedRunsPerAgent:z.number().int().min(1).max(100).default(5),
   maxQueuedRunsPerRoom:z.number().int().min(1).max(500).default(20),
+  maxAgentRunsPerMinute:z.number().int().min(1).max(1000).default(30),
   adaptiveTimeouts:z.boolean().default(false),
   roomTokenBudget:z.number().int().min(0).max(1000000000).default(0),
   roomCostBudgetUsd:z.number().min(0).max(1000000).default(0)
