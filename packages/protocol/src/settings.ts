@@ -13,7 +13,8 @@ export const executionSettingsSchema=z.object({
   tokenBudget:z.number().int().min(0).max(100000000).default(0),
   costBudgetUsd:z.number().min(0).max(1000000).default(0),
   maxQueuedRunsPerAgent:z.number().int().min(1).max(100).default(5),
-  maxQueuedRunsPerRoom:z.number().int().min(1).max(500).default(20)
+  maxQueuedRunsPerRoom:z.number().int().min(1).max(500).default(20),
+  adaptiveTimeouts:z.boolean().default(false)
 }).strict();
 export type ExecutionSettings=z.infer<typeof executionSettingsSchema>;
 export const defaultExecutionSettings:ExecutionSettings=executionSettingsSchema.parse({});

@@ -121,7 +121,7 @@
 - `discussion.start` 新增可选 `quorum`（默认等于参与者数）；拒绝 quorum 超过参与人数、或 maxResponses 小于 quorum 的不可达配置。
 - 每轮成功响应达到 quorum 即推进下一轮：未完成成员记入 `Discussion.absent` 并以 `superseded` 取消，避免慢成员阻塞本轮；若所有运行终止仍未达 quorum 则停止讨论。默认 quorum 为全员，保留原语义。
 - 讨论横幅显示 Quorum 与缺席成员；创建讨论表单增加 quorum 字段（0=全部）。
-- 测试：`tests/discussion-quorum.test.ts` 覆盖提前推进、缺席记录、迟到取消、quorum 不可达拒绝；`npm test` **202/202**。
+- 测试：`tests/discussion-quorum.test.ts` 覆盖提前推进、缺席记录、迟到取消、quorum 不可达拒绝；`npm test` **204/204**。
 
 ## 增量：房间 / 成员待处理运行上限
 
@@ -130,18 +130,25 @@
 - 聊天点名会先取消同成员旧聊天运行，因此上限主要约束任务与讨论等可累积运行；实际行为由测试覆盖。
 - 测试：`tests/queue-limits.test.ts` 覆盖成员上限、房间上限与失败回滚；`npm test` **202/202**。
 
+## 增量：EWMA 自适应超时
+
+- `executionSettings.adaptiveTimeouts`（默认关闭）；开启后按 (agent, task/chat) 分桶，取最近 8 次已完成运行的实际耗时计算 EWMA（alpha=0.3），有效超时 = clamp(EWMA × 3, 30 秒, 配置超时)，只缩短、不延长。
+- 入队时计算并冻结到 `Run.limits.timeoutMs`；设置改变不影响既有运行。
+- 设置表单新增开关；未启用时行为与之前完全一致。
+- 测试：`tests/adaptive-timeout.test.ts` 覆盖 EWMA、floor/cap、桶过滤与真实 service 入队冻结；`npm test` **204/204**。
+
 ## 原计划逐项剩余工作
 
 P0 尚未完成：
 
 1. 把可恢复副作用的操作记录扩展到适配器内部的命令执行，区分可证明幂等与结果未知的原生工作；Room 工具 fencing 与账本已完成，不能替代内部 Shell/网络副作用的验收。
 2. 带 generation/租约的崩溃恢复与安全自动重入队。中断标记、generation 撤销与显式重入队事件已具备；必须先解决外部命令副作用不受 SQLite 回滚保护的问题，当前仍不盲目重试状态不明的写运行。
-3. 更多 seq 边界的随机故障注入与并发冲突门禁，并把完整故障与 UI 不变量纳入 CI；本地 CI 配置已添加（`.github/workflows/ci.yml`：typecheck、密钥扫描、202 项测试、replay 契约、构建），尚未在远端实际执行。
+3. 更多 seq 边界的随机故障注入与并发冲突门禁，并把完整故障与 UI 不变量纳入 CI；本地 CI 配置已添加（`.github/workflows/ci.yml`：typecheck、密钥扫描、204 项测试、replay 契约、构建），尚未在远端实际执行。
 
 P1 尚未完成：
 
 1. 单一公平仲裁器、房间并发闸门、WFQ/aging、链深与每轮配额。
-2. quorum/absent/late 已实现（第六批）；分桶 EWMA 窗口、partial 超时降级与公平性压测仍待实现。
+2. quorum/absent/late 与分桶 EWMA 自适应超时已实现（第六/八批）；partial 超时降级、按轮公平性压测与单仲裁公平调度仍待实现。
 3. 每 Agent/房间待处理运行上限已实现（`maxQueuedRunsPerAgent`/`maxQueuedRunsPerRoom`，入队前 429 原子失败）；工具输出上限、每 Agent 增量 inbox 与大规模上下文分段/引用仍待实现。
 4. 时长上限已由 timeout 控制；单次运行 Token/费用硬预算与房间成本看板已实现（未知用量不按 0 计）。入口预算熔断（启动前按历史/房间预算拒绝）仍待实现。
 5. 来源/信任级、工具前策略校验和注入测试，以及更完整的失败解释与重试入口；JSONL 审计导出与显式 `run.retry` 已实现（198 项测试覆盖），但信任级/注入防护与自动重试策略仍未实现。

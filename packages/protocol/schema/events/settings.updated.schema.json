@@ -98,6 +98,10 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 500
+        },
+        "adaptiveTimeouts": {
+          "default": false,
+          "type": "boolean"
         }
       },
       "required": [
@@ -111,7 +115,8 @@
         "tokenBudget",
         "costBudgetUsd",
         "maxQueuedRunsPerAgent",
-        "maxQueuedRunsPerRoom"
+        "maxQueuedRunsPerRoom",
+        "adaptiveTimeouts"
       ],
       "additionalProperties": false
     }
