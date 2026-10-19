@@ -783,6 +783,7 @@ try {
     if (mobileState.overflow) fail('移动端出现水平溢出');
     const mobileRooms=await evaluate("(()=>{const button=document.querySelector('button[aria-label=打开房间列表]');button?.click();return !!button;})()");if(!mobileRooms)fail('缺少移动房间切换入口');
     await waitFor('完整房间列表',async()=>(await bodyText()).includes('切换房间')&&(await bodyText()).includes('运行设置'));
+    await sleep(250);
     const roomShot=await send('Page.captureScreenshot',{format:'png'},sessionId),roomShotPath=join(runDir,'ui-mobile-rooms.png');writeFileSync(roomShotPath,Buffer.from(roomShot.data,'base64'));report.screenshots.push(roomShotPath);
     await clickByText('dialog.modal button','关闭');await sleep(150);step('mobile-room-switcher-and-settings');
     const mobilePanelOpened = await evaluate("(()=>{const button=document.querySelector('button[aria-label=\"打开协作面板\"]');if(!button)return false;button.click();return true;})()");

@@ -27,7 +27,7 @@
 
 响应式检查覆盖 320、390、768、1024、1440、1920px，断言无横向溢出且输入区在视口内。视觉截图保存于 docs/screenshots/workbench-*.png。此项只修改前端与验收脚本，不改变 Agent 配置、执行权限或数据库协议。
 
-本次记录：280/280 项测试通过；60 项浏览器检查通过，控制台无错误。浏览器证据为 `.state/browser-e2e/run-eXVui0/report.json`，测试日志为 `.state/workbench-tests.log`。日常服务的 main.tsx 和 workbench.css 已通过 HTTP 核实为新版。
+本次记录：280/280 项测试通过；60 项浏览器检查通过，控制台无错误。浏览器证据为 `.state/browser-e2e/run-BgEsgQ/report.json`，测试日志为 `.state/workbench-tests.log`。日常服务的 main.tsx 和 workbench.css 已通过 HTTP 核实为新版。
 
 ![桌面工作台](./screenshots/workbench-desktop.png)
 
