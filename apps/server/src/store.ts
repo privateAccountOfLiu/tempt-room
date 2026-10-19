@@ -4,14 +4,14 @@ import { dirname, join } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { VERSION, capabilitiesFor, executionSettingsSchema,eventSchema,eventMetadata,EventContractError,projectionTableNames,type ProjectionTable,type ExecutionSettings, type Actor, type AgentDescriptor, type Room, type RoomEvent, type RoomSnapshot, type Run, type Task, type Discussion,type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { MemoryProjectionSink,SqlProjectionSink,projectEvent,projectionJson } from './event-projections.ts';
-export const DATABASE_VERSION=9;
+export const DATABASE_VERSION=10;
 
 export const uid = (prefix = 'id') => `${prefix}_${randomUUID().replaceAll('-', '')}`;
 export const now = () => new Date().toISOString();
 export const OWNER: Actor = { id: 'owner', kind: 'human' };
 export const SYSTEM: Actor = { id: 'system', kind: 'system' };
-type Table = 'agents' | 'messages' | 'tasks' | 'runs' | 'artifacts' | 'discussions' | 'decisions' | 'contexts' | 'operations';
-const tables = new Set(['agents', 'messages', 'tasks', 'runs', 'artifacts', 'discussions', 'decisions','contexts','operations']);
+type Table = 'agents' | 'messages' | 'tasks' | 'runs' | 'artifacts' | 'discussions' | 'decisions' | 'contexts' | 'operations' | 'agent_sessions' | 'subscriptions' | 'inbox_deliveries' | 'input_batches' | 'wake_intents' | 'capability_evidence' | 'discussion_rounds';
+const tables = new Set(['agents', 'messages', 'tasks', 'runs', 'artifacts', 'discussions', 'decisions','contexts','operations','agent_sessions','subscriptions','inbox_deliveries','input_batches','wake_intents','capability_evidence','discussion_rounds']);
 export function canonical(value: unknown): string {
   if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
   if (value && typeof value === 'object') return '{' + Object.keys(value).sort().map(k => JSON.stringify(k) + ':' + canonical((value as any)[k])).join(',') + '}';
@@ -33,6 +33,15 @@ export class Store {
     if (version > DATABASE_VERSION) throw new Error('Database version is newer than this application');
     this.db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
     if(existed&&version<DATABASE_VERSION){this.db.exec('PRAGMA wal_checkpoint(TRUNCATE)');copyFileSync(path,`${path}.v${version}.${Date.now()}.bak`);}
+    // B02 tables exist before old migrations emit projection checkpoints,
+    // even when the database version is still below 10.
+    this.db.exec(`CREATE TABLE IF NOT EXISTS agent_sessions(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS agent_sessions_room ON agent_sessions(room_id);
+CREATE TABLE IF NOT EXISTS subscriptions(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS subscriptions_room ON subscriptions(room_id);
+CREATE TABLE IF NOT EXISTS inbox_deliveries(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS inbox_deliveries_room ON inbox_deliveries(room_id);
+CREATE TABLE IF NOT EXISTS input_batches(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS input_batches_room ON input_batches(room_id);
+CREATE TABLE IF NOT EXISTS wake_intents(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS wake_intents_room ON wake_intents(room_id);
+CREATE TABLE IF NOT EXISTS capability_evidence(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS capability_evidence_room ON capability_evidence(room_id);
+CREATE TABLE IF NOT EXISTS discussion_rounds(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS discussion_rounds_room ON discussion_rounds(room_id);`);
     if (version < 1) {
       this.db.exec(`BEGIN;
         CREATE TABLE IF NOT EXISTS rooms(id TEXT PRIMARY KEY, seq INTEGER NOT NULL, body TEXT NOT NULL);
@@ -48,7 +57,7 @@ export class Store {
       this.db.exec("CREATE INDEX IF NOT EXISTS operations_dedupe ON operations(json_extract(body,'$.runId'),json_extract(body,'$.agentId'),json_extract(body,'$.operationId'),json_extract(body,'$.generation'))");
       for(const table of ['rooms',...projectionTableNames]){
         const columns=this.db.prepare(`PRAGMA table_info(${table})`).all() as any[];
-        if(!columns.some(column=>column.name==='as_of_seq'))this.db.exec(`ALTER TABLE ${table} ADD COLUMN as_of_seq INTEGER NOT NULL DEFAULT 0`);
+        if(columns.length&&!columns.some(column=>column.name==='as_of_seq'))this.db.exec(`ALTER TABLE ${table} ADD COLUMN as_of_seq INTEGER NOT NULL DEFAULT 0`);
       }
       this.db.exec(`CREATE TABLE IF NOT EXISTS projection_offsets(room_id TEXT PRIMARY KEY REFERENCES rooms(id),seq INTEGER NOT NULL,floor_seq INTEGER NOT NULL DEFAULT 0);
         CREATE VIEW IF NOT EXISTS proj_task AS SELECT id,room_id,body,as_of_seq FROM tasks;
@@ -59,7 +68,7 @@ export class Store {
       // Historic versions did not record every lease or context change. Seal
       // their current state as a new fact, without rewriting a single old event.
       if(existed&&version<3)for(const room of this.rooms()){
-        const rows=Object.fromEntries(projectionTableNames.map(table=>[table,this.list(table,room.id)]));
+        const rows=Object.fromEntries(projectionTableNames.filter(table=>this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table)).map(table=>[table,this.list(table,room.id)]));
         const event=this.event(room.id,'projection.checkpoint',SYSTEM,{room,rows,reason:'legacy-migration'});
         this.db.prepare('UPDATE projection_offsets SET floor_seq=? WHERE room_id=?').run(event.seq,room.id);
       }
@@ -84,6 +93,18 @@ export class Store {
     if(version<8)this.atomic(()=>this.db.exec('PRAGMA user_version=8'));
     // v9 writers understand convergence ballots and the separate summary lifecycle.
     if(version<9)this.atomic(()=>this.db.exec('PRAGMA user_version=9'));
+    // v10 adds the B02 collaboration projections. Old databases receive the
+    // tables and uniqueness indexes before any new event can be appended.
+    if(version<10)this.atomic(()=>{
+      for(const table of ['agent_sessions','subscriptions','inbox_deliveries','input_batches','wake_intents','capability_evidence','discussion_rounds'])
+        this.db.exec(`CREATE TABLE IF NOT EXISTS ${table}(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS ${table}_room ON ${table}(room_id);`);
+      this.db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS inbox_delivery_unique ON inbox_deliveries(json_extract(body,'$.agentSessionId'),json_extract(body,'$.sourceEventId'));
+        CREATE UNIQUE INDEX IF NOT EXISTS wake_scope_unique ON wake_intents(json_extract(body,'$.scopeKey'),json_extract(body,'$.sourceEventId'));
+        CREATE UNIQUE INDEX IF NOT EXISTS capability_evidence_unique ON capability_evidence(json_extract(body,'$.fingerprint'),json_extract(body,'$.capability'));
+        CREATE UNIQUE INDEX IF NOT EXISTS runs_response_slot ON runs(json_extract(body,'$.responseSlotId')) WHERE json_extract(body,'$.responseSlotId') IS NOT NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS runs_agent_session_active ON runs(json_extract(body,'$.agentSessionId')) WHERE json_extract(body,'$.agentSessionId') IS NOT NULL AND json_extract(body,'$.status') NOT IN ('completed','failed','canceled','superseded','interrupted','unknown');
+        PRAGMA user_version=10;`);
+    });
     this.seed();
     this.atomic(() => {
       for (const run of this.list<Run>('runs')) if (['running', 'waiting_input', 'cancel_requested'].includes(run.status) || (run.status==='queued' && run.codex)) {
@@ -131,8 +152,8 @@ export class Store {
     if(this.rebuilding)throw new Error('Projection rebuild is read-only');
     if((projectionTableNames as readonly string[]).includes(table)){
       if(!value.roomId)throw new Error('Projected rows require a roomId');
-      const field=({messages:'message',tasks:'task',runs:'run',artifacts:'artifact',discussions:'discussion',decisions:'decision',contexts:'context',operations:'operation'} as Record<string,string>)[table];
-      const type=({messages:'chat.message.created',tasks:'task.updated',runs:'run.updated',artifacts:'artifact.created',discussions:'discussion.round',decisions:(value as any).accepted?'decision.accepted':'decision.proposed',contexts:'context.captured',operations:'operation.'+(value as any).status} as Record<string,string>)[table];
+      const field=({messages:'message',tasks:'task',runs:'run',artifacts:'artifact',discussions:'discussion',decisions:'decision',contexts:'context',operations:'operation',agent_sessions:'agentSession',subscriptions:'subscription',inbox_deliveries:'delivery',input_batches:'batch',wake_intents:'wakeIntent',capability_evidence:'capabilityEvidence',discussion_rounds:'round'} as Record<string,string>)[table];
+      const type=({messages:'chat.message.created',tasks:'task.updated',runs:'run.updated',artifacts:'artifact.created',discussions:'discussion.round',decisions:(value as any).accepted?'decision.accepted':'decision.proposed',contexts:'context.captured',operations:'operation.'+(value as any).status,agent_sessions:'agent_session.created',subscriptions:'subscription.updated',inbox_deliveries:'inbox.delivered',input_batches:'input.batch.created',wake_intents:'wake.requested',capability_evidence:'capability.verified',discussion_rounds:'discussion.round.opened'} as Record<string,string>)[table];
       this.event(value.roomId,type,SYSTEM,{[field]:value});return;
     }
     this.db.prepare(`INSERT INTO ${table}(id,room_id,body) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET room_id=excluded.room_id,body=excluded.body`).run(value.id, value.roomId ?? null, JSON.stringify(value));

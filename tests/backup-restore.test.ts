@@ -5,6 +5,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 
 import { DatabaseSync } from 'node:sqlite';
 import { join, resolve } from 'node:path';
 import { createApp } from '../apps/server/src/app.ts';
+import { DATABASE_VERSION } from '../apps/server/src/store.ts';
 
 test('backup command captures a consistent snapshot and restore command applies it', async t => {
   const base = resolve('.state/test-data'); mkdirSync(base, { recursive: true });
@@ -34,7 +35,7 @@ test('backup command captures a consistent snapshot and restore command applies 
   assert.equal(restore.status, 0, restore.stderr);
   const restored = new DatabaseSync(join(target, 'room.sqlite'), { readOnly: true });
   try {
-    assert.equal(Number((restored.prepare('PRAGMA user_version').get() as any).user_version), 9);
+    assert.equal(Number((restored.prepare('PRAGMA user_version').get() as any).user_version), DATABASE_VERSION);
     assert.equal(Number((restored.prepare('SELECT COUNT(*) AS count FROM rooms').get() as any).count), snapshotRooms);
   } finally { restored.close(); }
 });

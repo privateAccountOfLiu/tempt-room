@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: a3c6ed3d4e85886bdcba11151f3058f0e15c72b8 (dirty)
+source HEAD: 011ac59b65c0872806e6d4fddb91c1dc07465d5c (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-19T15-23-24-996Z-42d00206/report.json
+report: .state/collaboration-baseline/run-2026-10-19T15-57-40-945Z-5adc4514/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -54,6 +54,15 @@ report: .state/collaboration-baseline/run-2026-10-19T15-23-24-996Z-42d00206/repo
 - host 任务仍使用真实项目目录（D01a 尚未接入），报告只做内容变化清单，不改写用户工作树
 - 新增 `tests/host-workspace-isolation.test.ts` 3 项；`npm test` **295/295**
 
+### B02 — 可重放投影与 v10 迁移
+
+- 数据库版本 v9→v10；新增投影表：agent_sessions、subscriptions、inbox_deliveries、input_batches、wake_intents、capability_evidence、discussion_rounds
+- 新事件注册与 projector：agent_session.created/paused/resumed/ended、subscription.updated、inbox.delivered、input.batch.created/provided/acknowledged/expired、wake.requested/assigned/suppressed、capability.verified、discussion.round.opened/closed/late.received
+- 唯一约束：inbox(agentSessionId,sourceEventId)、wake(scopeKey,sourceEventId)、capability(fingerprint,capability)、run responseSlotId、单 AgentSession 活动 Run
+- v10 迁移前创建缺失表；旧数据库先备份，旧 checkpoint payload 缺新数组时按空集合解码，不重写旧事件字节
+- Store.put / projectionBytes / snapshotAt / rebuildProjections / 清空逻辑覆盖新表
+- 新增 tests/collaboration-projections.test.ts 4 项：新库投影与重建一致、inbox 唯一键、v9→v10 备份与事件字节不变、旧 checkpoint 兼容
+- 服务端 B03/B04 前不产生这些事件；日常数据库未迁移，全部验证在 fixture/临时库完成
 ### B01 — 协作协议对象（B 批起点）
 
 - 新增 `packages/protocol/src/collaboration.ts`：AgentSession、Subscription、InboxDelivery、InputBatch、WakeIntent、CapabilityEvidence，全部 Zod strict schema 为事实源
@@ -62,7 +71,7 @@ report: .state/collaboration-baseline/run-2026-10-19T15-23-24-996Z-42d00206/repo
 - 新增严格命令 schema：`discussion.pause`、`discussion.resume`、`subscription.set`、`input.ack`；服务端在 B03/B04 前明确返回 501，不假装已实现
 - `scripts/schema.ts` 生成 6 个新 JSON schema 并更新 command/discussion/run schema
 - 新增 `tests/collaboration-protocol.test.ts` 3 项：严格对象、旧 Run/Discussion 兼容、命令 schema 严格性
-- B02 迁移与投影表尚未接入；本轮只冻结协议，不创建新事实源
+- B02 的迁移与投影已接入；B01/B02 共同构成协作事实层
 
 ### B05a — 能力指纹与三态证据格式（M0 前移切片）
 
@@ -105,24 +114,27 @@ report: .state/collaboration-baseline/run-2026-10-19T15-23-24-996Z-42d00206/repo
 
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
-- `npm test`：301/301
-- `npm run test:preflight -- --with-native`：9/9 通过（`.state/preflight/run-RSjLF7/report.json`，301.7s）
+- `npm test`：305/305
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-8fYmvH/report.json`，256.3s）
+- 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-X62tW1/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-NaqQqK/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-19T15-23-24-996Z-42d00206/report.json`
-- `.state/collaboration-baseline/run-2026-10-19T15-23-24-996Z-42d00206/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-19T15-23-24-996Z-42d00206/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-19T15-23-24-996Z-42d00206/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T15-57-40-945Z-5adc4514/report.json`
+- `.state/collaboration-baseline/run-2026-10-19T15-57-40-945Z-5adc4514/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T15-57-40-945Z-5adc4514/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T15-57-40-945Z-5adc4514/replay.stdout.txt`
 
 ## 未完成 / 下一波
 
 - B05a 能力探针与三态结果格式（M0 前移切片）
-- B01/B02 会话协议对象与迁移
+- B03/B04 会话生命周期、订阅投递与唤醒
+- B05b 能力证据持久化/UI/路由
+- M1 双 Agent 固定契约任务闭环
 - M1 双 Agent 固定契约任务闭环：Task 契约、独立工作区、验收/集成分离、并行验收脚本
 
 ## 约束提醒

@@ -12,6 +12,7 @@ import {join, resolve} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 import WebSocket from 'ws';
+import { DATABASE_VERSION } from '../apps/server/src/store.ts';
 
 interface StepReport { name: string; at: string; detail?: Record<string, unknown> }
 const project = resolve('.');
@@ -162,7 +163,7 @@ try {
   try {
     const versionRow = db.prepare('PRAGMA user_version').get() as {user_version?: number};
     const countRow = db.prepare('SELECT COUNT(*) AS count FROM rooms').get() as {count?: number};
-    if (versionRow.user_version !== 9) fail(`数据库 user_version 应为 9，实际 ${versionRow.user_version}`);
+    if (versionRow.user_version !== DATABASE_VERSION) fail(`数据库 user_version 应为 ${DATABASE_VERSION}，实际 ${versionRow.user_version}`);
     if ((countRow.count ?? 0) < 1) fail('数据库中没有房间记录');
     step('database-schema-and-data', {userVersion: versionRow.user_version, rooms: countRow.count});
   } finally { db.close(); }

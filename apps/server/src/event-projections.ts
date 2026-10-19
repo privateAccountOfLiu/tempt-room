@@ -155,6 +155,13 @@ export function projectEvent(sink:ProjectionSink,event:RoomEvent){
     }
     // Control-plane configuration is kept separately; these events invalidate
     // clients and are auditable, but never replay settings from another room.
+    case 'agent-session':put('agent_sessions',payload.agentSession);break;
+    case 'subscription':put('subscriptions',payload.subscription);break;
+    case 'inbox-delivery':put('inbox_deliveries',payload.delivery);break;
+    case 'input-batch':put('input_batches',payload.batch);break;
+    case 'wake-intent':put('wake_intents',payload.wakeIntent);break;
+    case 'capability-evidence':put('capability_evidence',payload.capabilityEvidence);break;
+    case 'discussion-round':put('discussion_rounds',payload.round);break;
     case 'settings':case 'audit':break;
   }
 }

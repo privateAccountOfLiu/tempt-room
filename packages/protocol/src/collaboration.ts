@@ -66,11 +66,30 @@ export const inputBatchSchema = z.object({
 }).strict();
 export type InputBatch = z.infer<typeof inputBatchSchema>;
 
+export const discussionRoundStatusSchema = z.enum(['open', 'closed', 'late']);
+export const discussionRoundSchema = z.object({
+  id,
+  roomId: id.optional(),
+  discussionId: id,
+  round: z.number().int().positive(),
+  status: discussionRoundStatusSchema,
+  openedSeq: z.number().int().nonnegative(),
+  openedAt: time,
+  windowDeadline: time.optional(),
+  closedSeq: z.number().int().nonnegative().optional(),
+  closedAt: time.optional(),
+  closeReason: z.string().max(200).optional(),
+  slotIds: z.array(id).max(100).default([]),
+  quorum: z.number().int().positive().optional()
+}).strict();
+export type DiscussionRound = z.infer<typeof discussionRoundSchema>;
+
 export const wakeIntentStatusSchema = z.enum(['pending', 'assigned', 'suppressed']);
 export const wakeIntentSchema = z.object({
   id,
   discussionId: id.optional(),
   roundId: id.optional(),
+  scopeKey: z.string().min(1).max(300),
   agentSessionId: id,
   sourceEventId: id,
   status: wakeIntentStatusSchema,
@@ -106,5 +125,6 @@ export const collaborationSchemas = {
   inboxDelivery: inboxDeliverySchema,
   inputBatch: inputBatchSchema,
   wakeIntent: wakeIntentSchema,
+  discussionRound: discussionRoundSchema,
   capabilityEvidence: capabilityEvidenceSchema
 };

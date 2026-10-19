@@ -7,7 +7,7 @@ import {spawn,spawnSync} from 'node:child_process';
 import {createInterface} from 'node:readline';
 import {HostRoomPipe} from '../apps/server/src/host.ts';
 import {DatabaseSync} from 'node:sqlite';
-import {Store,uid,SYSTEM,now} from '../apps/server/src/store.ts';
+import {Store,uid,SYSTEM,now,DATABASE_VERSION} from '../apps/server/src/store.ts';
 import {RoomService} from '../apps/server/src/service.ts';
 import {Worker} from '../apps/server/src/worker.ts';
 import {executionFence,assertRunFence} from '../apps/server/src/execution.ts';
@@ -212,7 +212,7 @@ test('v3 upgrade preserves event bytes and cursors while adding the operation pr
   // v3 has all prior projection columns and triggers, but no operation table.
   const old=new DatabaseSync(path);old.exec('DROP TABLE operations; PRAGMA user_version=3');old.close();
   const upgraded=new Store(path);
-  try{assert.equal((upgraded.db.prepare('PRAGMA user_version').get() as any).user_version,9);assert.deepEqual(upgraded.db.prepare('SELECT body FROM events ORDER BY seq').all(),bytes);assert.equal(upgraded.room(roomId)!.seq,history.at(-1)!.seq);assert.equal(upgraded.list('operations').length,0);const before=upgraded.projectionBytes(roomId);upgraded.rebuildProjections(roomId);assert.equal(upgraded.projectionBytes(roomId),before);assert.ok(readdirSync(root).some(name=>name.includes('.v3.')&&name.endsWith('.bak')));}finally{upgraded.close();}
+  try{assert.equal((upgraded.db.prepare('PRAGMA user_version').get() as any).user_version ,DATABASE_VERSION);assert.deepEqual(upgraded.db.prepare('SELECT body FROM events ORDER BY seq').all(),bytes);assert.equal(upgraded.room(roomId)!.seq,history.at(-1)!.seq);assert.equal(upgraded.list('operations').length,0);const before=upgraded.projectionBytes(roomId);upgraded.rebuildProjections(roomId);assert.equal(upgraded.projectionBytes(roomId),before);assert.ok(readdirSync(root).some(name=>name.includes('.v3.')&&name.endsWith('.bak')));}finally{upgraded.close();}
 });
 
 test('the authenticated HTTP API and SDK expose operation evidence for exactly one run',async t=>{

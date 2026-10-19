@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync,mkdtempSync,readdirSync,rmSync } from 'node:fs';
 import { join,resolve } from 'node:path';
 import { defaultExecutionSettings,type AgentDescriptor,type Discussion,type Run,type RunContext,type Task,type Message } from '../packages/protocol/src/index.ts';
-import { Store,uid,SYSTEM } from '../apps/server/src/store.ts';
+import { Store,uid,SYSTEM,DATABASE_VERSION } from '../apps/server/src/store.ts';
 import { RoomService } from '../apps/server/src/service.ts';
 import { createApp } from '../apps/server/src/app.ts';
 import { dependencyInputs } from '../apps/server/src/dependencies.ts';
@@ -57,7 +57,7 @@ test('discussion participants share one frozen context and the next round includ
 });
 test('v1 databases get a checkpointed backup before settings/context migration',t=>{
  const {store,root}=fixture(t),path=join(root,'room.sqlite');store.db.exec('DROP TABLE settings; DROP TABLE contexts; PRAGMA user_version=1;');store.close();
- const migrated=new Store(path);assert.equal((migrated.db.prepare('PRAGMA user_version').get() as any).user_version,9);migrated.close();
+ const migrated=new Store(path);assert.equal((migrated.db.prepare('PRAGMA user_version').get() as any).user_version ,DATABASE_VERSION);migrated.close();
  const backup=join(root,readdirSync(root).find(name=>name.startsWith('room.sqlite.v1.')&&name.endsWith('.bak'))!);assert.ok(backup);
  const original=new DatabaseSync(backup,{readOnly:true});assert.equal((original.prepare('PRAGMA user_version').get() as any).user_version,1);assert.equal(original.prepare("SELECT name FROM sqlite_master WHERE name='settings'").get(),undefined);original.close();
 });

@@ -657,6 +657,176 @@
     ]
   },
   {
+    "type": "agent_session.created",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "agent-session",
+    "schemaVersion": 1,
+    "kinds": [
+      "agent.session.state"
+    ]
+  },
+  {
+    "type": "agent_session.paused",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "agent-session",
+    "schemaVersion": 1,
+    "kinds": [
+      "agent.session.state"
+    ]
+  },
+  {
+    "type": "agent_session.resumed",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "agent-session",
+    "schemaVersion": 1,
+    "kinds": [
+      "agent.session.state"
+    ]
+  },
+  {
+    "type": "agent_session.ended",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "agent-session",
+    "schemaVersion": 1,
+    "kinds": [
+      "agent.session.state"
+    ]
+  },
+  {
+    "type": "subscription.updated",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "subscription",
+    "schemaVersion": 1,
+    "kinds": [
+      "subscription.updated"
+    ]
+  },
+  {
+    "type": "inbox.delivered",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "inbox-delivery",
+    "schemaVersion": 1,
+    "kinds": [
+      "inbox.delivered"
+    ]
+  },
+  {
+    "type": "input.batch.created",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "input-batch",
+    "schemaVersion": 1,
+    "kinds": [
+      "input.batch.state"
+    ]
+  },
+  {
+    "type": "input.batch.provided",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "input-batch",
+    "schemaVersion": 1,
+    "kinds": [
+      "input.batch.state"
+    ]
+  },
+  {
+    "type": "input.batch.acknowledged",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "input-batch",
+    "schemaVersion": 1,
+    "kinds": [
+      "input.batch.state"
+    ]
+  },
+  {
+    "type": "input.batch.expired",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "input-batch",
+    "schemaVersion": 1,
+    "kinds": [
+      "input.batch.state"
+    ]
+  },
+  {
+    "type": "wake.requested",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "wake-intent",
+    "schemaVersion": 1,
+    "kinds": [
+      "wake.intent"
+    ]
+  },
+  {
+    "type": "wake.assigned",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "wake-intent",
+    "schemaVersion": 1,
+    "kinds": [
+      "wake.intent"
+    ]
+  },
+  {
+    "type": "wake.suppressed",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "wake-intent",
+    "schemaVersion": 1,
+    "kinds": [
+      "wake.intent"
+    ]
+  },
+  {
+    "type": "capability.verified",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "capability-evidence",
+    "schemaVersion": 1,
+    "kinds": [
+      "capability.verified"
+    ]
+  },
+  {
+    "type": "discussion.round.opened",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "discussion-round",
+    "schemaVersion": 1,
+    "kinds": [
+      "discussion.round"
+    ]
+  },
+  {
+    "type": "discussion.round.closed",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "discussion-round",
+    "schemaVersion": 1,
+    "kinds": [
+      "discussion.round"
+    ]
+  },
+  {
+    "type": "discussion.round.late.received",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "discussion-round",
+    "schemaVersion": 1,
+    "kinds": [
+      "discussion.round"
+    ]
+  },
+  {
     "type": "projection.checkpoint",
     "durability": "durable",
     "aggregate": "room",
