@@ -54,3 +54,18 @@
 .usage-row strong small{display:block;margin-top:3px;font-size:9px;font-weight:400;color:#738364}
 .usage-row>span{display:block;margin-top:6px;font-size:9px;line-height:1.8;color:#91a385}
 .usage-budget{font-size:9px;color:#9db08d;border:1px solid #2f3d28;background:#151b13;border-radius:4px;padding:6px 8px;margin:0 0 13px;line-height:1.7}
+/* Run detail modal: explain state, prompt, usage and Room tool operations. */
+.run-detail{display:flex;flex-direction:column;gap:14px;min-width:min(560px,72vw);max-height:62vh;overflow:auto;padding-right:3px}
+.run-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.run-detail-grid>div{border:1px solid #2c3826;border-radius:5px;padding:8px 10px;background:#161b14;min-width:0}
+.run-detail-grid small,.run-detail-block>small{display:block;font-size:9px;color:#7e8f74;margin-bottom:5px}
+.run-detail-grid span{font-size:10px;color:#c5d3bb;overflow-wrap:anywhere}
+.run-detail-block{border:1px solid #2c3826;border-radius:5px;padding:9px 10px;background:#151a14}
+.run-detail-block.error{border-color:#5a4532;background:#1e1914}
+.run-detail-block pre{margin:0;font-family:'IBM Plex Mono',Consolas,monospace;font-size:10px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere;max-height:150px;overflow:auto;color:#b9c7ae}
+.run-detail-block.error pre{color:#d8b99d}
+.run-operations{display:grid;gap:6px;margin-top:8px}
+.run-operations>div{display:flex;align-items:center;gap:8px;min-width:0}
+.run-operations code{font-size:10px;color:#b7c9aa;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.run-operations small{font-family:'IBM Plex Mono',monospace;font-size:8px;color:#738364}
+.run-detail .run-summary{margin:0;padding:9px 10px;border:1px solid #2c3826;border-radius:5px;background:#151a14}

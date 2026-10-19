@@ -97,8 +97,9 @@
 ## 增量：审计导出与 UI 体验
 
 - 新增 owner-only `GET /api/rooms/:id/audit/export`：按事件原样输出 NDJSON（事件 id、seq、type、actor、payload 等），并设置 `application/x-ndjson` 与附件下载名；房间头部新增「导出审计日志」按钮。测试覆盖 owner 下载、未认证 401、NDJSON 可解析与事件字段；自动测试 198/198。
-- UI 体验：运行用量改为紧凑的两行（用量未返回时不再重复三个“未知”），任务卡操作下拉改为紧凑样式并补 aria-label，房间头部显示“N 进行中”，owner 页脚提高对比度；新增“当前房间 id 写入 URL 查询参数 + 浏览器标签标题显示房间名”的持久化，刷新后保持所选房间。浏览器 E2E 新增 `room-url-and-title-persistence` 与 `usage-tab` 步骤，全量 37/37 通过。
+- UI 体验：运行用量改为紧凑的两行（用量未返回时不再重复三个“未知”），任务卡操作下拉改为紧凑样式并补 aria-label，房间头部显示“N 进行中”，owner 页脚提高对比度；新增“当前房间 id 写入 URL 查询参数 + 浏览器标签标题显示房间名”的持久化，刷新后保持所选房间。浏览器 E2E 新增 `room-url-and-title-persistence`、`usage-tab` 与 `run-detail-modal` 步骤，全量 38/38 通过。
 - 新增右侧「用量」标签：按房间汇总输入/输出 Token、费用估值、已上报/未知运行数，并按 Agent 列出用量；未知提供方不会被当作 0。该面板不强制预算，只提供可解释的成本可见性。
+- 新增「运行详情」弹窗：从进行中运行、错误卡片或用量历史打开，展示时间、任务/版本、上下文水位、提示词、错误原文、限额/预算与 Room 工具操作记录；支持停止和显式重试。
 - 仓库与 CI：`git init -b main` 首个提交 `ced6da3` 纳入全部基线；新增 `.github/workflows/ci.yml`（typecheck、密钥扫描、单元测试、replay 契约、production build，Windows runner）；本地未实际触发 GitHub Actions。
 
 ## 增量：运行级 Token / 费用硬预算

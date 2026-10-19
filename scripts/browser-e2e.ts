@@ -317,6 +317,13 @@ try {
     if (!usageClicked) fail('找不到用量标签');
     await waitFor('用量面板', async () => { const text = await bodyText(); return text.includes('输入 Token') && text.includes('已记录运行'); }, 10000);
     step('usage-tab');
+    await evaluate("(()=>{const details=document.querySelector('.usage-history');if(details)details.open=true;return !!details;})()");
+    const detailClicked = await evaluate("(()=>{const button=[...document.querySelectorAll('.usage-history button')].find(item=>(item.textContent??'').includes('详情'));if(!button)return false;button.click();return true;})()");
+    if (!detailClicked) fail('找不到运行详情入口');
+    await waitFor('运行详情', async () => { const text = await bodyText(); return text.includes('运行详情') && text.includes('Room 工具操作'); }, 10000);
+    await evaluate("(()=>{const button=[...document.querySelectorAll('dialog.modal button')].find(item=>(item.textContent??'').trim()==='关闭');if(button)button.click();return !!button;})()");
+    await waitFor('关闭运行详情', async () => !(await bodyText()).includes('Room 工具操作'), 10000);
+    step('run-detail-modal');
 
     const newRoomName = `浏览器新房间 ${Date.now()}`;
     if (await clickByText('button', '新建一个房间') !== 'ok') fail('找不到新建房间入口');

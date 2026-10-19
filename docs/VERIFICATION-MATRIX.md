@@ -9,13 +9,14 @@
 | 类型检查 / 单元测试 | PASS（198/198） | `npx tsc --noEmit`、`npm test` | 测试输出；含 replay/context/audit/budget/UI 测试 |
 | 运行级 Token / 费用硬预算 | PASS | `npm test`（`tests/budget.test.ts`、`tests/budget-worker.test.ts`）；设置对话框浏览器 E2E | 测试输出 |
 | 显式失败重试 `run.retry` | PASS | `npm test`（`tests/run-retry.test.ts`） | 测试输出 |
+| 运行详情与工具操作可见性 | PASS | 浏览器 E2E `run-detail-modal` 步骤 | 上述浏览器报告 |
 | 事件回放 / fencing / partial / 上下文契约 | PASS（63/63） | `npm run test:replay` | 测试输出 |
 | 房间事件审计导出（NDJSON） | PASS | `npm test`（`tests/audit-export.test.ts`） | 测试输出 |
 | 仓库密钥扫描 | PASS（0 finding） | `npm run check:secrets` | `.state/secret-scan/latest.json` |
-| 预发布全链路 | PASS（9/9） | `npm run test:preflight -- --with-native` | `.state/preflight/run-5MAZM4/report.json` |
-| 浏览器端到端 / URL 与标题恢复 / 草稿与对账 UI / 用量看板 | PASS（37/37） | `npm run test:browser` | `.state/browser-e2e/run-DGHvwZ/report.json`、`docs/screenshots/ui-polish-20261019.png` |
+| 预发布全链路 | PASS（9/9） | `npm run test:preflight -- --with-native` | `.state/preflight/run-6VP7lK/report.json` |
+| 浏览器端到端 / URL 与标题恢复 / 草稿与对账 UI / 用量看板 | PASS（38/38） | `npm run test:browser` | `.state/browser-e2e/run-bxcoIn/report.json`、`docs/screenshots/ui-polish-20261019.png` |
 | 房间用量看板（Token / 费用估值 / 未知用量） | PASS | 浏览器 E2E `usage-tab` 步骤 | 上述报告 |
-| 生产构建 + 重启恢复 + Cookie 保持 | PASS（10/10） | `npm run test:production` | `.state/production-smoke/run-CFKqnE/report.json` |
+| 生产构建 + 重启恢复 + Cookie 保持 | PASS（10/10） | `npm run test:production` | `.state/production-smoke/run-BeGuM3/report.json` |
 | Windows 原生沙箱探测 | PASS（23/23） | `npm run test:sandbox` | `.state/diagnostics/sandbox.json` |
 | 连接器进程树 | PASS（9/9） | `npm run test:connectors` | `.state/connector-probes/` |
 | 原生 Agent 协议预检 | PASS（codex/claude/deepseek） | `npm run test:agent-protocols -- --check` | `.state/native-pipecompat-20261017/diagnostics/agent-protocols.json` |
