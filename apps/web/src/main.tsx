@@ -24,7 +24,8 @@ function Icon({name,size=18}:{name:string;size?:number}) {
   play:<path d="m8 5 11 7-11 7Z"/>,stop:<rect x="6" y="6" width="12" height="12" rx="2"/>,
   reply:<><path d="m8 5-5 5 5 5M3 10h9a7 7 0 0 1 7 7v3"/></>,
   download:<><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/></>,
-  grid:<><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>
+  grid:<><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
+  list:<><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></>
  };
  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]??paths.chat}</svg>;
 }
@@ -45,6 +46,7 @@ function App(){
  const [helpOpen,setHelpOpen]=useState(false);
  const [mobileDetailsOpen,setMobileDetailsOpen]=useState(false);
  const [roomQuery,setRoomQuery]=useState('');
+ const [density,setDensity]=useState<'comfortable'|'compact'>(()=>{try{return localStorage.getItem('temptroom-density')==='compact'?'compact':'comfortable';}catch{return 'comfortable';}});
  const [streaming,setStreaming]=useState<Record<string,DraftStream>>({}),[sandbox,setSandbox]=useState<Diagnostic>(),[probing,setProbing]=useState(false);
  const messagesEnd=useRef<HTMLDivElement>(null),fileInput=useRef<HTMLInputElement>(null),textarea=useRef<HTMLTextAreaElement>(null),generation=useRef(0),pendingSend=useRef<{body:string;id:string}|undefined>(undefined);
  const notify=useCallback((message:string)=>{setNotice(message);},[]);
@@ -85,7 +87,7 @@ function App(){
  function addAgent(){setDialog(null);setEditing(agentSchema.parse({id:`agent_${crypto.randomUUID().replaceAll('-','')}`,name:'新 Agent',provider:'api'}));}
  if(fatal)return <main className="start-screen"><div className="brand-mark">T</div><h1>重新连接本地工作室</h1><p>{fatal}</p><p className="muted">会话现在会跨重启保持，正常重启无需重新打开。如果浏览器清除了登录状态，可以粘贴启动地址或启动令牌直接连接。</p><div className="form-grid"><input placeholder="粘贴 http://127.0.0.1:4317/#session=… 或 64 位令牌" value={sessionInput} onChange={event=>setSessionInput(event.target.value)} onKeyDown={event=>{if(event.key==='Enter')void connectWithSession(sessionInput);}}/><button className="button" disabled={!sessionInput.trim()} onClick={()=>void connectWithSession(sessionInput)}>连接</button></div><button className="button" onClick={()=>location.reload()}>重新加载</button></main>;
  if(!ready)return <main className="start-screen"><div className="brand-mark">T</div><p>正在连接本地工作室…</p></main>;
- return <div className="app-shell">
+ return <div className={`app-shell ${density==='compact'?'compact-density':''}`}>
   <aside className="sidebar">
    <a className="brand" href="/" aria-label="Tempt Room"><span className="brand-mark">T</span><span>tempt<span className="brand-light">room</span><small>一起想清楚，一起完成。</small></span></a>
    <div className="workspace-label"><Icon name="grid" size={16}/><span>本地工作空间</span><span className="local-tag">LOCAL</span></div>
@@ -102,7 +104,7 @@ function App(){
    <footer className="owner"><Avatar human/><div><strong>我的工作空间</strong><small>仅本机可访问</small></div><span className={`tiny-dot ${connected?'online':''}`}/></footer>
   </aside>
   <main className="room-main">
-   <header className="room-header"><div className="room-title"><span className="room-icon"><Icon name="chat" size={21}/></span><div><h1>{snapshot?.room.name??'正在打开房间'}</h1><p>{snapshot?.room.description||'人和 Agent 的共同工作空间'}</p></div></div><div className="header-actions">{activeRuns.length>0&&<span className="header-activity" title="当前有排队或运行中的 Agent 工作"><span className="tiny-dot working"/>{activeRuns.length} 进行中</span>}<span className="connection"><span className={`tiny-dot ${connected?'online':''}`}/>{connected?'实时连接':hasConnected?'重新连接中':'正在连接'}</span><button className="icon-button mobile-only" aria-label="打开协作面板" onClick={()=>setMobileDetailsOpen(true)}><Icon name="grid" size={17}/></button><button className="icon-button" aria-label="导出审计日志" title="导出本房间事件日志（JSONL）" onClick={()=>void exportAudit()}><Icon name="download" size={17}/></button><button className="icon-button" aria-label="房间设置" onClick={()=>setDialog('room-settings')}><Icon name="settings"/></button></div></header>
+   <header className="room-header"><div className="room-title"><span className="room-icon"><Icon name="chat" size={21}/></span><div><h1>{snapshot?.room.name??'正在打开房间'}</h1><p>{snapshot?.room.description||'人和 Agent 的共同工作空间'}</p></div></div><div className="header-actions">{activeRuns.length>0&&<span className="header-activity" title="当前有排队或运行中的 Agent 工作"><span className="tiny-dot working"/>{activeRuns.length} 进行中</span>}<span className="connection"><span className={`tiny-dot ${connected?'online':''}`}/>{connected?'实时连接':hasConnected?'重新连接中':'正在连接'}</span><button className="icon-button" aria-label="切换消息密度" title={density==='compact'?'切换舒适布局':'切换紧凑布局'} onClick={()=>setDensity(previous=>{const next=previous==='compact'?'comfortable':'compact';try{localStorage.setItem('temptroom-density',next);}catch{}return next;})}><Icon name="list" size={17}/></button><button className="icon-button mobile-only" aria-label="打开协作面板" onClick={()=>setMobileDetailsOpen(true)}><Icon name="grid" size={17}/></button><button className="icon-button" aria-label="导出审计日志" title="导出本房间事件日志（JSONL）" onClick={()=>void exportAudit()}><Icon name="download" size={17}/></button><button className="icon-button" aria-label="房间设置" onClick={()=>setDialog('room-settings')}><Icon name="settings"/></button></div></header>
    <div className="room-toolbar"><div className="member-stack">{agents.slice(0,4).map(a=><Avatar key={a.id} agent={a}/>)}<span>{agents.length} 位 Agent · 你</span></div><div className="toolbar-actions"><button className="button small" onClick={()=>setDialog('task')}><Icon name="plus" size={15}/>创建任务</button><button className="button primary small" onClick={()=>setDialog('discussion')}><Icon name="play" size={14}/>开启讨论</button></div></div>
    {discussion&&<div className="discussion-banner"><span className="pulse"/><span>讨论进行中 <strong>{discussion.round} / {discussion.rounds} 轮</strong>{discussion.quorum<discussion.participants.length&&<small className="discussion-quorum">Quorum {discussion.quorum}/{discussion.participants.length}</small>}{discussion.absent?.length?<small className="discussion-quorum">缺席 {discussion.absent.map(id=>agents.find(agent=>agent.id===id)?.name??id).join("、")}</small>:null}</span><span className="discussion-goal">{discussion.goal}</span><button onClick={()=>void command('discussion.stop',{discussionId:discussion.id}).catch(e=>notify(e.message))}><Icon name="stop" size={13}/>停止</button></div>}
    <section className="message-list" aria-label="群聊消息" aria-live="polite">

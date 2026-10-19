@@ -28,15 +28,16 @@
 | 快捷键帮助面板 | PASS | 浏览器 E2E `shortcut-help` | 上述浏览器报告 |
 | 侧边栏房间搜索 | PASS | 浏览器 E2E `room-search` | 上述浏览器报告 |
 | 移动端协作面板 | PASS | 浏览器 E2E `mobile-collaboration-panel` | `docs/screenshots/ui-mobile-panel-20261019.png` |
+| 消息密度切换 | PASS | 浏览器 E2E `density-toggle` | 上述浏览器报告 |
 | 讨论历史与只读详情 | PASS | 浏览器 E2E `discussion-history` | 上述浏览器报告 |
 | 运行详情与工具操作可见性 | PASS | 浏览器 E2E `run-detail-modal` 步骤 | 上述浏览器报告 |
 | 事件回放 / fencing / partial / 上下文契约 | PASS（63/63） | `npm run test:replay` | 测试输出 |
 | 房间事件审计导出（NDJSON） | PASS | `npm test`（`tests/audit-export.test.ts`） | 测试输出 |
 | 仓库密钥扫描 | PASS（0 finding） | `npm run check:secrets` | `.state/secret-scan/latest.json` |
-| 预发布全链路 | PASS（9/9） | `npm run test:preflight -- --with-native` | `.state/preflight/run-mDZARB/report.json` |
-| 浏览器端到端 / URL 与标题恢复 / 草稿与对账 UI / 用量看板 | PASS（44/44） | `npm run test:browser` | `.state/browser-e2e/run-yn9XxK/report.json`、`docs/screenshots/ui-polish-20261019.png` |
+| 预发布全链路 | PASS（9/9） | `npm run test:preflight -- --with-native` | `.state/preflight/run-xzdIIW/report.json` |
+| 浏览器端到端 / URL 与标题恢复 / 草稿与对账 UI / 用量看板 | PASS（45/45） | `npm run test:browser` | `.state/browser-e2e/run-ka10jA/report.json`、`docs/screenshots/ui-polish-20261019.png` |
 | 房间用量看板（Token / 费用估值 / 未知用量） | PASS | 浏览器 E2E `usage-tab` 步骤 | 上述报告 |
-| 生产构建 + 重启恢复 + Cookie 保持 | PASS（10/10） | `npm run test:production` | `.state/production-smoke/run-vSlgO4/report.json` |
+| 生产构建 + 重启恢复 + Cookie 保持 | PASS（10/10） | `npm run test:production` | `.state/production-smoke/run-7PknHX/report.json` |
 | Windows 原生沙箱探测 | PASS（23/23） | `npm run test:sandbox` | `.state/diagnostics/sandbox.json` |
 | 连接器进程树 | PASS（9/9） | `npm run test:connectors` | `.state/connector-probes/` |
 | 原生 Agent 协议预检 | PASS（codex/claude/deepseek） | `npm run test:agent-protocols -- --check` | `.state/native-pipecompat-20261017/diagnostics/agent-protocols.json` |

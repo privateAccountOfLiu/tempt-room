@@ -116,3 +116,10 @@
 .mobile-row{display:flex;align-items:center;gap:7px;padding:5px 0;font-size:10px;color:#b9c8ad;min-width:0}
 .mobile-row strong{font-weight:400;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mobile-row small{font-size:8px;color:#718264;white-space:nowrap}
+/* Compact density: more runs visible without changing information. */
+.compact-density .message{margin-bottom:14px}
+.compact-density .message-text{font-size:11px;line-height:1.65}
+.compact-density .message-meta{height:18px;margin-bottom:5px}
+.compact-density .date-separator{margin:9px 0 16px}
+.compact-density .task-card{padding:2px 0 10px;margin-bottom:10px}
+.compact-density .message-list{padding-bottom:10px}

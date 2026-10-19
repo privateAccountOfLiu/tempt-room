@@ -194,6 +194,13 @@ try {
     await evaluate("(()=>{const input=document.querySelector('.room-search');if(!input)return false;const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(input,'');input.dispatchEvent(new Event('input',{bubbles:true}));return true;})()");
     await waitFor('房间搜索清空', async () => { const count = await evaluate("document.querySelectorAll('.room-list .room-link').length"); return count > 0; }, 10000);
     step('room-search');
+    const densityClicked = await evaluate("(()=>{const button=document.querySelector('button[aria-label=\"切换消息密度\"]');if(!button)return false;button.click();return true;})()");
+    if (!densityClicked) fail('找不到密度切换按钮');
+    await waitFor('紧凑密度', async () => await evaluate("document.querySelector('.app-shell')?.classList.contains('compact-density')") === true, 5000);
+    await evaluate("(()=>{document.querySelector('button[aria-label=\"切换消息密度\"]')?.click();return true;})()");
+    await waitFor('恢复舒适密度', async () => await evaluate("document.querySelector('.app-shell')?.classList.contains('compact-density')") === false, 5000);
+    step('density-toggle');
+
 
 
 
@@ -302,10 +309,12 @@ try {
 
     const socketCount = await evaluate('window.__roomSockets ? window.__roomSockets.length : 0');
     if (!socketCount) fail('页面没有可观测的 WebSocket 连接');
+    await send('Network.enable', {}, sessionId);
+    await send('Network.emulateNetworkConditions', {offline: true, latency: 0, downloadThroughput: 0, uploadThroughput: 0}, sessionId);
     await evaluate('window.__roomSockets.forEach(socket => socket.close())');
     await waitFor('断线状态提示', async () => (await bodyText()).includes('重新连接中'), 15000);
     step('offline-detected');
-    await waitFor('WebSocket 自动重连', async () => (await bodyText()).includes('实时连接'), 20000);
+    await send('Network.emulateNetworkConditions', {offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1}, sessionId);
     await waitFor('WebSocket 自动重连', async () => (await bodyText()).includes('实时连接'), 20000);
     const catchup = `断线恢复消息 ${Date.now()}`;
     await command(roomId, 'message.send', {text: catchup});
