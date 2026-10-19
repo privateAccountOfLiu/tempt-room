@@ -333,10 +333,14 @@ test('Worker serializes one thread across rooms, rejects rebinding, and blocks b
   a.worker.tick(); await until(() => f.queue.length === 1); a.worker.tick(); await delay(150);
   assert.equal(f.requests.filter(frame => frame.method === 'thread/queue/add').length, 1);
   assert.throws(() => a.command('agent.save', { ...f.agent, codexBinding: { ...f.binding, threadId: 'another' } }), /先停止并核对/);
-  const run = a.store.list<Run>('runs')[0]; a.command('run.cancel', { runId: run.id });
-  assert.equal(a.store.get<Run>('runs', run.id)!.status, 'cancel_requested');
+  await until(() => a.store.list<Run>('runs').some(candidate => candidate.codex));
+  const run = a.store.list<Run>('runs').find(candidate => candidate.codex)!;
+  a.command('run.cancel', { runId: run.id }, run.roomId);
+  assert.ok(['cancel_requested','canceled'].includes(a.store.get<Run>('runs', run.id)!.status));
   await until(() => a.store.get<Run>('runs', run.id)!.status === 'canceled');
-  const uncertain = { ...a.store.list<Run>('runs').find(candidate=>candidate.id!==run.id)!, status: 'unknown' as const, codex: { ...run.codex!, phase: 'uncertain' as const } }; a.store.put('runs', uncertain);
+  const other = a.store.list<Run>('runs').find(candidate=>candidate.id!==run.id)!;
+  const codexRun = a.store.get<Run>('runs', run.id)!;
+  const uncertain = { ...other, status: 'unknown' as const, codex: { ...codexRun.codex!, phase: 'uncertain' as const } }; a.store.put('runs', uncertain);
   a.worker.tick(); await delay(100); assert.equal(f.requests.filter(frame => frame.method === 'thread/queue/add').length, 1);
 });
 test('restart retains queue intent as unknown; explicit recovery confirms completion without resubmission', async t => {

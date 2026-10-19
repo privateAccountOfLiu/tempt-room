@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync } from 'no
 import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
-import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type Artifact, type Discussion, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
+import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type Artifact, type Discussion, type ExecutionSettings, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { diagnose, ExecutionUnknown, RemoteCanceled, runAdapter } from './adapters.ts';
 import { SandboxHost } from './sandbox.ts';
 import { digest, now, Store, SYSTEM, uid } from './store.ts';
@@ -13,7 +13,7 @@ import { redactDiagnostic } from './diagnostics.ts';
 import { runContext } from './context.ts';
 import {contextDelta,advanceContext,assertContextCurrent,reconciliationPrompt} from './context-reconciliation.ts';
 import { captureContext } from './context.ts';
-import { fairOrder } from './scheduler.ts';
+import { ReadyScheduler } from './scheduler.ts';
 import { trustForActor } from './trust.ts';
 import { assertRoomPostLength, assertRoomToolAllowed, assertTaskTitleLength } from './tool-policy.ts';
 import { formatContextMessage, UNTRUSTED_CONTEXT_NOTICE } from './context-format.ts';
@@ -96,7 +96,7 @@ export class Worker {
   private inputs = new Map<string,{fence:RunFence;receive:(text:string)=>void}>();
   private timer?: NodeJS.Timeout;
   private closed = false;
-  private fairServed = new Map<string,number>();
+  private scheduler = new ReadyScheduler();
   private toolCalls = new Map<string,number>();
   readonly streamListeners = new Set<(delta: StreamDelta) => void>();
   constructor(public store: Store, public service: RoomService, public root: string,private options:{adapter?:typeof runAdapter}={}) {
@@ -150,38 +150,56 @@ export class Worker {
     });
     const runs = this.store.list<Run>('runs');
     const settings=this.store.settings();
-    for (const run of fairOrder(runs,this.fairServed,this.schedulerWeights())) {
-      if (this.active.size >= settings.concurrency) break;
-      if (run.status !== 'queued' || this.active.has(run.id)) continue;
-      const thread = this.threadKey(run);
-      if (thread && runs.some(other => other.id !== run.id && this.threadKey(other) === thread &&
-        (this.active.has(other.id) || (other.codex && !['completed','canceled'].includes(other.codex.phase) && ['unknown','interrupted'].includes(other.status))))) continue;
-      if ([...this.active.keys()].some(id => { const r = this.store.get<Run>('runs', id); return r?.agentId === run.agentId && r.roomId === run.roomId; })) continue;
-      // Host-mode tasks edit the real project in place: never let two of them
-      // write the same directory at once. Other work keeps running in parallel.
-      const projectKey = this.hostProjectKey(run);
-      if (projectKey && [...this.active.keys()].some(id => this.hostProjectKey(this.store.get<Run>('runs', id)) === projectKey)) continue;
-      if (run.taskId) {
-        const task = this.store.get<Task>('tasks', run.taskId)!;
-        const dependencies = task.dependencies.map(id => this.store.get<Task>('tasks', id));
-        if (dependencies.some(t => !t || ['failed','canceled','superseded','interrupted','unknown'].includes(t.status))) { this.finish(run, 'failed', '依赖任务未成功'); continue; }
-        if (dependencies.some(t => t?.status !== 'completed')) continue;
-        try{const inputs=dependencyInputs(this.store,task);run.dependencyVersions=inputs.versions;run.inputArtifacts=inputs.artifacts;}catch(error){this.finish(run,'failed',(error as Error).message);continue;}
-      }
-      const controller = new AbortController(); this.active.set(run.id, controller);
-      this.fairServed.set(run.roomId+'/'+run.agentId,Date.now());
-      // Legacy queued work keeps its original authorization: no implicit extra
-      // model turns on upgrade, but old-context success is still rejected.
-      run.contextPolicy??={...settings.contextPolicy,maxRounds:0};run.lifecycleVersion??=1;
-      run.limits??={memoryMb:settings.memoryMb,maxProcesses:settings.maxProcesses,timeoutMs:run.taskId?settings.taskTimeoutMs:settings.chatTimeoutMs,tokenBudget:settings.tokenBudget,costBudgetUsd:settings.costBudgetUsd};
-      run.generation??=1;run.executionId=uid('execution');run.leaseUntil=new Date(Date.now()+settings.taskLeaseMs).toISOString();
-      const fence=executionFence(run);this.executions.set(fence.executionId,fence);
-      run.status = 'running'; run.updatedAt = now();
-      this.store.atomic(() => {  this.store.event(run.roomId, 'run.started', SYSTEM, { run }, null, run.id); });
-      void this.execute(run, controller).catch(error=>{
-        try{const current=assertRunFence(this.store,fence,{allowTerminal:true,allowStaleTask:true});if(!terminalStates.has(current.status)){const agent=this.store.get<AgentDescriptor>('agents',current.agentId);this.finish(current,'unknown',redactDiagnostic(error,[agent?.credentialEnv?process.env[agent.credentialEnv]:undefined]));}}catch{/* Never settle another generation from an old supervisor. */}
-      }).finally(() => { this.executions.delete(fence.executionId);if(this.active.get(run.id)===controller)this.active.delete(run.id); });
+    for(const run of runs){
+      if(run.status!=='queued'||!run.taskId)continue;
+      const task=this.store.get<Task>('tasks',run.taskId);
+      const dependencies=task?.dependencies.map(id=>this.store.get<Task>('tasks',id))??[];
+      if(!task||dependencies.some(t=>!t||['failed','canceled','superseded','interrupted','unknown'].includes(t.status)))this.finish(run,'failed','依赖任务未成功');
     }
+    while(this.active.size<settings.concurrency){
+      const candidates=this.dispatchCandidates();
+      const next=this.scheduler.pick(candidates,this.schedulerWeights(),settings.maxBypassDispatches);
+      if(!next)break;
+      if(this.startRun(next,settings))this.scheduler.recordServed(next);
+    }
+  }
+  private dispatchCandidates():Run[]{
+    const runs=this.store.list<Run>('runs'),candidates:Run[]=[];
+    for(const run of runs){
+      if(run.status!=='queued'||this.active.has(run.id))continue;
+      const thread=this.threadKey(run);
+      if(thread&&runs.some(other=>other.id!==run.id&&this.threadKey(other)===thread&&(this.active.has(other.id)||(other.codex&&!['completed','canceled'].includes(other.codex.phase)&&['unknown','interrupted'].includes(other.status)))))continue;
+      if([...this.active.keys()].some(id=>{const active=this.store.get<Run>('runs',id);return active?.agentId===run.agentId&&active.roomId===run.roomId;}))continue;
+      const projectKey=this.hostProjectKey(run);
+      if(projectKey&&[...this.active.keys()].some(id=>this.hostProjectKey(this.store.get<Run>('runs',id))===projectKey))continue;
+      if(run.taskId){
+        const task=this.store.get<Task>('tasks',run.taskId);if(!task)continue;
+        const dependencies=task.dependencies.map(id=>this.store.get<Task>('tasks',id));
+        if(dependencies.some(t=>!t||['failed','canceled','superseded','interrupted','unknown'].includes(t.status)))continue;
+        if(dependencies.some(t=>t?.status!=='completed'))continue;
+      }
+      candidates.push(run);
+    }
+    return candidates;
+  }
+  private startRun(run:Run,settings:ExecutionSettings):boolean{
+    if(run.taskId){
+      const task=this.store.get<Task>('tasks',run.taskId)!;
+      try{const inputs=dependencyInputs(this.store,task);run.dependencyVersions=inputs.versions;run.inputArtifacts=inputs.artifacts;}catch(error){this.finish(run,'failed',(error as Error).message);return false;}
+    }
+    const controller = new AbortController(); this.active.set(run.id, controller);
+    // Legacy queued work keeps its original authorization: no implicit extra
+    // model turns on upgrade, but old-context success is still rejected.
+    run.contextPolicy??={...settings.contextPolicy,maxRounds:0};run.lifecycleVersion??=1;
+    run.limits??={memoryMb:settings.memoryMb,maxProcesses:settings.maxProcesses,timeoutMs:run.taskId?settings.taskTimeoutMs:settings.chatTimeoutMs,tokenBudget:settings.tokenBudget,costBudgetUsd:settings.costBudgetUsd};
+    run.generation??=1;run.executionId=uid('execution');run.leaseUntil=new Date(Date.now()+settings.taskLeaseMs).toISOString();
+    const fence=executionFence(run);this.executions.set(fence.executionId,fence);
+    run.status = 'running'; run.updatedAt = now();
+    this.store.atomic(() => {  this.store.event(run.roomId, 'run.started', SYSTEM, { run }, null, run.id); });
+    void this.execute(run, controller).catch(error=>{
+      try{const current=assertRunFence(this.store,fence,{allowTerminal:true,allowStaleTask:true});if(!terminalStates.has(current.status)){const agent=this.store.get<AgentDescriptor>('agents',current.agentId);this.finish(current,'unknown',redactDiagnostic(error,[agent?.credentialEnv?process.env[agent.credentialEnv]:undefined]));}}catch{/* Never settle another generation from an old supervisor. */}
+    }).finally(() => { this.executions.delete(fence.executionId);if(this.active.get(run.id)===controller)this.active.delete(run.id); });
+    return true;
   }
   private schedulerWeights(){const weights=new Map<string,number>();for(const agent of this.store.list<AgentDescriptor>('agents'))weights.set(agent.id,agent.schedulerWeight??1);return weights;}
   /** Real project directory touched by a host-mode task run, if any. */

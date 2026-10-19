@@ -6,6 +6,7 @@ import staticFiles from '@fastify/static';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { Readable } from 'node:stream';
 import { z } from 'zod';
 import { VERSION,payloadSchemas, agentToolCallSchema, ProtocolError, type AgentDescriptor, type Artifact, type RoomEvent,type ServerCapabilities,type Run,type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { Store, now, OWNER, uid } from './store.ts';
@@ -88,10 +89,15 @@ export async function createApp(options: AppOptions = {}) {
   app.get<{ Params: { id: string } }>('/api/rooms/:id/audit/export', (request, reply) => {
     const roomId = request.params.id;
     if (!store.room(roomId)) throw new ProtocolError('not_found', '房间不存在', 404);
-    const events = store.events(roomId, 0);
+    const throughSeq = store.room(roomId)!.seq, floorSeq = store.projectionStatus(roomId).historyFloor;
     reply.header('content-type', 'application/x-ndjson; charset=utf-8');
     reply.header('content-disposition', `attachment; filename="${roomId}-audit.jsonl"`);
-    return events.map(event => JSON.stringify(event)).join('\n') + '\n';
+    reply.header('cache-control', 'no-store');
+    reply.header('x-audit-history-floor', String(floorSeq));
+    reply.header('x-audit-through-seq', String(throughSeq));
+    return reply.send(Readable.from((function* () {
+      for (const event of store.scanEvents(roomId, {afterSeq: 0, throughSeq})) yield JSON.stringify(event) + '\n';
+    })()));
   });
   app.get('/api/agents', () => store.list('agents'));
   // Read-only discovery of locally installed Agent programs for the setup form.

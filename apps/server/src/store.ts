@@ -166,6 +166,29 @@ export class Store {
     return {...raw,...metadata,schemaVersion:0,durability:'durable',ts:raw.createdAt,idempotencyKey:raw.causationId??null,traceId:raw.correlationId??raw.eventId};
   }
   events(roomId: string, after = 0, limit = 500): RoomEvent[] { return this.db.prepare('SELECT body FROM events WHERE room_id=? AND seq>? ORDER BY seq LIMIT ?').all(roomId, after, Math.min(limit, 2000)).map((r: any) => this.decodeEvent(r.body)); }
+  /** Bounded, resumable event scan. Callers capture throughSeq first so new facts append after the snapshot. */
+  *scanEvents(roomId: string, options: {afterSeq?: number; throughSeq?: number; pageSize?: number} = {}): Generator<RoomEvent> {
+    const afterSeq = options.afterSeq ?? 0, pageSize = Math.max(1, Math.min(options.pageSize ?? 1000, 1000));
+    if (!Number.isSafeInteger(afterSeq) || afterSeq < 0) throw new Error('Invalid event scan cursor');
+    const throughSeq = options.throughSeq ?? this.room(roomId)?.seq ?? 0;
+    if (!Number.isSafeInteger(throughSeq) || throughSeq < afterSeq) throw new Error('Invalid event scan watermark');
+    let cursor = afterSeq;
+    while (cursor < throughSeq) {
+      const rows = this.db.prepare('SELECT body FROM events WHERE room_id=? AND seq>? AND seq<=? ORDER BY seq LIMIT ?').all(roomId, cursor, throughSeq, pageSize) as Array<{body: string}>;
+      if (!rows.length) break;
+      let last = cursor;
+      for (const row of rows) {
+        const event = this.decodeEvent(row.body);
+        if (event.seq <= last) throw new Error('Event scan cursor did not advance');
+        if (event.seq !== last + 1) throw new Error(`Event scan detected a gap after seq ${last}`);
+        last = event.seq;
+        yield event;
+      }
+      if (last <= cursor) throw new Error('Event scan cursor did not advance');
+      cursor = last;
+    }
+    if (cursor < throughSeq) throw new Error(`Event scan stopped before watermark ${throughSeq} (at ${cursor})`);
+  }
   receipt(id: string): { hash: string; receipt: any } | undefined { const r = this.db.prepare('SELECT hash,receipt FROM commands WHERE id=?').get(id) as any; return r ? { hash: r.hash, receipt: JSON.parse(r.receipt) } : undefined; }
   saveReceipt(id: string, hash: string, receipt: unknown) { this.db.prepare('INSERT INTO commands VALUES(?,?,?)').run(id, hash, JSON.stringify(receipt)); }
   session(key: string): string | undefined { return (this.db.prepare('SELECT value FROM sessions WHERE key=?').get(key) as any)?.value; }

@@ -105,6 +105,12 @@
           "minimum": 1,
           "maximum": 1000
         },
+        "maxBypassDispatches": {
+          "default": 5,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
         "allowAgentMentionsToWake": {
           "default": false,
           "type": "boolean"
@@ -177,6 +183,7 @@
         "maxQueuedRunsPerAgent",
         "maxQueuedRunsPerRoom",
         "maxAgentRunsPerMinute",
+        "maxBypassDispatches",
         "allowAgentMentionsToWake",
         "maxWakeChainDepth",
         "maxToolResultBytes",
