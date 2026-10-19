@@ -121,7 +121,7 @@
 - `discussion.start` 新增可选 `quorum`（默认等于参与者数）；拒绝 quorum 超过参与人数、或 maxResponses 小于 quorum 的不可达配置。
 - 每轮成功响应达到 quorum 即推进下一轮：未完成成员记入 `Discussion.absent` 并以 `superseded` 取消，避免慢成员阻塞本轮；若所有运行终止仍未达 quorum 则停止讨论。默认 quorum 为全员，保留原语义。
 - 讨论横幅显示 Quorum 与缺席成员；创建讨论表单增加 quorum 字段（0=全部）。
-- 测试：`tests/discussion-quorum.test.ts` 覆盖提前推进、缺席记录、迟到取消、quorum 不可达拒绝；`npm test` **219/219**。
+- 测试：`tests/discussion-quorum.test.ts` 覆盖提前推进、缺席记录、迟到取消、quorum 不可达拒绝；`npm test` **220/220**。
 
 ## 增量：房间 / 成员待处理运行上限
 
@@ -179,37 +179,44 @@
 
 ## 增量：公平性压力测试与移动端布局
 
-- 新增 20 Agent × 5 运行的无模型公平性压力测试：使用公平排序连续调度 100 次，所有 Agent 均被服务 5 次，无饥饿；`npm test` **219/219**。
+- 新增 20 Agent × 5 运行的无模型公平性压力测试：使用公平排序连续调度 100 次，所有 Agent 均被服务 5 次，无饥饿；`npm test` **220/220**。
 - 浏览器 E2E 新增 390×844 移动端步骤：右侧详情面板隐藏、消息输入框可见、无水平溢出；移动端截图 `docs/screenshots/ui-mobile-20261019.png`，全量 **42/42**。
 
 ## 增量：随机 seq 故障注入与 CI 门禁
 
 - 新增种子化随机命令历史测试：40 条随机消息/决策后，在 30 个任意 seq 边界重建真实投影，要求投影字节与 head 完全一致、房间游标不前进；故障扫描后的继续写入仍可回放。
 - 新增 `npm run test:faults`，并加入本地 CI 配置步骤（在单元测试、replay 契约之后，build 之前）；种子固定，失败可重放。
-- 测试：`tests/fault-injection.test.ts` 1 项；`npm test` **219/219**。GitHub Actions 仍未实际执行。
+- 测试：`tests/fault-injection.test.ts` 1 项；`npm test` **220/220**。GitHub Actions 仍未实际执行。
 
 ## 增量：Agent 权重与加权公平调度
 
 - `AgentDescriptor.schedulerWeight`（0.1–10，默认 1）加入协议与 Agent 设置表单；权重越高，最近服务虚拟时间越小，越容易获得下一次调度机会。
 - `fairOrder(runs, servedAt, weights)` 按 `servedAt / weight` 排序；未配置权重时保持原有行为。Worker 每 tick 读取本地 Agent 权重并传入。
-- 测试：`tests/fair-scheduler.test.ts` 新增静态权重偏好与 12 次调度中高权重获得更多机会的验证；`npm test` **219/219**，浏览器 E2E 42/42。
+- 测试：`tests/fair-scheduler.test.ts` 新增静态权重偏好与 12 次调度中高权重获得更多机会的验证；`npm test` **220/220**，浏览器 E2E 42/42。
 
 ## 增量：双连接并发写入门禁
 
 - 新增两个独立 SQLite 连接互发 40 条消息的并发测试：每轮比较双方快照与房间 seq，最终事件连续、投影一致；从任意水位重建后投影字节不变。
 - 新增 `npm run test:concurrency` 并加入本地 CI 配置；测试不调用模型。
-- 测试：`tests/concurrency-conflict.test.ts` 1 项；`npm test` **219/219**。
+- 测试：`tests/concurrency-conflict.test.ts` 1 项；`npm test` **220/220**。
 
 ## 增量：单成员每分钟运行上限
 
 - 设置新增 `maxAgentRunsPerMinute`（默认 30）；入队前统计该成员最近 60 秒创建的运行，超限返回 429 `agent_rate_limited` 并原子回滚，防止点名风暴/快速重试打爆模型额度。
 - 设置表单增加「单成员每分钟运行上限」；默认值高于队列上限，保持常规行为。
-- 测试：`tests/rate-limit.test.ts` 1 项；`npm test` **219/219**。
+- 测试：`tests/rate-limit.test.ts` 1 项；`npm test` **220/220**。
 
 ## 增量：快捷键帮助面板
 
 - 新增快捷键帮助弹窗，可在输入框底部「快捷键」按钮、`Ctrl/⌘ + /` 或非输入状态按 `?` 打开；列出 Enter、Shift+Enter、Ctrl/⌘+K、帮助、Esc 等操作，并说明不会绕过权限/预算/确认流程。
 - 浏览器 E2E 新增 `shortcut-help` 步骤；全量 **42/42**。
+
+## 增量：受限沙箱聊天自动重试
+
+- 设置新增 `autoRetryChatRuns`（默认关闭）与 `maxAutoRetries`（默认 1，0–3）。
+- 仅对同时满足以下条件的失败运行自动重试：chat、无 task/discussion、sandbox 执行、无已记录 Room 工具操作、无已产出 artifact、失败类别为 timeout/network/provider；任务、host、unknown/interrupted、预算/上下文/工具失败一律不自动重试。
+- 新运行带 `autoRetryOf` / `autoRetryCount` 追踪字段，并写入审计事件；队列/速率/预算限制仍会阻止自动重试。
+- UI 设置新增自动重试开关与次数；测试 `tests/auto-retry.test.ts` 验证一次自动重试后成功；`npm test` **220/220**。
 
 ## 原计划逐项剩余工作
 
@@ -225,7 +232,7 @@ P1 尚未完成：
 2. quorum/absent/late、分桶 EWMA 自适应超时、超时草稿降级与 20 Agent 公平性压力测试已实现；加权 WFQ、链深/每轮配额仍待实现。
 3. 每 Agent/房间待处理运行上限已实现（`maxQueuedRunsPerAgent`/`maxQueuedRunsPerRoom`，入队前 429 原子失败）；工具输出上限、每 Agent 增量 inbox 与大规模上下文分段/引用仍待实现。
 4. 单次运行 Token/费用硬预算、房间累计用量上限与入队前熔断、房间成本看板均已实现（未知用量不按 0 计）；时长上限由 timeout 控制。
-5. 消息 trust 来源级、上下文内不可信标注与序列化注入测试、JSONL 审计导出、显式 `run.retry`、失败分类建议已实现；工具前策略校验与自动重试策略仍待实现。
+5. 消息 trust 来源级、上下文内不可信标注与序列化注入测试、JSONL 审计导出、显式 `run.retry`、失败分类建议与受限沙箱聊天自动重试已实现；工具前策略校验仍待实现。
 6. 真实 CLI 的混合快慢场景验收仍须与无模型测试分开，不能用模拟结果替代。
 
 P2 尚未完成：

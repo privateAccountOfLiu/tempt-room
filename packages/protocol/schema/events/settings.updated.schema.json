@@ -105,6 +105,16 @@
           "minimum": 1,
           "maximum": 1000
         },
+        "autoRetryChatRuns": {
+          "default": false,
+          "type": "boolean"
+        },
+        "maxAutoRetries": {
+          "default": 1,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
         "adaptiveTimeouts": {
           "default": false,
           "type": "boolean"
@@ -135,6 +145,8 @@
         "maxQueuedRunsPerAgent",
         "maxQueuedRunsPerRoom",
         "maxAgentRunsPerMinute",
+        "autoRetryChatRuns",
+        "maxAutoRetries",
         "adaptiveTimeouts",
         "roomTokenBudget",
         "roomCostBudgetUsd"

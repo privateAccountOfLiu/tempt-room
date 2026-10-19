@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync } from 'no
 import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
-import { defaultSandbox, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError, type AgentDescriptor, type Artifact, type Discussion, type Message, type Run, type Task, type StreamDelta } from '../../../packages/protocol/src/index.ts';
+import { defaultSandbox, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type Artifact, type Discussion, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { diagnose, ExecutionUnknown, RemoteCanceled, runAdapter } from './adapters.ts';
 import { SandboxHost } from './sandbox.ts';
 import { digest, now, Store, SYSTEM, uid } from './store.ts';
@@ -381,6 +381,29 @@ export class Worker {
       }
       this.service.settleDiscussion(run);
     });
+    const stored=this.store.get<Run>('runs',run.id);
+    if(stored&&this.shouldAutoRetry(stored))queueMicrotask(()=>this.autoRetry(stored));
+  }
+  /** Automatic retry is intentionally narrower than the owner retry command: sandbox-only chat runs without recorded side effects. */
+  private shouldAutoRetry(run:Run){
+    const settings=this.store.settings();
+    if(!settings.autoRetryChatRuns||settings.maxAutoRetries<=0)return false;
+    if(run.status!=='failed'||run.taskId||run.discussionId)return false;
+    if((run.autoRetryCount??0)>=settings.maxAutoRetries)return false;
+    const agent=this.store.get<AgentDescriptor>('agents',run.agentId);
+    if(!agent?.enabled||agent.executionMode!=='sandbox'||agent.connectionMode==='external')return false;
+    const failure=classifyFailure(run.error,'failed');
+    if(!['timeout','network','provider'].includes(failure.kind))return false;
+    if(this.store.list<ToolOperation>('operations',run.roomId).some(operation=>operation.runId===run.id))return false;
+    if(this.store.list<Artifact>('artifacts',run.roomId).some(artifact=>artifact.runId===run.id))return false;
+    return true;
+  }
+  private autoRetry(run:Run){
+    try{
+      if(this.store.list<Run>('runs',run.roomId).some(item=>item.id!==run.id&&item.agentId===run.agentId&&!terminalStates.has(item.status)))return;
+      const next=this.service.enqueue(run.roomId,run.agentId,run.prompt,this.store.room(run.roomId)!.seq,{autoRetryOf:run.id,autoRetryCount:(run.autoRetryCount??0)+1});
+      this.store.event(run.roomId,'audit.recorded',SYSTEM,{action:'auto.retry:'+run.id+'->'+next.id},null,run.id);
+    }catch{/* Queue, rate, or budget limits still apply to automatic retries. */}
   }
   /** Explicit recovery does not submit or restart a model request. */
   async reconcileCodex(runId:string,cancel=false) {

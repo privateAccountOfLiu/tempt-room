@@ -229,7 +229,7 @@ try {
 
     const settingsOpened = await evaluate(`(() => { const buttons = [...document.querySelectorAll('button')]; const button = buttons.find(item => item.textContent && item.textContent.includes('运行设置')); if (!button) return 'missing-settings:' + buttons.map(item => (item.textContent ?? '').trim().slice(0, 24)).join('|'); button.click(); return 'ok'; })()`);
     if (settingsOpened !== 'ok') fail(`找不到运行设置入口（${settingsOpened}）`);
-    await waitFor('运行设置对话框', async () => { const text = await bodyText(); return text.includes('单次内存上限') && text.includes('单次运行 Token 上限') && text.includes('单次运行费用上限') && text.includes('单成员待处理运行上限') && text.includes('房间待处理运行上限') && text.includes('自适应超时') && text.includes('房间累计 Token 上限') && text.includes('房间累计费用上限') && text.includes('单成员每分钟运行上限'); }, 10000);
+    await waitFor('运行设置对话框', async () => { const text = await bodyText(); return text.includes('单次内存上限') && text.includes('单次运行 Token 上限') && text.includes('单次运行费用上限') && text.includes('单成员待处理运行上限') && text.includes('房间待处理运行上限') && text.includes('自适应超时') && text.includes('房间累计 Token 上限') && text.includes('房间累计费用上限') && text.includes('单成员每分钟运行上限') && text.includes('最多自动重试次数'); }, 10000);
     await evaluate(`(() => { const buttons = [...document.querySelectorAll('button')]; const cancel = buttons.find(item => item.textContent && item.textContent.trim() === '取消'); if (cancel) cancel.click(); return 'ok'; })()`);
     step('settings-dialog-opens');
 
