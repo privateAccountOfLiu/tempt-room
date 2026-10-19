@@ -461,7 +461,7 @@ export class Worker {
       if (!run || !this.active.has(run.id) || this.active.get(run.id)!.signal.aborted || !['running','waiting_input'].includes(run.status)) throw new ProtocolError('run_not_active','运行没有活动授权',409);
       if(fence)assertRunFence(this.store,fence);
       else if(run.executionId)throw new ProtocolError('execution_identity_required','工具通道缺少不可变的执行授权',409);
-      const args=request?.arguments??{},name=request?.name,actor={id:run.agentId,kind:'agent' as const};const toolAgent=this.store.get<AgentDescriptor>('agents',run.agentId);assertRoomToolAllowed(toolAgent?.roomToolPolicy,String(name));
+      const args=request?.arguments??{},name=request?.name,actor={id:run.agentId,kind:'agent' as const};const toolAgent=this.store.get<AgentDescriptor>('agents',run.agentId);assertRoomToolAllowed(toolAgent?.roomToolPolicy,String(name),toolAgent?.allowedRoomTools);
       const commandId=fence?'tool_'+digest([run.id,fence.generation,request?.operationId]).slice(0,64):uid('tool');
       const scope={runId:run.id,...(fence?{generation:fence.generation,executionId:fence.executionId}:{})};
       let action:()=>unknown;
@@ -505,7 +505,7 @@ export class Worker {
     const agent = this.store.get<AgentDescriptor>('agents', agentId), room = this.store.room(roomId);
     if (!agent || !agent.enabled) throw new Error('Agent 未启用');
     if (!room || !room.members.includes(agentId)) throw new Error('Agent 不在该房间');
-    assertRoomToolAllowed(agent.roomToolPolicy,String(name));
+    assertRoomToolAllowed(agent.roomToolPolicy,String(name),agent.allowedRoomTools);
     if(['room_read','room_status'].includes(name))z.object({}).strict().parse(args??{});
     const actor = { id: agentId, kind: 'agent' as const };
     this.store.event(roomId, 'agent.tool.called', actor, { agentId, name: String(name).slice(0, 100) }, null, null);

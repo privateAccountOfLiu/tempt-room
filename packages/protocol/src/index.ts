@@ -21,10 +21,12 @@ export const capabilitiesSchema = z.object({
   execute: z.boolean(), artifacts: z.boolean(), input: z.boolean(), usage: z.boolean()
 });
 export type AgentCapabilities = z.infer<typeof capabilitiesSchema>;
+export const roomToolNames=['room_read','room_status','room_post','task_propose','task_claim','task_complete','task_heartbeat','artifact_publish'] as const;
 export const agentSchema = z.object({
   id: idSchema, name: z.string().min(1).max(60), provider: providerSchema,
   role: z.string().max(300).default('协作助手'), color: z.enum(['blue', 'green', 'orange', 'purple', 'teal']).default('blue'), schedulerWeight: z.number().min(0.1).max(10).default(1),
   roomToolPolicy: z.enum(['allow','read-only','deny']).default('allow'),
+  allowedRoomTools: z.array(z.enum(roomToolNames)).min(1).default(()=>[...roomToolNames]),
   enabled: z.boolean().default(false), executable: z.string().max(1000).default(''),
   endpoint: z.string().max(2000).default(''), model: z.string().max(200).default(''),
   credentialEnv: z.string().regex(/^[A-Z][A-Z0-9_]*$/).or(z.literal('')).default(''),

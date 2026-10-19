@@ -55,6 +55,33 @@
         "deny"
       ]
     },
+    "allowedRoomTools": {
+      "default": [
+        "room_read",
+        "room_status",
+        "room_post",
+        "task_propose",
+        "task_claim",
+        "task_complete",
+        "task_heartbeat",
+        "artifact_publish"
+      ],
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "room_read",
+          "room_status",
+          "room_post",
+          "task_propose",
+          "task_claim",
+          "task_complete",
+          "task_heartbeat",
+          "artifact_publish"
+        ]
+      }
+    },
     "enabled": {
       "default": false,
       "type": "boolean"
@@ -216,6 +243,7 @@
     "color",
     "schedulerWeight",
     "roomToolPolicy",
+    "allowedRoomTools",
     "enabled",
     "executable",
     "endpoint",
