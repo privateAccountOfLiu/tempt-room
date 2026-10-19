@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 76632d4b4f4019722ffe8080da0ce1270b47bc0a (dirty)
+source HEAD: 4101beba9571067e04a3c2cd547dab0d69e353c7 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-19T14-57-39-975Z-2d9106e3/report.json
+report: .state/collaboration-baseline/run-2026-10-19T15-06-12-988Z-497e88f4/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -42,6 +42,17 @@ report: .state/collaboration-baseline/run-2026-10-19T14-57-39-975Z-2d9106e3/repo
   - 事件 seq 连续
   - 非 owner token 返回 401
   - scan watermark 冻结与后续增量读取
+
+### A03 — host 变更归因与独立执行目录
+
+- 新增 `apps/server/src/host-workspace.ts`：
+  - `hostStatus` 从 Git porcelain 状态码升级为“状态码 + 文件内容 SHA256”
+  - 覆盖 tracked、untracked、删除、重命名和“执行前后同为 M 但内容再次变化”
+  - `hostChangeReport` 只报告执行期间观察到的变化，并明确“未证明由该 Agent 独占产生”，不做归因
+- host 聊天工作区改为每 Run 独立目录 `workspaces/host-chat/<roomId>/<runId>`；不再复用旧房间共享目录，不再执行 `git add -A` 自动提交
+- host 聊天结束后生成「本机对话变更清单」artifact，不替用户提交既有修改
+- host 任务仍使用真实项目目录（D01a 尚未接入），报告只做内容变化清单，不改写用户工作树
+- 新增 `tests/host-workspace-isolation.test.ts` 3 项；`npm test` **295/295**
 
 ### A02 — 调度公平与 anti-starvation
 
@@ -70,23 +81,22 @@ report: .state/collaboration-baseline/run-2026-10-19T14-57-39-975Z-2d9106e3/repo
 ## 验证结果
 
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
-- `npm test`：292/292
-- `npm run test:preflight -- --with-native`：9/9 通过（`.state/preflight/run-Dta6d5/report.json`，269.2s）
+- `npm test`：295/295
+- `npm run test:preflight -- --with-native`：9/9 通过（`.state/preflight/run-Hh0hAE/report.json`，300.9s）
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-63djst/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-m26mbA/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-19T14-57-39-975Z-2d9106e3/report.json`
-- `.state/collaboration-baseline/run-2026-10-19T14-57-39-975Z-2d9106e3/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-19T14-57-39-975Z-2d9106e3/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-19T14-57-39-975Z-2d9106e3/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T15-06-12-988Z-497e88f4/report.json`
+- `.state/collaboration-baseline/run-2026-10-19T15-06-12-988Z-497e88f4/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T15-06-12-988Z-497e88f4/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T15-06-12-988Z-497e88f4/replay.stdout.txt`
 
 ## 未完成 / 下一波
 
-- A03 host 变更归因与共享提交
 - B05a 能力探针与三态结果格式（M0 前移切片）
 - B01/B02 会话协议对象与迁移
 - M1 双 Agent 固定契约任务闭环：Task 契约、独立工作区、验收/集成分离、并行验收脚本

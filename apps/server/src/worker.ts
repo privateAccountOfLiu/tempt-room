@@ -18,6 +18,7 @@ import { trustForActor } from './trust.ts';
 import { assertRoomPostLength, assertRoomToolAllowed, assertTaskTitleLength } from './tool-policy.ts';
 import { formatContextMessage, UNTRUSTED_CONTEXT_NOTICE } from './context-format.ts';
 import { dependencyInputs } from './dependencies.ts';
+import { prepareHostChatWorkspace, hostStatus, hostChangeReport } from './host-workspace.ts';
 import { codexThreadKey, reconcileAttachedRun } from './codex-attach.ts';
 import { assertRunFence,assertRunIdentity,executionFence } from './execution.ts';
 import { ToolOperations } from './tool-operations.ts';
@@ -41,49 +42,6 @@ function prepareChatWorkspace(root:string,run:Run):string{
   const workspace=chatWorkspace(root,run);mkdirSync(workspace,{recursive:true});
   if(!existsSync(join(workspace,'.git')))try{spawnSync('git',['init','--quiet','.'],{cwd:workspace,windowsHide:true,timeout:15000,stdio:'ignore'});}catch{}
   return workspace;
-}
-
-/** Host-mode chat runs share one concrete directory per room, so agents can see each other's files. */
-function prepareHostChatWorkspace(root:string,run:Run):string{
-  const workspace=join(root,'workspaces','rooms',run.roomId);mkdirSync(workspace,{recursive:true});
-  if(!existsSync(join(workspace,'.git')))try{spawnSync('git',['init','--quiet','.'],{cwd:workspace,windowsHide:true,timeout:15000,stdio:'ignore'});}catch{}
-  return workspace;
-}
-
-/** Snapshot of the real project's Git status; undefined when the directory is not a Git repository. */
-function hostStatus(projectPath:string):Map<string,string>|undefined{  const result=spawnSync('git',['-C',projectPath,'status','--porcelain=v1','-z'],{encoding:'utf8',windowsHide:true,timeout:30000});
-  if(result.status!==0)return undefined;
-  const status=new Map<string,string>();
-  for(const entry of (result.stdout||'').split('\0')){if(!entry)continue;status.set(entry.slice(3),entry.slice(0,2));}
-  return status;
-}
-
-/**
- * Host-mode tasks edit the real project directly (no snapshot and no apply step).
- * Report the files this run actually touched so a human can review them in Git.
- */
-function hostChangeReport(projectPath:string,baseline?:Map<string,string>):string{
-  const status=hostStatus(projectPath);
-  if(!status)return `本机直连模式已直接在真实目录中执行并可能修改文件；该目录不是 Git 仓库，无法生成差异清单。\n项目目录：${projectPath}`;
-  const changed=[...status].filter(([path,code])=>!baseline||baseline.get(path)!==code);
-  if(!changed.length)return `本机直连模式执行完成；Git 工作树没有新增改动。\n项目目录：${projectPath}`;
-  const stat=spawnSync('git',['-C',projectPath,'diff','--stat','--',...changed.map(([path])=>path)],{encoding:'utf8',windowsHide:true,timeout:30000});
-  return [`本机直连模式已直接修改真实项目（没有经过快照，也不需要“应用交付物”）：`,`项目目录：${projectPath}`,'',`变更文件（Git 状态 + 路径）：`,...changed.map(([path,code])=>`${code} ${path}`),'',stat.stdout?.trim()||'','', '请用 Git 审查并提交这些改动。'].join('\n').slice(0,2**20-1000);
-}
-
-/**
- * Host-mode chat runs share one workspace per room. Commit after every run so
- * multiple Agents hand off work through traceable Git checkpoints instead of
- * overwriting each other's files invisibly.
- */
-function commitSharedWorkspace(workspace:string,message:string):{changed:boolean;commit?:string}{
-  const git=(args:string[])=>spawnSync('git',['-C',workspace,...args],{encoding:'utf8',windowsHide:true,timeout:20000});
-  if(git(['rev-parse','--is-inside-work-tree']).status!==0)return{changed:false};
-  if(!git(['status','--porcelain=v1']).stdout?.trim())return{changed:false};
-  git(['add','-A']);
-  const commit=git(['-c','user.name=Tempt Room','-c','user.email=room@localhost','commit','--quiet','-m',message]);
-  if(commit.status!==0)return{changed:false};
-  return{changed:true,commit:git(['rev-parse','HEAD']).stdout?.trim()||undefined};
 }
 
 export class Worker {
@@ -312,7 +270,8 @@ export class Worker {
             task.workspaceId = run.id; task.status = 'running'; this.store.atomic(() => {  this.store.event(run.roomId, 'task.updated', SYSTEM, { task }); });
           } else mkdirSync(workspace, { recursive: true });
         }
-      } else workspace = hostMode ? prepareHostChatWorkspace(this.root, run) : prepareChatWorkspace(this.root, run);
+      } else if (hostMode) { workspace = prepareHostChatWorkspace(this.root, run); baseline = hostStatus(workspace); }
+      else workspace = prepareChatWorkspace(this.root, run);
       const home = join(this.root, 'homes', `${run.roomId}_${run.agentId}`); mkdirSync(home, { recursive: true });
       const scope = sessionKey(run,agent,workspace);
       let supplement='';
@@ -351,11 +310,10 @@ export class Worker {
           }
         }
       }
-      // Host-mode chat runs share one room workspace; checkpoint each run so
-      // another Agent's handoff can be reviewed and reverted with Git.
+      // Host chat uses an isolated per-run directory. Record an observed-change
+      // artifact; never commit the room-shared tree on the Agent's behalf.
       if (hostMode && !attached && !run.taskId) {
-        const checkpoint = commitSharedWorkspace(workspace, `room run ${run.id} (${agent.id})`);
-        if (checkpoint.changed) this.store.event(run.roomId, 'room.git.checkpoint', { id: agent.id, kind: 'agent' }, { runId: run.id, agentId: agent.id, workspace, commit: checkpoint.commit ?? null }, null, run.id);
+        this.publishArtifact(run, '本机对话变更清单', hostChangeReport(workspace, baseline));
       }
       this.finish(run, 'completed');
       });break;
