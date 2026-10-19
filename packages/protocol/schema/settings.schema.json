@@ -99,6 +99,18 @@
     "adaptiveTimeouts": {
       "default": false,
       "type": "boolean"
+    },
+    "roomTokenBudget": {
+      "default": 0,
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000000
+    },
+    "roomCostBudgetUsd": {
+      "default": 0,
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000000
     }
   },
   "required": [
@@ -113,7 +125,9 @@
     "costBudgetUsd",
     "maxQueuedRunsPerAgent",
     "maxQueuedRunsPerRoom",
-    "adaptiveTimeouts"
+    "adaptiveTimeouts",
+    "roomTokenBudget",
+    "roomCostBudgetUsd"
   ],
   "additionalProperties": false
 }

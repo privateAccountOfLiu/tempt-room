@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { agentSchema,contextSeqOf, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type Task, type Decision } from '../../../packages/protocol/src/index.ts';
+import { agentSchema,contextSeqOf, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type Task, type Decision } from '../../../packages/protocol/src/index.ts';
 import { digest, now, OWNER, Store, SYSTEM, uid } from './store.ts';
 import {assertContextCurrent} from './context-reconciliation.ts';
 import { assertRunFence } from './execution.ts';
@@ -284,6 +284,7 @@ export class RoomService {
     const backlog=this.store.list<Run>('runs',roomId).filter(run=>!terminalStates.has(run.status));
     if(backlog.length>=settings.maxQueuedRunsPerRoom)throw new ProtocolError('room_queue_full',`房间待处理运行已达上限（${settings.maxQueuedRunsPerRoom}）`,429);
     if(backlog.filter(run=>run.agentId===agentId).length>=settings.maxQueuedRunsPerAgent)throw new ProtocolError('agent_queue_full',`该成员的待处理运行已达上限（${settings.maxQueuedRunsPerAgent}）`,429);
+    const roomBudget=roomBudgetError(settings,this.store.list<Run>('runs',roomId));if(roomBudget)throw new ProtocolError('room_budget_exhausted',roomBudget,429);
     const baseTimeoutMs=fields.taskId?settings.taskTimeoutMs:settings.chatTimeoutMs;
     const timeoutMs=settings.adaptiveTimeouts?adaptiveTimeoutMs(this.store.list<Run>('runs',roomId),agentId,fields.taskId?'task':'chat',baseTimeoutMs):baseTimeoutMs;
     const run: Run = { id: uid('run'), roomId, agentId, prompt, basedOnSeq, status: 'queued',lifecycleVersion:1,generation:1,contextPolicy:structuredClone(settings.contextPolicy), createdAt: now(), updatedAt: now(),contextId:fields.contextId??this.saveContext(roomId,basedOnSeq),limits:{memoryMb:settings.memoryMb,maxProcesses:settings.maxProcesses,timeoutMs,tokenBudget:settings.tokenBudget,costBudgetUsd:settings.costBudgetUsd}, ...fields };
