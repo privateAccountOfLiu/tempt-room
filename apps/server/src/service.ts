@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {discussionPrompt,assessConvergence,discussionSummaryPrompt} from './discussions.ts';
-import { agentSchema,contextSeqOf, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type Task, type Decision, type AgentSession, type Subscription } from '../../../packages/protocol/src/index.ts';
+import { agentSchema,contextSeqOf, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type Task, type Decision, type AgentSession, type Subscription, type WakeIntent } from '../../../packages/protocol/src/index.ts';
 import { digest, now, OWNER, Store, SYSTEM, uid } from './store.ts';
 import {assertContextCurrent} from './context-reconciliation.ts';
 import { assertRunFence } from './execution.ts';
@@ -389,7 +389,8 @@ export class RoomService {
     for (const agentId of discussion.participants) {
       if (discussion.responses >= discussion.maxResponses) break;
       if ((discussion.activationsUsed??0) >= limit) { this.endDiscussion(discussion,'activation_limit','stopped',`讨论激活额度已达上限（${limit}）`); break; }
-      this.enqueue(discussion.roomId, agentId, discussionPrompt(discussion), basedOnSeq, { discussionId: discussion.id, round: discussion.round,contextId,responseSlotId:`${discussion.id}_r${discussion.round}_${agentId}` });
+      const agentSession=this.store.list<AgentSession>('agent_sessions',discussion.roomId).find(session=>session.discussionId===discussion.id&&session.agentId===agentId);
+      this.enqueue(discussion.roomId, agentId, discussionPrompt(discussion), basedOnSeq, { discussionId: discussion.id, round: discussion.round,contextId,responseSlotId:`${discussion.id}_r${discussion.round}_${agentId}`,...(agentSession?{agentSessionId:agentSession.id}:{}) });
       discussion.responses++; discussion.activationsUsed=(discussion.activationsUsed??0)+1;
     }
     this.store.event(discussion.roomId,'discussion.scheduled',SYSTEM,{discussion});
@@ -442,6 +443,24 @@ export class RoomService {
       }catch(error){discussion.summary={status:'failed',error:(error as Error).message.slice(0,2000)};}
       this.store.event(discussion.roomId,'discussion.summary.updated',SYSTEM,{discussion});
     }
+  }
+  /** Turn pending subscription wake intents into one queued Run per AgentSession. */
+  dispatchPendingWakes(){
+    this.store.atomic(()=>{
+      for(const wakeIntent of this.store.list<WakeIntent>('wake_intents').filter(intent=>intent.status==='pending')){
+        const session=this.store.get<AgentSession>('agent_sessions',wakeIntent.agentSessionId);
+        if(!session||session.status!=='active'||!this.store.room(session.roomId)?.members.includes(session.agentId))continue;
+        if(this.store.list<Run>('runs',session.roomId).some(run=>run.agentSessionId===session.id&&!terminalStates.has(run.status)))continue;
+        const event=this.store.events(session.roomId,Math.max(0,wakeIntent.sourceSeq-1),1).find(item=>item.seq===wakeIntent.sourceSeq);
+        const message=(event?.payload as any)?.message, task=(event?.payload as any)?.task;
+        const prompt=message?.text??task?.title??('订阅命中事件 '+(event?.type??'unknown'));
+        try{
+          const run=this.enqueue(session.roomId,session.agentId,prompt,this.store.room(session.roomId)!.seq,{agentSessionId:session.id});
+          wakeIntent.status='assigned';wakeIntent.runId=run.id;
+          this.store.event(session.roomId,'wake.assigned',SYSTEM,{wakeIntent});
+        }catch{/* Queue/pressure errors leave the wake pending for a later tick. */}
+      }
+    });
   }
   stopDiscussion(discussion: Discussion, reason: string) {
     this.store.atomic(()=>{

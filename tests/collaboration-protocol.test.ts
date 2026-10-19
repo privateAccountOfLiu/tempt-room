@@ -23,7 +23,7 @@ test('B01 collaboration objects parse with strict schemas', () => {
   assert.equal(delivery.status, 'pending');
   const batch = inputBatchSchema.parse({id: 'batch_1', agentSessionId: 'as_1', runId: 'run_1', generation: 1, executionId: 'exec_1', deliveryIds: ['del_1'], sourceEventIds: ['evt_1'], fromScanSeq: 0, throughScanSeq: 3, payloadHash: 'a'.repeat(64), deliveryMode: 'next-turn', createdAt: now, status: 'created'});
   assert.equal(batch.deliveryMode, 'next-turn');
-  const wake = wakeIntentSchema.parse({id: 'wake_1', discussionId: 'disc_1', roundId: 'round_1', scopeKey: 'disc_1/round_1', agentSessionId: 'as_1', sourceEventId: 'evt_1', status: 'pending'});
+  const wake = wakeIntentSchema.parse({id: 'wake_1', discussionId: 'disc_1', roundId: 'round_1', scopeKey: 'disc_1/round_1', agentSessionId: 'as_1', sourceEventId: 'evt_1', sourceSeq: 1, status: 'pending'});
   assert.equal(wake.status, 'pending');
   const evidence = capabilityEvidenceSchema.parse({fingerprint: 'fp_1', capability: 'steerDuringRun', state: 'verified_unsupported', mode: 'simulated', testedAt: now, suiteVersion: 'sim-v1', evidenceHash: 'b'.repeat(64)});
   assert.equal(evidence.state, 'verified_unsupported');

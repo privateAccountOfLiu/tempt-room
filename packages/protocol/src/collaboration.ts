@@ -93,6 +93,7 @@ export const wakeIntentSchema = z.object({
   scopeKey: z.string().min(1).max(300),
   agentSessionId: id,
   sourceEventId: id,
+  sourceSeq: z.number().int().nonnegative(),
   status: wakeIntentStatusSchema,
   runId: id.optional(),
   suppressionReason: optionalText(300)

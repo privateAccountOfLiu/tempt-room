@@ -110,6 +110,7 @@ export class Worker {
          this.store.event(task.roomId, 'task.lease_expired', SYSTEM, { task, previousAgentId });
       }
     });
+    this.service.dispatchPendingWakes();
     const runs = this.store.list<Run>('runs');
     const settings=this.store.settings();
     for(const run of runs){

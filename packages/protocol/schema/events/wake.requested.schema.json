@@ -40,6 +40,11 @@
           "maxLength": 128,
           "pattern": "^[a-zA-Z0-9_-]+$"
         },
+        "sourceSeq": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
         "status": {
           "type": "string",
           "enum": [
@@ -64,6 +69,7 @@
         "scopeKey",
         "agentSessionId",
         "sourceEventId",
+        "sourceSeq",
         "status"
       ],
       "additionalProperties": {}

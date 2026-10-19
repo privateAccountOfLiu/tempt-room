@@ -18,7 +18,7 @@ const session = {id: 'session_1', roomId: 'room_1', agentId: 'demo-planner', sta
 const subscription = {id: 'subscription_1', roomId: 'room_1', agentSessionId: session.id, eventTypes: [], taskIds: [], sourcePolicy: 'explicit', enabled: true, scanSeq: 0};
 const delivery = {id: 'delivery_1', agentSessionId: session.id, sourceEventId: 'event_1', sourceSeq: 1, status: 'pending'};
 const batch = {id: 'batch_1', agentSessionId: session.id, generation: 1, executionId: 'exec_1', deliveryIds: [delivery.id], sourceEventIds: [delivery.sourceEventId], fromScanSeq: 0, throughScanSeq: 1, payloadHash: 'a'.repeat(64), deliveryMode: 'next-turn', createdAt: now, status: 'created'};
-const wake = {id: 'wake_1', scopeKey: 'discussion_1/round_1', discussionId: 'discussion_1', roundId: 'round_1', agentSessionId: session.id, sourceEventId: delivery.sourceEventId, status: 'pending'};
+const wake = {id: 'wake_1', scopeKey: 'discussion_1/round_1', discussionId: 'discussion_1', roundId: 'round_1', agentSessionId: session.id, sourceEventId: delivery.sourceEventId, sourceSeq: 1, status: 'pending'};
 const capability = {id: 'capability_1', fingerprint: 'fp_1', capability: 'streamOutput', state: 'verified_supported', mode: 'simulated', testedAt: now, suiteVersion: 'sim-v1', evidenceHash: 'b'.repeat(64)};
 const round = {id: 'round_1', discussionId: 'discussion_1', round: 1, status: 'open', openedSeq: 1, openedAt: now};
 

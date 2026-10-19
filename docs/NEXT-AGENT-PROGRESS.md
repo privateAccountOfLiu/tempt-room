@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: cb24a3800fa8ad42e510ced8a227c92a4f8a278e (dirty)
+source HEAD: c0e357edd5869410ed7daaaff9ceae9319176cd3 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-19T16-35-04-846Z-e7523498/report.json
+report: .state/collaboration-baseline/run-2026-10-19T16-43-29-093Z-84efdca2/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -74,7 +74,7 @@ report: .state/collaboration-baseline/run-2026-10-19T16-35-04-846Z-e7523498/repo
 - 队列上限：maxInboxDeliveries / maxInboxBytes；超限返回 429 inbox_full 并在事务内回滚本次扫描
 - 权限/会话/成员撤销立即阻断；scanSeq 与 pending delivery 分开保存
 - 新增 tests/inbox-subscription.test.ts 3 项：唤醒白名单、幂等扫描、队列上限与禁用
-- 尚未完成：InputBatch 与输入回执（B06）、wake 到执行的实际派工、UI 订阅管理
+- 新增 dispatchPendingWakes：pending WakeIntent 为每个 AgentSession 生成一个 queued Run；重复 tick 不重复派工；active Run 存在时保持 pending
 ### B03 — 讨论生命周期主体（pause/resume/激活额度）
 
 - discussion.start 在同一事务创建参与成员 AgentSession、首轮 Run（带唯一 responseSlotId）并冻结 activationLimit/activationsUsed
@@ -145,20 +145,20 @@ report: .state/collaboration-baseline/run-2026-10-19T16-35-04-846Z-e7523498/repo
 
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
-- `npm test`：313/313
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-1bbrdO/report.json`，213.3s）
+- `npm test`：314/314
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-dnsfHF/report.json`，213.1s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-2JOIEe/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-rtAXzz/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-19T16-35-04-846Z-e7523498/report.json`
-- `.state/collaboration-baseline/run-2026-10-19T16-35-04-846Z-e7523498/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-19T16-35-04-846Z-e7523498/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-19T16-35-04-846Z-e7523498/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T16-43-29-093Z-84efdca2/report.json`
+- `.state/collaboration-baseline/run-2026-10-19T16-43-29-093Z-84efdca2/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T16-43-29-093Z-84efdca2/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T16-43-29-093Z-84efdca2/replay.stdout.txt`
 
 ## 未完成 / 下一波
 
