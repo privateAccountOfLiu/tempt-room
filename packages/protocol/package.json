@@ -1,5 +1,7 @@
 {
   "name": "@tempt/room-protocol", "version": "0.1.0", "type": "module",
+  "license": "Apache-2.0",
+  "repository": { "type": "git", "url": "git+https://github.com/privateAccountOfLiu/tempt-room.git", "directory": "packages/protocol" },
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }, "./schema/*": "./schema/*" },
   "files": ["dist", "schema"], "dependencies": { "zod": "^4.1.12" }
 }

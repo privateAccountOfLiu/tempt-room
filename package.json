@@ -1,6 +1,14 @@
 {
   "name": "tempt-room",
   "version": "0.1.0",
+  "description": "Windows-native local multi-agent collaboration workspace with rooms, tasks, MCP and A2A adapters.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/privateAccountOfLiu/tempt-room.git"
+  },
+  "homepage": "https://github.com/privateAccountOfLiu/tempt-room#readme",
+  "bugs": { "url": "https://github.com/privateAccountOfLiu/tempt-room/issues" },
   "private": true,
   "type": "module",
   "engines": {

@@ -18,7 +18,12 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
       - run: npm ci
+      - name: Build Windows sandbox host and pipe compatibility module
+        run: npm run build:sandbox
       - name: Typecheck
         run: npm run typecheck
       - name: Secret scan

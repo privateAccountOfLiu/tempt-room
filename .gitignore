@@ -13,3 +13,7 @@ packages/*/dist/
 # Local Claude Code project MCP config contains a room-scoped token
 .mcp.json
 .claude/
+
+# User-specific Agent state and credential-bearing config backups
+.codex/
+*.tempt-room.bak.*
