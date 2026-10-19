@@ -15,7 +15,7 @@ import {contextDelta,advanceContext,assertContextCurrent,reconciliationPrompt} f
 import { captureContext } from './context.ts';
 import { fairOrder } from './scheduler.ts';
 import { trustForActor } from './trust.ts';
-import { assertRoomPostLength, assertRoomToolAllowed } from './tool-policy.ts';
+import { assertRoomPostLength, assertRoomToolAllowed, assertTaskTitleLength } from './tool-policy.ts';
 import { formatContextMessage, UNTRUSTED_CONTEXT_NOTICE } from './context-format.ts';
 import { dependencyInputs } from './dependencies.ts';
 import { codexThreadKey, reconcileAttachedRun } from './codex-attach.ts';
@@ -479,6 +479,7 @@ export class Worker {
         action=()=>this.service.execute({version:VERSION,commandId,roomId:run.roomId,type:'message.send',payload:input},actor,scope);
       }else if(name==='task_propose'){
         const input=z.object({title:z.string().min(1).max(5000),agentId:z.string(),dependencies:z.array(z.string()).max(20).default([])}).strict().parse(args);
+        assertTaskTitleLength(toolAgent,input.title);
         action=()=>this.service.execute({version:VERSION,commandId,roomId:run.roomId,type:'task.create',payload:input},actor,scope);
       }else if(name==='task_claim'){
         const input=z.object({taskId:z.string()}).strict().parse(args);
@@ -532,6 +533,7 @@ export class Worker {
     }
     if (name === 'task_propose') {
       const input = z.object({ title: z.string().min(1).max(5000), agentId: z.string(), dependencies: z.array(z.string()).max(20).default([]) }).strict().parse(args);
+      assertTaskTitleLength(agent,input.title);
       return this.service.execute({ version: VERSION, commandId, roomId, type: 'task.create', payload: input }, actor);
     }
     if (name === 'task_claim') {

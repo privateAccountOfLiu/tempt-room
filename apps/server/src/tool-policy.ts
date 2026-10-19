@@ -2,6 +2,11 @@ import { ProtocolError, type AgentDescriptor } from '../../../packages/protocol/
 
 const readOnlyTools = new Set(['room_read', 'room_status', 'room_inbox']);
 /** Per-agent pre-tool policy for Room tools. Authorization still comes from the run/connection token. */
+export function assertTaskTitleLength(agent: Pick<AgentDescriptor,'maxTaskTitleChars'> | undefined, title: string): void {
+  const limit = agent?.maxTaskTitleChars ?? 5000;
+  if (title.length > limit) throw new ProtocolError('tool_policy_denied', `任务标题超过该 Agent 的上限（${limit} 字符）`, 403);
+}
+
 export function assertRoomPostLength(agent: Pick<AgentDescriptor,'maxRoomPostChars'> | undefined, text: string): void {
   const limit = agent?.maxRoomPostChars ?? 32000;
   if (text.length > limit) throw new ProtocolError('tool_policy_denied', `单条发言超过该 Agent 的上限（${limit} 字符）`, 403);

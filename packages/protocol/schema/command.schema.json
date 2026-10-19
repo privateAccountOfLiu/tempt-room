@@ -1404,6 +1404,12 @@
               "minimum": 1,
               "maximum": 32000
             },
+            "maxTaskTitleChars": {
+              "default": 5000,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000
+            },
             "enabled": {
               "default": false,
               "type": "boolean"
@@ -1567,6 +1573,7 @@
             "roomToolPolicy",
             "allowedRoomTools",
             "maxRoomPostChars",
+            "maxTaskTitleChars",
             "enabled",
             "executable",
             "endpoint",

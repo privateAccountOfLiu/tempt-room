@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createApp } from '../apps/server/src/app.ts';
 import { uid } from '../apps/server/src/store.ts';
-import { assertRoomPostLength, assertRoomToolAllowed } from '../apps/server/src/tool-policy.ts';
+import { assertRoomPostLength, assertRoomToolAllowed, assertTaskTitleLength } from '../apps/server/src/tool-policy.ts';
 import type { AgentDescriptor } from '../packages/protocol/src/index.ts';
 
 test('room tool policy helper allows reads and denies writes deterministically', () => {
@@ -19,6 +19,8 @@ test('room tool policy helper allows reads and denies writes deterministically',
   assert.doesNotThrow(() => assertRoomPostLength({ maxRoomPostChars: 4 }, 'abcd'));
   assert.throws(() => assertRoomPostLength({ maxRoomPostChars: 4 }, 'abcde'), /单条发言超过/);
   assert.doesNotThrow(() => assertRoomPostLength(undefined, 'x'.repeat(32000)));
+  assert.doesNotThrow(() => assertTaskTitleLength({ maxTaskTitleChars: 3 }, 'abc'));
+  assert.throws(() => assertTaskTitleLength({ maxTaskTitleChars: 3 }, 'abcd'), /任务标题超过/);
 });
 
 test('per-agent tool allowlist narrows the allowed tool surface', () => {
@@ -46,6 +48,28 @@ test('external Agent post length cap rejects oversized posts before mutation', a
   assert.equal(tooLong.json().code, 'tool_policy_denied');
   assert.equal((await call('room_post', { text: 'ok' })).statusCode, 200);
   assert.equal(store.list<{ text: string }>('messages', roomId).filter(message => message.text === 'ok').length, 1);
+});
+
+test('external Agent task title cap rejects oversized proposals before task creation', async t => {
+  const base = resolve('.state/test-data'); mkdirSync(base, { recursive: true });
+  const root = mkdtempSync(join(base, 'task-cap-'));
+  const state = await createApp({ root, token: 'taskcap-owner', startWorker: false });
+  t.after(async () => { await state.app.close(); rmSync(root, { recursive: true, force: true }); });
+  const { app, store, service } = state, agentId = 'demo-planner';
+  const agent = store.get<AgentDescriptor>('agents', agentId)!;
+  service.execute({ version: '0.1', commandId: uid(), type: 'agent.save', payload: { ...agent, enabled: true, connectionMode: 'external', maxTaskTitleChars: 5 } });
+  const roomId = service.execute({ version: '0.1', commandId: uid(), type: 'room.create', payload: { name: 'task cap', members: [agentId] } }).result.roomId as string;
+  const ownerHeaders = { host: '127.0.0.1:4317', authorization: 'Bearer taskcap-owner', 'room-protocol-version': '0.1' };
+  const connected = await app.inject({ url: `/api/agents/${agentId}/connect?roomId=${roomId}`, headers: ownerHeaders });
+  assert.equal(connected.statusCode, 200);
+  const headers = { ...ownerHeaders, authorization: 'Bearer ' + connected.json().token };
+  const call = (name: string, args: Record<string, unknown>) => app.inject({ method: 'POST', url: '/api/agent/tool', headers, payload: { roomId, commandId: uid(), name, arguments: args } });
+  const tooLong = await call('task_propose', { title: '123456', agentId });
+  assert.equal(tooLong.statusCode, 403);
+  assert.equal(tooLong.json().code, 'tool_policy_denied');
+  const tasksBefore = store.list('tasks', roomId).length;
+  assert.equal((await call('task_propose', { title: 'ok', agentId })).statusCode, 200);
+  assert.equal(store.list('tasks', roomId).length, tasksBefore + 1);
 });
 
 test('external Agent room policy is enforced before the tool command is dispatched', async t => {
