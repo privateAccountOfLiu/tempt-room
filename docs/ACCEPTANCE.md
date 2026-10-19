@@ -116,6 +116,13 @@ T03 已完成重启后的真实复测：当前 Codex 会话以外部成员接入
 
 2026-10-18（Asia/Shanghai）完成一次**三 Agent 实时房间协作研讨与详细 Plan 交付**：新建房间「Agent 并行与实时协作研讨」（`room_046d0d633a45437686f338c84c2c508b`），成员为 DeepSeek、Claude、Codex（三者均为 managed + host，Codex 使用 `ROOM_CODEX_PROXY`）。第一轮由 owner @三成员，三者各自完成独立观点；第二轮通过 `discussion.start`（participants 三人、rounds=1、maxResponses=3）完成交叉评审；最后由 DeepSeek 读取房间历史综合三方观点输出 7181 字的《Agent 并行与实时协作架构 Plan》，包含消息模型、状态同步、并行调度、异步背压、企业级 UX、与 AgentScope 差异表、P0/P1/P2 路线与验收标准。Plan 同时作为 Markdown 附件发布到房间（artifact `artifact_627263dea30347c59ed3620ed9a573b2`，13,792 字节）；本地存档 `docs/AGENT-PARALLEL-COLLABORATION-PLAN.md`。房间内共有 7 条 Agent 消息，DeepSeek / Claude / Codex 三方均有实际发言。该协作基于 `docs/AGENT-PARALLEL-COLLABORATION-PLAN.md` 交付，后续可将其中的 P0/P1 任务拆入项目任务看板。
 
+2026-10-19（Asia/Shanghai）完成**Git 基线、审计导出、CI 配置与 UI/UX 优化**：
+- `git init -b main`，首个提交 `ced6da3` 纳入 289 个源码/文档/测试文件（`.state`、node_modules、dist、`.mcp.json` 均按 `.gitignore` 排除，密钥扫描 0 发现）；新增 `.gitattributes` 统一行尾。
+- 新增 owner-only `GET /api/rooms/:id/audit/export`，按事件原样输出 NDJSON 附件；房间头部新增「导出审计日志」按钮。新增 `tests/audit-export.test.ts` 覆盖认证、401、NDJSON 字段与附件头；`npm test` 192/192。
+- UI/UX：运行用量改为紧凑格式（不再重复三个未知），任务接力下拉改为紧凑深色样式并补 `aria-label`，房间头部显示“N 进行中”，提高 owner 页脚对比度；当前房间 id 写入 URL 查询参数并同步浏览器标签标题，刷新后保持所选房间。浏览器 E2E 新增 `room-url-and-title-persistence`，全量 36/36 通过，截图 `docs/screenshots/ui-polish-20261019.png`。
+- 新增 `.github/workflows/ci.yml`（Windows runner：typecheck、密钥扫描、单元测试、replay 契约、生产构建）；仅完成本地配置，尚未在远端 CI 实际执行。
+- 计划实施记录已更新：`docs/AGENT-PARALLEL-PROGRESS.md` 增加第四批 baseSeq 上下文对账与第五批审计/UI 记录，并更新剩余工作清单；`PROTOCOL.md`/`RELEASE-NOTES.md` 同步 v6 与已实现/未实现边界。
+
 ## 已覆盖
 
 2026-10-18 13:30（Asia/Shanghai）补齐版本与交付回归：任务修改/转交会先使整棵依赖树的运行、发言和版本失效，再生成共同快照并重新排队；未接受提案保持待确认。外部任务完成摘要也有 taskId/taskVersion，能在目标变更后标旧；事件游标以前的历史仍保留原状态。HTTP 交付物应用测试确认旧开发/审查补丁均返回 409，原文件不变；新版本只应用一次，重复 commandId 返回原回执。

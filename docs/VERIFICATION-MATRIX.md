@@ -1,23 +1,25 @@
-# 验证矩阵（2026-10-18）
+# 验证矩阵（2026-10-19）
 
-本文件把 Scheme.md 的主要能力与当前可复现的验证方式、证据位置对应起来。所有命令都在项目根目录执行；无模型命令不会调用任何 Agent 模型。
+本文件把 Scheme.md 与并行协作计划的主要能力对应到当前可复现的验证方式与证据位置。所有命令都在项目根目录执行；标注“无模型”的命令不会调用任何 Agent 模型。结果来自本机实际执行，未执行的可选项明确标注为未执行。
 
-## 一、无模型门禁
+## 一、无模型与发布门禁
 
 | 能力 | 结果 | 验证方式 | 证据 |
 | --- | --- | --- | --- |
-| 类型检查 / 单元测试 | PASS | `npx tsc --noEmit`、`npm test`（105/105，含备份/恢复、Claude/Codex/DSH 版本解析与浏览器命令） | 测试输出 |
-| 仓库密钥扫描 | PASS（源码/文档无 API Key 或房间令牌） | `npm run check:secrets` | `.state/secret-scan/latest.json` |
-| 预发布全链路 | PASS（9/9） | `npm run test:preflight -- --with-native` | `.state/preflight/run-eFkpLl/report.json` |
-| 浏览器端到端（含会话恢复与原生端点字段） | PASS（31/31） | `npm run test:browser` | `.state/browser-e2e/run-LEGvlE/report.json`、`ui.png` |
-| 生产构建 + 重启恢复 + Cookie 保持 | PASS（10/10） | `npm run test:production` | `.state/production-smoke/run-tix5Qe/report.json` |
+| 类型检查 / 单元测试 | PASS（192/192） | `npx tsc --noEmit`、`npm test` | 测试输出；含 replay/context/audit/UI 测试 |
+| 事件回放 / fencing / partial / 上下文契约 | PASS（63/63） | `npm run test:replay` | 测试输出 |
+| 房间事件审计导出（NDJSON） | PASS | `npm test`（`tests/audit-export.test.ts`） | 测试输出 |
+| 仓库密钥扫描 | PASS（0 finding） | `npm run check:secrets` | `.state/secret-scan/latest.json` |
+| 预发布全链路 | PASS（9/9） | `npm run test:preflight -- --with-native` | `.state/preflight/run-M2sGyf/report.json` |
+| 浏览器端到端 / URL 与标题恢复 / 草稿与对账 UI | PASS（36/36） | `npm run test:browser` | `.state/browser-e2e/run-fLrCDr/report.json`、`docs/screenshots/ui-polish-20261019.png` |
+| 生产构建 + 重启恢复 + Cookie 保持 | PASS（10/10） | `npm run test:production` | `.state/production-smoke/run-GpvQs7/report.json` |
 | Windows 原生沙箱探测 | PASS（23/23） | `npm run test:sandbox` | `.state/diagnostics/sandbox.json` |
 | 连接器进程树 | PASS（9/9） | `npm run test:connectors` | `.state/connector-probes/` |
-| 原生 Agent 协议预检 | PASS（codex/claude/deepseek） | `npm run check:secrets   # 源码/文档密钥扫描
-npm run report:readiness` 读取 | `.state/native-pipecompat-20261017/diagnostics/agent-protocols.json` |
-| 外部会话令牌巡检（Claude Code / Codex） | PASS | `npm run test:external-mcp` | `.state/external-mcp/` |
-| 外部 Agent 自动值守运行器（假 CLI） | PASS | `npm run test:runner` | `.state/runner-smoke/` |
-| 发布就绪汇总 | 退出码 0 | `npm run report:readiness` | `docs/RELEASE-READINESS.md` |
+| 原生 Agent 协议预检 | PASS（codex/claude/deepseek） | `npm run test:agent-protocols -- --check` | `.state/native-pipecompat-20261017/diagnostics/agent-protocols.json` |
+| 外部 Agent 自动值守（假 CLI） | PASS | `npm run test:runner` | `.state/runner-smoke/` |
+| 发布就绪汇总 | 退出码 0（可选沙箱密钥档未执行） | `npm run report:readiness` | `docs/RELEASE-READINESS.md` |
+| Git 基线 | PASS | `git init -b main`、首个提交 `ced6da3` | 当前 `main` 分支 |
+| CI 配置 | 已添加，未在远端执行 | `.github/workflows/ci.yml`（Windows runner） | 本地配置 |
 
 ## 二、账号登录真实模型验证（本机实际使用方式）
 
@@ -29,13 +31,14 @@ npm run report:readiness` 读取 | `.state/native-pipecompat-20261017/diagnostic
 | Codex host 单项真实轮次 | PASS | `npm run test:codex -- --allow-paid` | `.state/codex-smoke/run-3kz2oE/report.json` |
 | DeepSeek host 单项真实轮次 | PASS | `npm run test:deepseek -- --allow-paid` | `.state/deepseek-smoke/run-lCElSj/report.json` |
 | 三 Agent 同房间协作发言 | PASS | `npm run test:team-host -- --allow-paid` | `.state/team-smoke/run-Xu8EIb/report.json` |
-| host 任务文件编辑 + task_complete | PASS | `npm run test:host-task -- --allow-paid` | `.state/host-task-smoke/run-Y54Kwd/report.json` |
+| host 任务文件编辑 + `task_complete` | PASS | `npm run test:host-task -- --allow-paid` | `.state/host-task-smoke/run-Y54Kwd/report.json` |
 | host 命令/测试执行 | PASS | `npm run test:host-commands -- --allow-paid` | `.state/host-commands-smoke/run-yXrXVQ/report.json` |
 | host 运行取消 | PASS | `npm run test:host-cancel -- --allow-paid` | `.state/host-cancel-smoke/run-5N1tWY/report.json` |
 | host 两 Agent 任务接力 | PASS | `npm run test:host-handoff -- --allow-paid` | `.state/host-handoff-smoke/run-qhwnpd/report.json` |
 | 外部 Claude Code 实际房间发言 | PASS | 用户在 Claude Code 中调用 `mcp__room__room_post` | test2 消息记录（19:37:53） |
 | 外部 Codex 实际 MCP 调用 | PASS | `codex exec` + 全局 room MCP | `.state/codex-exec-last.jsonl` |
 | 外部 Agent 自动值守真实模型（Claude CLI） | PASS | `npm run test:runner-real -- --allow-paid` | `.state/runner-real-smoke/` |
+| 三 Agent 讨论并交付 Plan | PASS | 房间「Agent 并行与实时协作研讨」两轮讨论 + DeepSeek 综合；7 条 Agent 消息、7181 字计划与附件 | `docs/AGENT-PARALLEL-COLLABORATION-PLAN.md`、房间 `room_046d0d633a45437686f338c84c2c508b` |
 
 ## 三、可选“沙箱 + 显式 API 密钥”档
 
@@ -46,21 +49,27 @@ npm run report:readiness` 读取 | `.state/native-pipecompat-20261017/diagnostic
 
 ## 四、已知限制与未覆盖项
 
-- 账号登录状态不导入沙箱；如需要沙箱内使用 Claude/Codex 账号登录，需要单独的凭据策略评审。
-- 真实第三方 A2A 服务联调尚未进行；本地 HTTP A2A 协议测试已覆盖。
-- Codex/DSH Desktop 版本尚未做每次运行的强制二进制版本校验；正式发布前应人工固定安装版本。
+- 账号登录状态不导入沙箱；如需沙箱内使用 Claude/Codex 账号登录，需要单独的凭据策略评审。
+- 真实第三方 A2A HTTPS 服务联调尚未进行；本地 HTTP A2A 协议测试已覆盖。
+- GitHub Actions 仅完成配置，未在远端实际执行；本地 preflight 已通过。
+- 计划剩余项：适配器内部命令副作用的操作账本、状态不明运行的安全自动重入队；P1 的公平仲裁/WFQ、EWMA/quorum、预算熔断、来源信任级与工具前策略校验。
 - 系统代理/私有网络探测只覆盖本机已知路径，不代表所有 Windows 环境。
 - 成果应用（artifact apply）属于沙箱快照路径；host 模式直接修改真实项目，不走“应用到原项目”流程。
 
 ## 五、快捷入口
 
 ```powershell
-npm run dev            # 启动（已运行会提示当前地址）
-npm run open           # 在浏览器打开当前运行实例
+npm run dev                         # 启动（已运行会提示当前地址）
+npm run open                        # 在浏览器打开当前运行实例
+npm run typecheck
+npm test                            # 192 项单元/契约测试
+npm run test:replay                 # 事件/回放/fencing/partial/上下文契约
+npm run test:browser                # 无模型浏览器 E2E（36 步）
+npm run test:preflight -- --with-native
+npm run check:secrets               # 源码/文档密钥扫描
 npm run report:readiness
-npm run dev:open         # 启动并自动打开浏览器
-npm run backup           # 升级前一致性备份（快照 + artifacts + manifest）
-npm run restore -- --latest  # 恢复最新备份（需先停止服务）
+npm run backup                      # 升级前一致性备份（快照 + artifacts + manifest）
+npm run restore -- --latest         # 恢复最新备份（需先停止服务）
 npm run test:external-mcp
 npm run room:refresh-claude -- --session-url "<启动地址>"  # 仅显式轮换令牌后需要
 npm run room:refresh-codex  -- --session-url "<启动地址>"

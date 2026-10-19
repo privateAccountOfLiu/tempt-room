@@ -1,0 +1,31 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Secret scan
+        run: npm run check:secrets
+      - name: Unit and contract tests
+        run: npm test
+      - name: Event replay / fencing / partial / context contract tests
+        run: npm run test:replay
+      - name: Production build
+        run: npm run build

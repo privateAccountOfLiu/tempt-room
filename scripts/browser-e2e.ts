@@ -180,6 +180,16 @@ try {
     await waitFor('实时连接状态', async () => (await bodyText()).includes('实时连接'), 15000);
     step('app-load-and-auth', {textLength: (await bodyText()).length});
     step('connection-status-live');
+    const titleBefore = await waitFor('房间标题', async () => { const title = String(await evaluate("document.querySelector('.room-title h1')?.textContent?.trim() ?? ''")); return title && title !== '正在打开房间' ? title : undefined; }, 15000);
+    const roomInUrl = String(await evaluate("new URLSearchParams(location.search).get('room') ?? ''"));
+    if (!roomInUrl) fail('房间 id 未写入 URL 查询参数');
+    if (!(await evaluate("document.title.includes('Tempt Room')"))) fail('页面标题未包含 Tempt Room');
+    const roomReload = waitEvent('Page.loadEventFired');
+    await send('Page.reload', {}, sessionId);
+    await roomReload;
+    await waitFor('刷新后恢复所选房间', async () => String(await evaluate("new URLSearchParams(location.search).get('room') ?? ''")) === roomInUrl && (await bodyText()).includes(titleBefore), 20000);
+    await waitFor('刷新后实时连接', async () => (await bodyText()).includes('实时连接'), 15000);
+    step('room-url-and-title-persistence', {room: roomInUrl, title: titleBefore});
 
     const sent = `浏览器端到端消息 ${Date.now()}`;
     const typed = await evaluate(`(() => {

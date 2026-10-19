@@ -83,6 +83,16 @@ export async function createApp(options: AppOptions = {}) {
     if (!store.room(request.params.id)) throw new ProtocolError('not_found', '房间不存在', 404);
     return store.events(request.params.id, z.coerce.number().int().min(0).parse(request.query.after ?? 0));
   });
+  // Local audit trail export: one JSON event per line. It passes through the
+  // normal owner authorization hook, so it is not available to Agent tokens.
+  app.get<{ Params: { id: string } }>('/api/rooms/:id/audit/export', (request, reply) => {
+    const roomId = request.params.id;
+    if (!store.room(roomId)) throw new ProtocolError('not_found', '房间不存在', 404);
+    const events = store.events(roomId, 0);
+    reply.header('content-type', 'application/x-ndjson; charset=utf-8');
+    reply.header('content-disposition', `attachment; filename="${roomId}-audit.jsonl"`);
+    return events.map(event => JSON.stringify(event)).join('\n') + '\n';
+  });
   app.get('/api/agents', () => store.list('agents'));
   // Read-only discovery of locally installed Agent programs for the setup form.
   app.get('/api/agents/autodetect', () => {

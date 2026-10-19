@@ -75,14 +75,38 @@
 
 仍未实现基于 baseSeq 的增量对账、EWMA 发言窗口与 quorum/late；持久检查点不等于这些调度行为已经实现。
 
+## 第四批：baseSeq 增量对账与上下文预算
+
+已实现：
+
+- 新增 `ContextPolicy`（`maxDeltaBytes`、`maxLag`、`maxRounds`）与 `ContextDelta`；每个运行记录 `contextSeq` 水位，派发后如果出现新的 @、已接受决策、任务/交付物变化或落后超过阈值，必须先对账再提交旧结果。
+- `contextDelta()` 从运行水位开始读取连续事件并生成有界增量（超过单条或总量上限时返回 `hasMore`，不把未读事实伪装成已读）；`assertContextCurrent()` 在消息发布、复核和完成路径拦截过期结果；`advanceContext()` 在同一事务内创建新的上下文快照、递增 generation/executionId 并发出 `run.context.advanced`，避免旧执行继续写入。
+- Worker 在候选结果完成后自动发起一次“增量对账”补充轮次；Agent 收到 `reconciliationPrompt`，要求只根据新增事实修正结果，禁止重复有副作用的命令；完成时写入 `run.context.confirmed`，并把水位推进记录保留在事件日志。
+- 协议与 SDK 提供 ContextDelta/ContextPolicy 类型及 JSON Schema；数据库升至 v6，迁移前创建独立备份并保留旧事件；旧数据库缺失上下文字段时按兼容策略处理，不伪造历史水位。
+- 浏览器支持展示“正在核对新增上下文”、持久草稿恢复、superseded 草稿保留与最终稿不重复；浏览器 E2E 新增 `context-reconciliation-visible`。
+
+验证：
+
+- `npm test` **191/191**，包含 13 项上下文对账测试（接受决策/点名触发、避免自激、增量上限、断号拒绝、上下文推进 fencing、旧写拒绝、真实 Worker 对账轮次、工作区成果保留、预算耗尽、零额外轮次策略等）。日志：`.state/context-tests-final.log`。
+- 浏览器 E2E PASS，证据 `.state/browser-e2e/run-Ur4eKx/report.json`；生产冒烟 PASS（`.state/production-smoke/run-5ikIT9/report.json`）；SDK 离线消费 PASS（`.state/sdk-probes/run-lky2a9/report.json`）；原生沙箱旧 generation 拒写探测 PASS（`.state/context-sandbox-native.log`，`oldPipeRejected=true`、无新事件、Job 已清空）。
+- v2/v3/v4 只读副本迁移审计：`.state/context-audit/latest.json`。全程未调用模型。
+- 仓库基线已纳入 Git：`git init -b main` 后首个提交 `ced6da3`，包含本批之前的全部实现；后续小改动继续提交。
+
+范围边界：这是“提交前增量对账 + 水位 fencing”，不是分布式共识，也不能撤销旧进程已经产生的外部副作用；有副作用的原生命令仍不盲目自动重跑。P1 的 EWMA 窗口、quorum/late 与公平调度尚未实现。
+
+## 增量：审计导出与 UI 体验
+
+- 新增 owner-only `GET /api/rooms/:id/audit/export`：按事件原样输出 NDJSON（事件 id、seq、type、actor、payload 等），并设置 `application/x-ndjson` 与附件下载名；房间头部新增「导出审计日志」按钮。测试覆盖 owner 下载、未认证 401、NDJSON 可解析与事件字段；自动测试 192/192。
+- UI 体验：运行用量改为紧凑的两行（用量未返回时不再重复三个“未知”），任务卡操作下拉改为紧凑样式并补 aria-label，房间头部显示“N 进行中”，owner 页脚提高对比度；新增“当前房间 id 写入 URL 查询参数 + 浏览器标签标题显示房间名”的持久化，刷新后保持所选房间。浏览器 E2E 新增 `room-url-and-title-persistence` 并全量通过。
+- 仓库与 CI：`git init -b main` 首个提交 `ced6da3` 纳入全部基线；新增 `.github/workflows/ci.yml`（typecheck、密钥扫描、单元测试、replay 契约、production build，Windows runner）；本地未实际触发 GitHub Actions。
+
 ## 原计划逐项剩余工作
 
 P0 尚未完成：
 
 1. 把可恢复副作用的操作记录扩展到适配器内部的命令执行，区分可证明幂等与结果未知的原生工作；Room 工具 fencing 与账本已完成，不能替代内部 Shell/网络副作用的验收。
-2. 按 baseSeq 检查新提及/任务版本/落后阈值，补投增量并对账，再允许结果提交。
-3. 带 generation/租约的崩溃恢复与安全自动重入队。中断标记、generation 撤销与显式重入队事件已具备；必须先解决外部命令副作用不受 SQLite 回滚保护的问题，当前仍不盲目重试状态不明的写运行。
-4. 更多 seq 边界的随机故障注入与并发冲突门禁；新运行状态机已要求 started 事实，仍须把完整故障与 UI 不变量纳入 CI。CI 配置与实际 CI 执行也需分别验收。
+2. 带 generation/租约的崩溃恢复与安全自动重入队。中断标记、generation 撤销与显式重入队事件已具备；必须先解决外部命令副作用不受 SQLite 回滚保护的问题，当前仍不盲目重试状态不明的写运行。
+3. 更多 seq 边界的随机故障注入与并发冲突门禁，并把完整故障与 UI 不变量纳入 CI；本地 CI 配置已添加（`.github/workflows/ci.yml`：typecheck、密钥扫描、191 项测试、replay 契约、构建），尚未在远端实际执行。
 
 P1 尚未完成：
 
@@ -90,7 +114,7 @@ P1 尚未完成：
 2. 分桶 EWMA 窗口、quorum、absent/late、partial 超时降级与公平性压测。
 3. 每 Agent 有界增量 inbox、房间待办上限、工具输出上限；大规模基线和上下文的分段/引用，避免重复内联造成日志膨胀。
 4. token/费用/时长硬预算、未知用量语义、入口预算熔断，以及 run/agent/房间成本看板。
-5. 来源/信任级、工具前策略校验和注入测试；JSONL 审计导出、可解释错误与重试入口。
+5. 来源/信任级、工具前策略校验和注入测试，以及可解释错误与重试入口；JSONL 审计导出已实现（`GET /api/rooms/:id/audit/export` + 房间头部下载按钮，192 项测试覆盖），但信任级/注入防护仍未实现。
 6. 真实 CLI 的混合快慢场景验收仍须与无模型测试分开，不能用模拟结果替代。
 
 P2 尚未完成：
@@ -99,4 +123,4 @@ P2 尚未完成：
 2. outbox、HLC、多机同步预留与房间分片。
 3. 单房间事件导出至第二实例重放的互操作验收；AgentScope Service 适配器在原计划中为可选项。
 
-已完成一致性底座、执行 fencing 与状态机/partial/supersede 三段，尚未完成整个 P0 或全项目目标。下一批继续 baseSeq 提交对账与恢复策略，并保留上述恢复约束。
+已完成一致性底座、执行 fencing、状态机/partial/supersede、baseSeq 提交对账与上下文预算四段，尚未完成整个 P0 或全项目目标。下一批优先处理适配器内部副作用的操作账本与安全恢复策略，P1 的公平调度/预算/可观测性可并行推进。

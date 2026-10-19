@@ -139,9 +139,10 @@ Run.limits 保存入队时的内存、进程与超时设置。系统宿主的 sa
 - `GET /api/rooms/:id/snapshot?cursor=N&limit=1000`：同一 SQLite 读事务内得到 `snapshot / asOfSeq / headSeq / tail / nextCursor / hasMore / historyFloor / reset`。默认或 cursor=0 返回当前完整快照；有效旧 cursor 返回该水位快照与之后的分页事件。旧 cursor 早于迁移基线时，返回基线快照并标记 reset，避免伪造完整的旧历史。
 - `GET /api/rooms/:id`：保留兼容查询，返回相同一致性读路径的当前快照。
 - `POST /api/rooms/:id/projections/rebuild`：Owner 认证，正文 `{ "fromSeq": 0 }`。从指定起点以前最近基线重放到 head；修改的是真实应用投影，重建失败整批回滚，事件日志不变。
+- `GET /api/rooms/:id/audit/export`：Owner 认证，按事件原样返回 `application/x-ndjson` 附件（每行一个事件，含 eventId/seq/type/actor/payload）；Agent 令牌不可访问。房间头部提供下载按钮。
 - WebSocket 与 SDK：持久序号出现缺口时通过 REST 补齐；同一房间连续提交、重复忽略、跨房间拒收。慢客户端可以丢瞬态；持久事件由游标恢复。客户端不会因为订阅建立就把缺失事件算作已处理。
 
-数据库 v3 为旧数据追加 migration checkpoint，而不重写旧事件；v4 新增 operations 投影及索引；当前开发版 v5 支持持久草稿和 superseded 终态。`historyFloor` 是可证明完整快照的最早水位。运行/工具的 generation fencing 已接入；baseSeq 提交前对账、自动崩溃重试、WFQ 和预算仍在 [实施记录](AGENT-PARALLEL-PROGRESS.md) 中跟踪。
+数据库 v3 为旧数据追加 migration checkpoint，而不重写旧事件；v4 新增 operations 投影及索引；v5 支持持久草稿和 superseded 终态；当前开发版 v6 增加 baseSeq 上下文对账与上下文预算。`historyFloor` 是可证明完整快照的最早水位。运行/工具的 generation fencing 与 baseSeq 提交前对账已接入；自动崩溃重试、WFQ/EWMA、quorum 与预算仍在 [实施记录](AGENT-PARALLEL-PROGRESS.md) 中跟踪。
 
 
 ## 执行 generation 与工具操作（开发版 v4）
@@ -169,4 +170,4 @@ Message.final=true 时，supersedes 必须指向当前 partial.id（没有草稿
 
 任务改版/交接和新的明确点名聊天请求可使旧运行进入 stopReason=superseded。排队且尚未提交原生请求的运行立即 superseded；已启动的运行先 cancel_requested，确认结束后 superseded。unknown/interrupted 仍保留不确定性，不能因逻辑目标变更就宣称进程已停止。用户的明确停止使用 stopReason=user_cancel，并在确认结束后 canceled；普通历史消息不会中止当前任务。
 
-草稿以独立视图显示，取消或替代后保留。刷新和瞬态缺口回退到持久检查点；最后一次未提交的瞬态片段仍可能丢失。动态 EWMA 窗口、quorum/late 与 baseSeq 对账尚未完成，不能从持久 partial 的存在推断这些能力。
+草稿以独立视图显示，取消或替代后保留。刷新和瞬态缺口回退到持久检查点；最后一次未提交的瞬态片段仍可能丢失。动态 EWMA 窗口、quorum/late 尚未完成；baseSeq 提交对账与上下文预算已实现，不能从持久 partial 的存在推断这些能力。

@@ -6,8 +6,7 @@ Windows 本地多 Agent 群协作软件。React 界面、Fastify 应用服务、
 
 已实现多个房间、成员配置、提及路由、流式回复、引用和附件、数据库队列、可调整的有界讨论、任务提议确认、任务转交/接力（`task.handoff`）与开放认领（`task.claim`）、依赖交付物传递与目标版本、决策接受、独立项目快照、差异审查与冲突检查后应用、HTTP/WebSocket 历史恢复。群聊消息按 GitHub 风格 Markdown（含表格、列表、代码块、链接）与 KaTeX 数学公式渲染，兼容 `$...$`、`$$...$$`、`\(...\)`、`\[...\]` 分隔符；未启用原始 HTML。运行设置可调整并发、内存、进程数和超时，提供方未返回的用量显示未知。随附两个明确标记的确定性演示成员，无须模型密钥。
 
-Codex App Server、Claude Code stream-json、DeepSeek Harness ACP、自建 Chat Completions API 和 A2A 1.0 适配器已经接线。**账号登录环境下的真实 Agent 路径已实测通过**：Claude 沙箱单项真实轮次、Codex/DeepSeek 本机直连单项真实轮次、Claude/Codex 外部 MCP 真实发言、三 Agent 同房间 host 协作均已验证；`npm run check:secrets       # 扫描源码/文档中的疑似密钥（排除 .state、node_modules 与本地 MCP 配置）
-npm run report:readiness` 的必需门禁全部通过。严格 AppContainer 三 Agent 完整场景（编辑、测试、取消、成果应用）属于可选“沙箱 + 显式 API 密钥”门槛，本机账号登录环境暂无该密钥，详见 [账号登录型 Agent 说明](docs/ACCOUNT-LOGIN.md)。本机最新原生探测 23/23 通过；DeepSeek Harness Desktop 0.2.0-rc.2 已在隔离沙箱内完成真实模型轮次、连续会话复用与群聊 MCP 验证，并支持按 Agent 可选的「本机直连」执行模式（沙箱仍是默认，不会自动降级）。参见 [验证矩阵](docs/VERIFICATION-MATRIX.md)、[v0.1 发布说明](docs/RELEASE-NOTES.md)、[验收与已知限制](docs/ACCEPTANCE.md) 和 [DeepSeek 反馈处理](docs/DEEPSEEK-FEEDBACK-RESPONSE.md)。
+Codex App Server、Claude Code stream-json、DeepSeek Harness ACP、自建 Chat Completions API 和 A2A 1.0 适配器已经接线。**账号登录环境下的真实 Agent 路径已实测通过**：Claude 沙箱单项真实轮次、Codex/DeepSeek 本机直连单项真实轮次、Claude/Codex 外部 MCP 真实发言、三 Agent 同房间 host 协作均已验证；`npm run report:readiness` 的必需门禁全部通过。严格 AppContainer 三 Agent 完整场景（编辑、测试、取消、成果应用）属于可选“沙箱 + 显式 API 密钥”门槛，本机账号登录环境暂无该密钥，详见 [账号登录型 Agent 说明](docs/ACCOUNT-LOGIN.md)。本机最新原生探测 23/23 通过；DeepSeek Harness Desktop 0.2.0-rc.2 已在隔离沙箱内完成真实模型轮次、连续会话复用与群聊 MCP 验证，并支持按 Agent 可选的「本机直连」执行模式（沙箱仍是默认，不会自动降级）。参见 [验证矩阵](docs/VERIFICATION-MATRIX.md)、[v0.1 发布说明](docs/RELEASE-NOTES.md)、[验收与已知限制](docs/ACCEPTANCE.md) 和 [DeepSeek 反馈处理](docs/DEEPSEEK-FEEDBACK-RESPONSE.md)。
 
 ## 启动
 
@@ -147,7 +146,7 @@ npm run test:agent-protocols -- --agent=deepseek  # 沙箱通过后，无模型�
 
 `npm run test:production` 对**生产构建产物**做本机启动冒烟：用隔离状态目录启动 `dist/server/main.js`，检查静态 SPA 与 CSP、未认证请求 401、Owner API 认证、WebSocket 事件流、消息持久化、退出后的重启恢复与 `room.sqlite` 的 `user_version=5`。Windows 上外部终止不会触发 Node 信号处理器，因此脚本验证“终止后重新启动可恢复”（含陈旧锁处理），而 POSIX 上验证优雅退出。报告写入 `.state/production-smoke/latest.json`；不调用模型。
 
-`npm run test:preflight` 按固定顺序串联发布前无模型检查：`typecheck → npm test → build → test:sdk → test:browser → test:production`，任一失败即中止并写入 `.state/preflight/latest.json`；可用 `--skip-browser` / `--skip-sdk` 跳过慢检查，`--with-native` 追加 `test:connectors` 与 `test:sandbox`（原生检查依赖 Windows 环境）。它不替代用户显式运行的付费真实 Agent 场景验收。
+`npm run test:preflight` 按固定顺序串联发布前无模型检查：`typecheck → npm test → check:secrets → build → test:sdk → test:browser → test:production`，任一失败即中止并写入 `.state/preflight/latest.json`；可用 `--skip-browser` / `--skip-sdk` 跳过慢检查，`--with-native` 追加 `test:connectors` 与 `test:sandbox`（原生检查依赖 Windows 环境）。它不替代用户显式运行的付费真实 Agent 场景验收。
 
 `npm test` 除协议/服务/适配器测试外，还包含 `tests/sdk-live.test.ts`：启动真实服务后用发布包客户端走 HTTP 与 WebSocket（幂等 commandId、Agent 房间令牌、跨房间拒绝、订阅与退订），与 `test:sdk` 的离线打包/消费者检查互补。
 
