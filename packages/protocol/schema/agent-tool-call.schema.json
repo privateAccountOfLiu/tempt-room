@@ -25,7 +25,8 @@
         "task_heartbeat",
         "artifact_publish",
         "room_status",
-        "room_wait"
+        "room_wait",
+        "room_inbox"
       ]
     },
     "arguments": {

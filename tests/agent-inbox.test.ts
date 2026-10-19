@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { createApp } from '../apps/server/src/app.ts';
+import { uid } from '../apps/server/src/store.ts';
+
+test('external Agent can page an incremental inbox cursor without duplicates', async t => {
+  const base = resolve('.state/test-data'); mkdirSync(base, { recursive: true });
+  const root = mkdtempSync(join(base, 'agent-inbox-'));
+  const state = await createApp({ root, token: 'inbox-owner', startWorker: false });
+  t.after(async () => { await state.app.close(); rmSync(root, { recursive: true, force: true }); });
+  const { app, service } = state, agentId = 'demo-planner';
+  const ownerHeaders = { host: '127.0.0.1:4317', authorization: 'Bearer inbox-owner', 'room-protocol-version': '0.1' };
+  const roomId = service.execute({ version: '0.1', commandId: uid(), type: 'room.create', payload: { name: 'inbox room', members: [agentId] } }).result.roomId as string;
+  const connected = await app.inject({ url: `/api/agents/${agentId}/connect?roomId=${roomId}`, headers: ownerHeaders });
+  assert.equal(connected.statusCode, 200);
+  const headers = { ...ownerHeaders, authorization: 'Bearer ' + connected.json().token };
+  const call = (name: string, args: Record<string, unknown> = {}) => app.inject({ method: 'POST', url: '/api/agent/tool', headers, payload: { roomId, commandId: uid(), name, arguments: args } });
+  assert.equal((await call('room_post', { text: 'inbox first message' })).statusCode, 200);
+  const first = await call('room_inbox', { afterSeq: 0, limit: 1 });
+  assert.equal(first.statusCode, 200);
+  const firstPage = (first.json() as { result: { fromSeq: number; nextSeq: number; hasMore: boolean; events: { seq: number }[] } }).result;
+  assert.equal(firstPage.fromSeq, 0);
+  assert.equal(firstPage.events.length, 1);
+  assert.ok(firstPage.events[0].seq > 0);
+  assert.equal(firstPage.nextSeq, firstPage.events.at(-1)!.seq);
+  const second = await call('room_inbox', { afterSeq: firstPage.nextSeq, limit: 50 });
+  assert.equal(second.statusCode, 200);
+  const secondPage = (second.json() as { result: { events: { seq: number }[] } }).result;
+  assert.ok(secondPage.events.every(event => event.seq > firstPage.nextSeq));
+  assert.ok(!secondPage.events.some(event => firstPage.events.some(seen => seen.seq === event.seq)));
+});

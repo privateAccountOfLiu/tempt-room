@@ -9,7 +9,7 @@ import { Markdown } from './markdown.tsx';
 
 const client = new RoomClient();
 const statusLabels:Record<string,string>={queued:'排队中',running:'工作中',waiting_input:'等待输入',cancel_requested:'正在停止',completed:'已完成',failed:'未完成',canceled:'已取消',superseded:'已被新目标替代',interrupted:'已中断',unknown:'状态待核实',proposed:'待你确认'};
-const roomToolLabels:Record<string,string>={room_read:'读取房间',room_status:'房间状态',room_post:'发言',task_propose:'提议任务',task_claim:'领取任务',task_complete:'完成任务',task_heartbeat:'任务心跳',artifact_publish:'发布交付物'};
+const roomToolLabels:Record<string,string>={room_read:'读取房间',room_status:'房间状态',room_inbox:'增量读取',room_post:'发言',task_propose:'提议任务',task_claim:'领取任务',task_complete:'完成任务',task_heartbeat:'任务心跳',artifact_publish:'发布交付物'};
 const providerLabels:Record<string,string>={codex:'Codex App Server',claude:'Claude Code CLI',deepseek:'DeepSeek Harness · ACP',api:'自建模型 API',a2a:'A2A 1.0',demo:'确定性演示'};
 const marks:Record<string,string>={codex:'Cx',claude:'Cl',deepseek:'Ds',api:'Ai',a2a:'A2',demo:'De'};
 function Icon({name,size=18}:{name:string;size?:number}) {

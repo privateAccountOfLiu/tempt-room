@@ -59,6 +59,7 @@
       "default": [
         "room_read",
         "room_status",
+        "room_inbox",
         "room_post",
         "task_propose",
         "task_claim",
@@ -73,6 +74,7 @@
         "enum": [
           "room_read",
           "room_status",
+          "room_inbox",
           "room_post",
           "task_propose",
           "task_claim",
