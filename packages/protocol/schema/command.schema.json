@@ -1386,6 +1386,12 @@
                 ]
               }
             },
+            "maxRoomPostChars": {
+              "default": 32000,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32000
+            },
             "enabled": {
               "default": false,
               "type": "boolean"
@@ -1548,6 +1554,7 @@
             "schedulerWeight",
             "roomToolPolicy",
             "allowedRoomTools",
+            "maxRoomPostChars",
             "enabled",
             "executable",
             "endpoint",

@@ -1,16 +1,16 @@
 # Tempt Room 发布就绪摘要
 
-> 自动生成于 2026-10-19T06:03:52.961Z。仅汇总本机已有报告，不触发任何模型请求。
+> 自动生成于 2026-10-19T06:11:06.043Z。仅汇总本机已有报告，不触发任何模型请求。
 
 ## 门禁结果
 
 | 门禁 | 结果 | 说明 | 证据 |
 | --- | --- | --- | --- |
-| 预发布检查（preflight） | 通过 | typecheck→test→build→SDK→浏览器→生产：通过（9/9 步） | `.state/preflight/run-w4cCtC/report.json` |
-| 浏览器端到端（browser-e2e） | 通过 | 真实无头 Edge/Chrome：通过（45/45 步） | `.state/browser-e2e/run-f2NUQJ/report.json` |
-| 生产构建启动（production-smoke） | 通过 | dist 产物 + 隔离数据目录：通过（10/10 步） | `.state/production-smoke/run-EiiOUz/report.json` |
+| 预发布检查（preflight） | 通过 | typecheck→test→build→SDK→浏览器→生产：通过（9/9 步） | `.state/preflight/run-2Iy4Wm/report.json` |
+| 浏览器端到端（browser-e2e） | 通过 | 真实无头 Edge/Chrome：通过（45/45 步） | `.state/browser-e2e/run-xo6aSF/report.json` |
+| 生产构建启动（production-smoke） | 通过 | dist 产物 + 隔离数据目录：通过（10/10 步） | `.state/production-smoke/run-wbBcb2/report.json` |
 | Windows 原生沙箱 | 通过 | 23/23 项通过 | `.state/diagnostics/sandbox.json` |
-| 仓库密钥扫描 | 通过 | 源码/文档未发现疑似 API Key 或房间令牌（2026-10-19T06:00:42.714Z） | `.state/secret-scan/latest.json` |
+| 仓库密钥扫描 | 通过 | 源码/文档未发现疑似 API Key 或房间令牌（2026-10-19T06:07:54.725Z） | `.state/secret-scan/latest.json` |
 | Claude 沙箱真实轮次（单项） | 通过 | paid-one-turn · AppContainer + 原生会话 + 回复通过 | `.state/claude-smoke/run-WWcVPe/report.json` |
 | 沙箱真实 Agent 成果应用（Claude） | 通过 | 沙箱文件差异交付物已应用到原项目并校验内容 | `.state/sandbox-artifact-smoke/run-GMpmfD/report.json` |
 | 沙箱两 Agent 任务接力（Claude + DeepSeek） | 通过 | Claude v1 完成并应用成果，交接 DeepSeek v2 完成，两条运行均带 AppContainer 证明 | `.state/sandbox-handoff-smoke/run-dTKJB6/report.json` |
@@ -24,7 +24,7 @@
 | 账号登录 host 命令/测试执行（单项） | 通过 | 真实运行 npm test 并保存输出后完成任务 | `.state/host-commands-smoke/run-yXrXVQ/report.json` |
 | 账号登录 host 取消运行（单项） | 通过 | 长命令运行被取消并进入 canceled 终态 | `.state/host-cancel-smoke/run-5N1tWY/report.json` |
 | 账号登录 host 任务接力（两 Agent） | 通过 | Claude v1 完成后交接 DeepSeek v2 并完成 | `.state/host-handoff-smoke/run-qhwnpd/report.json` |
-| Windows 连接器进程树 | 通过 | 9/9 项通过 | `.state/connector-probes/run-sYcaTx/report.json` |
+| Windows 连接器进程树 | 通过 | 9/9 项通过 | `.state/connector-probes/run-nhLvsV/report.json` |
 | 原生 Agent 协议预检 | 通过 | codex:通过 / claude:通过 / deepseek:通过 | `.state/native-pipecompat-20261017/diagnostics/agent-protocols.json` |
 | 完整验收前置（--check） | 通过 | ready-for-paid-tests（4/4 步，agents=3） | `.state/native-pipecompat-20261017/acceptance-tests/suite-wdp7HI/acceptance.json` |
 | 真实 Agent 场景（沙箱 + 显式密钥）（可选） | 可选，未执行 | 可选档：本机使用账号登录，已由单 Agent / 外部 MCP / 三 Agent host 门禁覆盖；如有 API Key 可运行 --allow-paid | `.state/native-pipecompat-20261017/acceptance-tests/suite-Y21n0G/acceptance.json` |

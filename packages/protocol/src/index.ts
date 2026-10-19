@@ -27,6 +27,7 @@ export const agentSchema = z.object({
   role: z.string().max(300).default('协作助手'), color: z.enum(['blue', 'green', 'orange', 'purple', 'teal']).default('blue'), schedulerWeight: z.number().min(0.1).max(10).default(1),
   roomToolPolicy: z.enum(['allow','read-only','deny']).default('allow'),
   allowedRoomTools: z.array(z.enum(roomToolNames)).min(1).default(()=>[...roomToolNames]),
+  maxRoomPostChars: z.number().int().min(1).max(32000).default(32000),
   enabled: z.boolean().default(false), executable: z.string().max(1000).default(''),
   endpoint: z.string().max(2000).default(''), model: z.string().max(200).default(''),
   credentialEnv: z.string().regex(/^[A-Z][A-Z0-9_]*$/).or(z.literal('')).default(''),

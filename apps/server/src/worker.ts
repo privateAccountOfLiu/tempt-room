@@ -15,7 +15,7 @@ import {contextDelta,advanceContext,assertContextCurrent,reconciliationPrompt} f
 import { captureContext } from './context.ts';
 import { fairOrder } from './scheduler.ts';
 import { trustForActor } from './trust.ts';
-import { assertRoomToolAllowed } from './tool-policy.ts';
+import { assertRoomPostLength, assertRoomToolAllowed } from './tool-policy.ts';
 import { formatContextMessage, UNTRUSTED_CONTEXT_NOTICE } from './context-format.ts';
 import { dependencyInputs } from './dependencies.ts';
 import { codexThreadKey, reconcileAttachedRun } from './codex-attach.ts';
@@ -475,6 +475,7 @@ export class Worker {
         action=()=>{const events=this.store.events(run.roomId,input.afterSeq,input.limit);const nextSeq=events.at(-1)?.seq??input.afterSeq;return {roomId:run.roomId,fromSeq:input.afterSeq,nextSeq,hasMore:events.length===input.limit,events:events.map(event=>({seq:event.seq,type:event.type,createdAt:event.createdAt,payload:event.payload}))};};
       }else if(name==='room_post'){
         const input=z.object({text:z.string().min(1).max(32000),mentions:z.array(z.string()).default([])}).strict().parse(args);
+        assertRoomPostLength(toolAgent,input.text);
         action=()=>this.service.execute({version:VERSION,commandId,roomId:run.roomId,type:'message.send',payload:input},actor,scope);
       }else if(name==='task_propose'){
         const input=z.object({title:z.string().min(1).max(5000),agentId:z.string(),dependencies:z.array(z.string()).max(20).default([])}).strict().parse(args);
@@ -526,6 +527,7 @@ export class Worker {
     }
     if (name === 'room_post') {
       const input = z.object({ text: z.string().min(1).max(32000), mentions: z.array(z.string()).default([]) }).strict().parse(args);
+      assertRoomPostLength(agent,input.text);
       return this.service.execute({ version: VERSION, commandId, roomId, type: 'message.send', payload: input }, actor);
     }
     if (name === 'task_propose') {
