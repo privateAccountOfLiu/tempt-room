@@ -107,7 +107,7 @@ JSON Schema 是命令形状的权威来源：`packages/protocol/schema/*.schema.
 
 ## 调度与状态
 
-普通消息仅进入历史。人类 mentions 唤醒被点名的启用成员。Agent 的 mentions 可表达协作意图，不直接产生无限级联；有界讨论由调度器按共同快照安排下一轮。每个 room/agent 会话串行，全局默认并发 2。Agent 提议的任务等人类确认。
+普通消息仅进入历史。人类 mentions 唤醒被点名的启用成员。Agent 的 mentions 可表达协作意图，不直接产生无限级联；有界讨论由调度器按共同快照安排下一轮。每个 room/agent 会话串行，全局默认并发 2；Worker 使用单一调度循环，按最近服务时间 + 创建时间做公平排序，避免高速 Agent 长期占用并发槽。Agent 提议的任务等人类确认。
 
 Run：queued → running → completed/failed；可进入 waiting_input，再由 run.input 回到 running。取消运行先进入 cancel_requested；确认 Job 无活动进程或远程任务明确 CANCELED 后才进入 canceled。远程 API 断流可能仍在计算，使用 interrupted 并说明不确定性；失去沙箱进程退出证明使用 unknown。终态不会被隐式重试；owner 可显式 `run.retry` 创建新运行，但这不会自动重做状态未知的外部副作用。
 

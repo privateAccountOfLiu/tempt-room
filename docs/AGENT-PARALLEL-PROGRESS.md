@@ -121,7 +121,7 @@
 - `discussion.start` 新增可选 `quorum`（默认等于参与者数）；拒绝 quorum 超过参与人数、或 maxResponses 小于 quorum 的不可达配置。
 - 每轮成功响应达到 quorum 即推进下一轮：未完成成员记入 `Discussion.absent` 并以 `superseded` 取消，避免慢成员阻塞本轮；若所有运行终止仍未达 quorum 则停止讨论。默认 quorum 为全员，保留原语义。
 - 讨论横幅显示 Quorum 与缺席成员；创建讨论表单增加 quorum 字段（0=全部）。
-- 测试：`tests/discussion-quorum.test.ts` 覆盖提前推进、缺席记录、迟到取消、quorum 不可达拒绝；`npm test` **204/204**。
+- 测试：`tests/discussion-quorum.test.ts` 覆盖提前推进、缺席记录、迟到取消、quorum 不可达拒绝；`npm test` **206/206**。
 
 ## 增量：房间 / 成员待处理运行上限
 
@@ -137,17 +137,24 @@
 - 设置表单新增开关；未启用时行为与之前完全一致。
 - 测试：`tests/adaptive-timeout.test.ts` 覆盖 EWMA、floor/cap、桶过滤与真实 service 入队冻结；`npm test` **204/204**。
 
+## 增量：单一调度器与最近服务公平排序
+
+- Worker 仍只有单一 dispatch 循环；候选 queued 运行先按 (`roomId/agentId` 最近被服务时间升序、创建时间升序) 排序，再执行原有串行/项目/依赖/租约检查。
+- 刚完成工作的 Agent 会排到同类候选之后；从未服务或等待最久的成员优先，避免快速 Agent 通过高频新运行长期占用全局并发槽。按 room+agent 分键，跨房间不互相干扰。
+- 该排序是内存态、可重放运行事实的来源仍是 SQLite 队列；进程重启后从未服务状态重新开始，不改变持久授权。
+- 测试：`tests/fair-scheduler.test.ts` 覆盖 never-served/aging、最近服务回退、房间分键与输入不可变；`npm test` **206/206**。
+
 ## 原计划逐项剩余工作
 
 P0 尚未完成：
 
 1. 把可恢复副作用的操作记录扩展到适配器内部的命令执行，区分可证明幂等与结果未知的原生工作；Room 工具 fencing 与账本已完成，不能替代内部 Shell/网络副作用的验收。
 2. 带 generation/租约的崩溃恢复与安全自动重入队。中断标记、generation 撤销与显式重入队事件已具备；必须先解决外部命令副作用不受 SQLite 回滚保护的问题，当前仍不盲目重试状态不明的写运行。
-3. 更多 seq 边界的随机故障注入与并发冲突门禁，并把完整故障与 UI 不变量纳入 CI；本地 CI 配置已添加（`.github/workflows/ci.yml`：typecheck、密钥扫描、204 项测试、replay 契约、构建），尚未在远端实际执行。
+3. 更多 seq 边界的随机故障注入与并发冲突门禁，并把完整故障与 UI 不变量纳入 CI；本地 CI 配置已添加（`.github/workflows/ci.yml`：typecheck、密钥扫描、206 项测试、replay 契约、构建），尚未在远端实际执行。
 
 P1 尚未完成：
 
-1. 单一公平仲裁器、房间并发闸门、WFQ/aging、链深与每轮配额。
+1. 单一 Worker 调度器、房间并发闸门与最近服务公平排序/aging 已实现；加权 WFQ、链深上限、每 Agent 每轮配额与公平性压测仍待实现。
 2. quorum/absent/late 与分桶 EWMA 自适应超时已实现（第六/八批）；partial 超时降级、按轮公平性压测与单仲裁公平调度仍待实现。
 3. 每 Agent/房间待处理运行上限已实现（`maxQueuedRunsPerAgent`/`maxQueuedRunsPerRoom`，入队前 429 原子失败）；工具输出上限、每 Agent 增量 inbox 与大规模上下文分段/引用仍待实现。
 4. 时长上限已由 timeout 控制；单次运行 Token/费用硬预算与房间成本看板已实现（未知用量不按 0 计）。入口预算熔断（启动前按历史/房间预算拒绝）仍待实现。

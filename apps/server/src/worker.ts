@@ -13,6 +13,7 @@ import { redactDiagnostic } from './diagnostics.ts';
 import { runContext } from './context.ts';
 import {contextDelta,advanceContext,assertContextCurrent,reconciliationPrompt} from './context-reconciliation.ts';
 import { captureContext } from './context.ts';
+import { fairOrder } from './scheduler.ts';
 import { dependencyInputs } from './dependencies.ts';
 import { codexThreadKey, reconcileAttachedRun } from './codex-attach.ts';
 import { assertRunFence,assertRunIdentity,executionFence } from './execution.ts';
@@ -89,6 +90,7 @@ export class Worker {
   private inputs = new Map<string,{fence:RunFence;receive:(text:string)=>void}>();
   private timer?: NodeJS.Timeout;
   private closed = false;
+  private fairServed = new Map<string,number>();
   readonly streamListeners = new Set<(delta: StreamDelta) => void>();
   constructor(public store: Store, public service: RoomService, public root: string,private options:{adapter?:typeof runAdapter}={}) {
     this.operations=new ToolOperations(store);
@@ -140,7 +142,7 @@ export class Worker {
     });
     const runs = this.store.list<Run>('runs');
     const settings=this.store.settings();
-    for (const run of runs) {
+    for (const run of fairOrder(runs,this.fairServed)) {
       if (this.active.size >= settings.concurrency) break;
       if (run.status !== 'queued' || this.active.has(run.id)) continue;
       const thread = this.threadKey(run);
@@ -159,6 +161,7 @@ export class Worker {
         try{const inputs=dependencyInputs(this.store,task);run.dependencyVersions=inputs.versions;run.inputArtifacts=inputs.artifacts;}catch(error){this.finish(run,'failed',(error as Error).message);continue;}
       }
       const controller = new AbortController(); this.active.set(run.id, controller);
+      this.fairServed.set(run.roomId+'/'+run.agentId,Date.now());
       // Legacy queued work keeps its original authorization: no implicit extra
       // model turns on upgrade, but old-context success is still rejected.
       run.contextPolicy??={...settings.contextPolicy,maxRounds:0};run.lifecycleVersion??=1;
