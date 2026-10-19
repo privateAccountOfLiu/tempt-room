@@ -1334,6 +1334,15 @@
               "minimum": 0.1,
               "maximum": 10
             },
+            "roomToolPolicy": {
+              "default": "allow",
+              "type": "string",
+              "enum": [
+                "allow",
+                "read-only",
+                "deny"
+              ]
+            },
             "enabled": {
               "default": false,
               "type": "boolean"
@@ -1494,6 +1503,7 @@
             "role",
             "color",
             "schedulerWeight",
+            "roomToolPolicy",
             "enabled",
             "executable",
             "endpoint",
