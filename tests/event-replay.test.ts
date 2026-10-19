@@ -191,7 +191,7 @@ test('v2 migration preserves raw history and seals unlogged old rows into a repl
   const oldTask={id:'old_task',roomId:room.id,title:'Unlogged lease',agentId:'legacy-agent',projectPath:'',version:3,status:'running',dependencies:[],leaseUntil:new Date(Date.now()+600000).toISOString(),createdAt:stamp};
   legacy.prepare('INSERT INTO tasks VALUES(?,?,?)').run(oldTask.id,room.id,JSON.stringify(oldTask));legacy.prepare('INSERT INTO agents VALUES(?,?,?)').run('legacy-agent',null,JSON.stringify({id:'legacy-agent',name:'Legacy',provider:'demo',enabled:true}));legacy.exec('PRAGMA user_version=2');legacy.close();
   const store=new Store(path);t.after(()=>{store.close();removeDirectory(root);});
-  assert.equal((store.db.prepare('PRAGMA user_version').get() as any).user_version,8);assert.equal((store.db.prepare('SELECT body FROM events WHERE event_id=?').get('old_fact') as any).body,raw);
+  assert.equal((store.db.prepare('PRAGMA user_version').get() as any).user_version,9);assert.equal((store.db.prepare('SELECT body FROM events WHERE event_id=?').get('old_fact') as any).body,raw);
   const checkpoint=store.events(room.id).at(-1)!;assert.equal(checkpoint.type,'projection.checkpoint');assert.equal(store.projectionStatus(room.id).historyFloor,checkpoint.seq);
   const before=store.projectionBytes(room.id);store.rebuildProjections(room.id);assert.equal(store.projectionBytes(room.id),before);assert.equal(store.get<Task>('tasks',oldTask.id)!.leaseUntil,oldTask.leaseUntil);
   assert.throws(()=>store.snapshotAt(room.id,1),/cursor/);assert.equal(store.snapshotWithTail(room.id,1).reset,true);

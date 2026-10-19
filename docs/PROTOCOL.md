@@ -2,6 +2,8 @@
 
 状态：本地 v0.1 实现。传输复用 HTTP、WebSocket 和受限 IPC，不另造 TCP。版本不匹配时明确拒绝。
 
+讨论支持可选的收敛结束与指定总结人；字段、确认格式、交付物和恢复行为见 [讨论收敛与总结](./discussions.md)。当前数据库写入版本为 v9。
+
 ## 身份与信任
 
 HTTP API 要求 `Room-Protocol-Version: 0.1` 及启动会话 Cookie，或 `Authorization: Bearer <startup-token>`。WebSocket 的协议列表首先为 `room.v0.1`；外部 TypeScript 客户端可再携带 `room-token.<startup-token>`，浏览器界面使用 HttpOnly、SameSite=Strict 的 Cookie，名称绑定本实例的数据目录，避免同一主机不同端口的预览实例覆盖日常登录；重启后凭据仍需重新交换。禁止在查询字符串中放令牌。

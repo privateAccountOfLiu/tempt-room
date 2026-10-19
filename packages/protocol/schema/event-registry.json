@@ -547,6 +547,16 @@
     ]
   },
   {
+    "type": "discussion.summary.updated",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "discussion",
+    "schemaVersion": 1,
+    "kinds": [
+      "discussion.state"
+    ]
+  },
+  {
     "type": "decision.proposed",
     "durability": "durable",
     "aggregate": "room",

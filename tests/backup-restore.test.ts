@@ -34,7 +34,7 @@ test('backup command captures a consistent snapshot and restore command applies 
   assert.equal(restore.status, 0, restore.stderr);
   const restored = new DatabaseSync(join(target, 'room.sqlite'), { readOnly: true });
   try {
-    assert.equal(Number((restored.prepare('PRAGMA user_version').get() as any).user_version), 8);
+    assert.equal(Number((restored.prepare('PRAGMA user_version').get() as any).user_version), 9);
     assert.equal(Number((restored.prepare('SELECT COUNT(*) AS count FROM rooms').get() as any).count), snapshotRooms);
   } finally { restored.close(); }
 });

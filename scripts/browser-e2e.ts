@@ -308,6 +308,35 @@ try {
     await waitFor('关闭讨论详情', async () => !(await bodyText()).includes('发言记录'), 10000);
     step('discussion-history');
 
+    // Actual form -> scheduler -> deterministic convergence -> summary artifact.
+    const convergenceGoal=`浏览器收敛与总结 ${Date.now()}`;
+    if(await clickByText('button','开启讨论')!=='ok')fail('无法打开收敛讨论表单');
+    await waitFor('收敛选项',async()=>(await bodyText()).includes('收敛后自动结束'));
+    const summaryDefault=await evaluate("(()=>{const select=[...document.querySelectorAll('dialog.modal select')].find(x=>x.closest('label')?.textContent?.includes('总结人'));return select?.value;})()");
+    if(summaryDefault!=='')fail('总结人必须缺省为空');
+    if(await setTextareaValue('dialog.modal textarea',convergenceGoal)!=='ok')fail('无法填写收敛目标');
+    if(await setNumberInput('讨论轮次',1)!=='ok'||await setNumberInput('最多响应次数',6)!=='ok')fail('无法填写收敛上限');
+    if(await setSelectByLabel('总结人','demo-reviewer')!=='ok')fail('无法指定总结人');
+    const convergenceToggle=await evaluate("(()=>{const input=[...document.querySelectorAll('dialog.modal input[type=checkbox]')].find(x=>x.closest('label')?.textContent?.includes('收敛后自动结束'));if(!input)return false;input.click();return true;})()");
+    if(!convergenceToggle)fail('找不到收敛复选框');
+    await waitFor('收敛模式禁用轮次',async()=>await evaluate("[...document.querySelectorAll('dialog.modal input[type=number]')].find(x=>x.closest('label')?.textContent?.includes('讨论轮次'))?.disabled")===true);
+    const formShot=await send('Page.captureScreenshot',{format:'png'},sessionId),formShotPath=join(runDir,'discussion-options.png');writeFileSync(formShotPath,Buffer.from(formShot.data,'base64'));report.screenshots.push(formShotPath);
+    step('discussion-options',{screenshot:formShotPath});
+    if(await clickByText('dialog.modal button','开始讨论')!=='ok')fail('无法提交收敛讨论');
+    const converged=await waitFor('收敛及总结交付',async()=>store.list<any>('discussions',roomId).find(d=>d.goal===convergenceGoal&&d.summary?.status==='completed'),30000);
+    if(converged.endReason!=='converged'||converged.round!==2||converged.responses!==4)fail('收敛未越过一轮限制或未达成全体确认');
+    const summaryArtifacts=store.list<any>('artifacts',roomId).filter(a=>a.discussionId===converged.id);
+    if(summaryArtifacts.length!==1||summaryArtifacts[0].runId!==converged.summary.runId)fail('总结交付物未唯一关联总结运行');
+    await waitFor('已收敛历史',async()=>await evaluate(`[...document.querySelectorAll('.discussion-row')].some(x=>x.textContent.includes(${JSON.stringify(convergenceGoal)})&&x.textContent.includes('已收敛'))`));
+    await evaluate(`(()=>{const row=[...document.querySelectorAll('.discussion-row')].find(x=>x.textContent.includes(${JSON.stringify(convergenceGoal)}));row?.click();return !!row;})()`);
+    await waitFor('总结交付物入口',async()=>(await bodyText()).includes('查看总结交付物'));
+    if(await clickByText('dialog.modal button','查看总结交付物')!=='ok')fail('无法打开总结交付物');
+    await waitFor('总结正文预览',async()=>(await bodyText()).includes('确定性演示总结'));
+    await evaluate("document.querySelector('dialog.modal button[aria-label=关闭]')?.click()");
+    await waitFor('关闭总结预览',async()=>await evaluate("document.querySelectorAll('dialog.modal[open]').length")===0);
+    step('convergence-summary-artifact',{discussionId:converged.id,artifactId:summaryArtifacts[0].id,rounds:converged.round});
+
+
 
     const socketCount = await evaluate('window.__roomSockets ? window.__roomSockets.length : 0');
     if (!socketCount) fail('页面没有可观测的 WebSocket 连接');

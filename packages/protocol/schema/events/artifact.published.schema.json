@@ -5,6 +5,12 @@
     "artifact": {
       "type": "object",
       "properties": {
+        "discussionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
         "generation": {
           "type": "integer",
           "exclusiveMinimum": 0,

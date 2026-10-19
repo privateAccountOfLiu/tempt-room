@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { VERSION, capabilitiesFor, executionSettingsSchema,eventSchema,eventMetadata,EventContractError,projectionTableNames,type ProjectionTable,type ExecutionSettings, type Actor, type AgentDescriptor, type Room, type RoomEvent, type RoomSnapshot, type Run, type Task, type Discussion,type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { MemoryProjectionSink,SqlProjectionSink,projectEvent,projectionJson } from './event-projections.ts';
-export const DATABASE_VERSION=8;
+export const DATABASE_VERSION=9;
 
 export const uid = (prefix = 'id') => `${prefix}_${randomUUID().replaceAll('-', '')}`;
 export const now = () => new Date().toISOString();
@@ -82,6 +82,8 @@ export class Store {
     if(version<7)this.atomic(()=>this.db.exec('PRAGMA user_version=7'));
     // Native operation provenance and explicit receipt reconciliation require v8 writers.
     if(version<8)this.atomic(()=>this.db.exec('PRAGMA user_version=8'));
+    // v9 writers understand convergence ballots and the separate summary lifecycle.
+    if(version<9)this.atomic(()=>this.db.exec('PRAGMA user_version=9'));
     this.seed();
     this.atomic(() => {
       for (const run of this.list<Run>('runs')) if (['running', 'waiting_input', 'cancel_requested'].includes(run.status) || (run.status==='queued' && run.codex)) {
@@ -91,8 +93,10 @@ export class Store {
         if(run.taskId){const task=this.get<Task>('tasks',run.taskId);if(task&&task.version===run.taskVersion){task.status=run.status;this.event(run.roomId,'task.updated',SYSTEM,{task});}}
       }
       for(const operation of this.list<ToolOperation>('operations'))if(operation.status==='started'){operation.status='unknown';operation.updatedAt=now();this.event(operation.roomId,'operation.unknown',SYSTEM,{operation});}
-      for(const discussion of this.list<Discussion>('discussions'))if(discussion.status==='active'){
-        discussion.status='stopped';this.event(discussion.roomId,'discussion.stopped',SYSTEM,{discussion,reason:'服务重启，讨论需由用户重新开始'});
+      for(const discussion of this.list<Discussion>('discussions'))if(discussion.status==='active'||discussion.summary?.status==='queued'){
+        if(discussion.status==='active'){discussion.status='stopped';discussion.endReason='restart';discussion.endedAt=now();discussion.endedSeq=this.room(discussion.roomId)!.seq;}
+        if(discussion.summary?.status==='queued')discussion.summary={...discussion.summary,status:'interrupted',error:'服务重启，总结已中断，未自动重试'};
+        this.event(discussion.roomId,'discussion.stopped',SYSTEM,{discussion,reason:'服务重启，讨论需由用户重新开始'});
         for(const run of this.list<Run>('runs',discussion.roomId))if(run.discussionId===discussion.id&&run.status==='queued'){run.status='canceled';run.updatedAt=now();this.event(run.roomId,'run.updated',SYSTEM,{run});}
       }
     });

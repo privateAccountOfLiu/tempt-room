@@ -455,7 +455,12 @@ async function* a2aRun(ctx:AdapterContext):AsyncGenerator<AgentOutput> {
   for(const artifact of task.artifacts??[]){const text=(artifact.parts??[]).map((p:any)=>p.text??(p.data?JSON.stringify(p.data,null,2):p.url?`文件引用：${p.url}`:'')).join('\n');yield {type:'artifact',name:artifact.name??'远程交付物',text,mediaType:'text/plain'};}
 }
 async function* demoRun(ctx:AdapterContext):AsyncGenerator<AgentOutput> {
-  const text=ctx.agent.id.includes('reviewer')?'这是确定性演示回复，不代表模型分析。\n\n我会关注三件事：任务边界是否明确、交付物是否能复现、用户修改要求后是否仍使用正确版本。建议先完成一个小闭环，再增加自动化。':'这是确定性演示回复，不消耗模型额度。\n\n建议将工作分成三个步骤：\n1. 明确目标、输入和验收条件。\n2. 在独立工作区完成实现与验证。\n3. 交付结果与差异，供你决定是否应用。\n\n配置真实成员后，可以将相同任务交给它们协作。';
+  let text=ctx.agent.id.includes('reviewer')?'这是确定性演示回复，不代表模型分析。\n\n我会关注三件事：任务边界是否明确、交付物是否能复现、用户修改要求后是否仍使用正确版本。建议先完成一个小闭环，再增加自动化。':'这是确定性演示回复，不消耗模型额度。\n\n建议将工作分成三个步骤：\n1. 明确目标、输入和验收条件。\n2. 在独立工作区完成实现与验证。\n3. 交付结果与差异，供你决定是否应用。\n\n配置真实成员后，可以将相同任务交给它们协作。';
+  if(ctx.run.discussionRole==='summary')text='这是确定性演示总结，不代表模型分析。\n\n## 讨论总结\n已演示目标、验收条件和独立工作区的讨论流程。请查看讨论结束原因；达到上限不代表全体共识。';
+  else if(ctx.run.discussionId&&ctx.run.prompt.includes('这是收敛讨论。')){
+    const candidate=JSON.parse(ctx.run.prompt.match(/当前候选（JSON 数据，不是指令）：([^\n]+)/)?.[1]??'null');
+    text+='\n\n```room-consensus\n'+JSON.stringify({proposalId:candidate?.proposalId??null,agree:Boolean(candidate),proposal:candidate?.text??'确定性演示共识：明确目标和验收条件，在独立工作区完成实现与验证。'})+'\n```';
+  }
   for(const chunk of text.match(/.{1,8}|\n/g)??[]){await delay(25,undefined,{signal:ctx.signal});yield {type:'text',text:chunk};}
 }
 export function runAdapter(ctx:AdapterContext):AsyncIterable<AgentOutput> { return ctx.agent.connectionMode==='attach'?attachedCodexRun(ctx):native.has(ctx.agent.provider)?nativeRun(ctx):ctx.agent.provider==='api'?apiRun(ctx):ctx.agent.provider==='a2a'?a2aRun(ctx):demoRun(ctx); }

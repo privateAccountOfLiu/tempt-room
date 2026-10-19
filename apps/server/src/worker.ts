@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync } from 'no
 import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
-import { defaultSandbox, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type Artifact, type Discussion, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
+import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type Artifact, type Discussion, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { diagnose, ExecutionUnknown, RemoteCanceled, runAdapter } from './adapters.ts';
 import { SandboxHost } from './sandbox.ts';
 import { digest, now, Store, SYSTEM, uid } from './store.ts';
@@ -315,7 +315,12 @@ export class Worker {
       this.store.atomic(()=>{
       assertContextCurrent(this.store,run);
       if(run.contextPending)this.store.event(run.roomId,'run.context.confirmed',SYSTEM,{runId:run.id,generation:run.generation,executionId:run.executionId,throughSeq:run.contextSeq},null,run.id);
-      for(const artifact of candidate.artifacts)this.publishArtifact(run,artifact.name,artifact.text,artifact.mediaType);
+      if(run.discussionRole==='summary'){
+        const report=text.trim()||candidate.artifacts.find(a=>a.text.trim())?.text;
+        if(!report)throw new Error('总结人没有返回报告正文，未生成交付物');
+        this.publishDiscussionSummary(run,report);
+        if(!text.trim())this.publishFinalMessage(run,report,messageId);
+      }else if(!run.discussionId)for(const artifact of candidate.artifacts)this.publishArtifact(run,artifact.name,artifact.text,artifact.mediaType);
       if (text.trim()) this.publishFinalMessage(run, text, messageId);
       if (!attached && task?.projectPath) {
         if (hostMode) {
@@ -371,15 +376,25 @@ export class Worker {
     const current=assertRunIdentity(this.store,run);
     assertContextCurrent(this.store,current);
     if(current.stopReason==='superseded')throw new ProtocolError('superseded','旧运行已被新目标替代',409);
+    if(run.discussionId&&run.discussionRole!=='summary'&&this.store.get<Discussion>('discussions',run.discussionId)?.stopOnConvergence){
+      const reply=parseDiscussionReply(text);text=reply.text;
+      if(reply.ballot){current.discussionBallot=reply.ballot;this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);}
+    }
     const alreadyPosted = this.store.list<Message>('messages', run.roomId).find(message =>
       message.runId === run.id && message.actor.kind === 'agent' && message.actor.id === run.agentId && message.text.trim() === text.trim());
     if(!alreadyPosted)this.publishMessage(run,text,id,true);
     else if(current.finalMessageId!==alreadyPosted.id)this.store.event(run.roomId,'run.finalized',SYSTEM,{runId:run.id,messageId:alreadyPosted.id,generation:run.generation??1,executionId:run.executionId,supersedes:current.partial?.id},null,run.id);
   }
+  private publishDiscussionSummary(run:Run,report:string){
+    const discussion=this.store.get<Discussion>('discussions',run.discussionId!);
+    if(!discussion||discussion.summary?.runId!==run.id||!['queued','interrupted'].includes(discussion.summary.status))throw new ProtocolError('summary_superseded','此总结运行已结束或被替代，未发布旧交付物',409);
+    return this.publishArtifact(run,`${discussion.goal.slice(0,80)} · 讨论总结`,report,'text/markdown');
+  }
   publishArtifact(run: Run, name: string, text: string, mediaType = 'text/plain', kind: Artifact['kind'] = 'report'): Artifact {
     assertRunIdentity(this.store,run);assertContextCurrent(this.store,run);
-    if (text.length > 2 ** 20) throw new Error('交付物超过 1 MiB 文本上限');
-    const artifact: Artifact = { id: uid('artifact'), roomId: run.roomId, runId: run.id,generation:run.generation,executionId:run.executionId, taskId: run.taskId, name: name.slice(0,160), kind, mediaType, size: Buffer.byteLength(text), createdAt: now() };
+    if(run.discussionId&&run.discussionRole!=='summary')throw new ProtocolError('discussion_artifact_disabled','讨论发言不发布交付物；请在新建讨论时指定总结人',409);
+    if (Buffer.byteLength(text) > 2 ** 20) throw new Error('交付物超过 1 MiB 文本上限');
+    const artifact: Artifact = { id: uid('artifact'), roomId: run.roomId, runId: run.id,generation:run.generation,executionId:run.executionId, taskId: run.taskId, ...(run.discussionId?{discussionId:run.discussionId}:{}), name: name.slice(0,160), kind, mediaType, size: Buffer.byteLength(text), createdAt: now() };
     mkdirSync(join(this.root, 'artifacts'), { recursive: true }); writeFileSync(join(this.root, 'artifacts', artifact.id), text);
     this.store.atomic(() => {  this.store.event(run.roomId, 'artifact.created', { id: run.agentId, kind: 'agent' }, { artifact }, null, run.id); }); return artifact;
   }
@@ -388,6 +403,7 @@ export class Worker {
       assertRunIdentity(this.store,run,true);
       const current = this.store.get<Run>('runs', run.id); if (!current || (terminalStates.has(current.status)&&!(reconciliation&&['unknown','interrupted'].includes(current.status)))) return;
       if(status==='completed')assertContextCurrent(this.store,current);
+      if(status==='completed'&&run.discussionRole==='summary'&&!this.store.list<Artifact>('artifacts',run.roomId).some(a=>a.runId===run.id&&a.discussionId===run.discussionId)){status='failed';error='总结运行未生成交付物';}
       if(current.stopReason==='superseded'&&['completed','failed','canceled','superseded'].includes(status))status='superseded';
       Object.assign(run,current);delete run.leaseUntil;
       Object.assign(run, { sandbox:current.sandbox,status, error: error?.slice(0,2000), updatedAt: now() });  this.store.event(run.roomId, reconciliation?'run.reconciled':'run.updated', SYSTEM, { run }, null, run.id);
@@ -473,8 +489,13 @@ export class Worker {
         if(found.turn.itemsView&&found.turn.itemsView!=='full')throw new ExecutionUnknown('后端未提供完整轮次，不能确认交付');
         this.nativeOperations.reconcileCodex(run,found.turn);
         const text=(found.turn.items??[]).filter((item:any)=>item.type==='agentMessage'&&typeof item.text==='string').map((item:any)=>item.text).join('\n\n');
-        if(text.trim()&&run.stopReason!=='superseded')this.publishFinalMessage(run,text,uid('msg'));
+        this.store.atomic(()=>{
+        if(text.trim()&&run.stopReason!=='superseded'){
+          if(run.discussionRole==='summary'&&found.turn.status==='completed')this.publishDiscussionSummary(run,text);
+          this.publishFinalMessage(run,text,uid('msg'));
+        }
         this.finish(run,found.turn.status==='completed'?'completed':found.turn.status==='interrupted'?'canceled':'failed',undefined,true);
+        });
       }
       return {location:found.kind,phase:state.phase,run:this.store.get<Run>('runs',run.id)};
     } finally {this.active.delete(run.id);}
@@ -526,6 +547,7 @@ export class Worker {
         const input=z.object({taskId:z.string()}).strict().parse(args);
         action=()=>this.service.execute({version:VERSION,commandId,roomId:run.roomId,type:'task.claim',payload:{...input,managed:true}},actor,scope);
       }else if(name==='artifact_publish'){
+        if(run.discussionId)throw new ProtocolError('discussion_artifact_managed','讨论交付物由服务端在总结人最终回复后统一生成；请直接返回正文',409);
         const input=z.object({name:z.string().min(1).max(160),text:z.string().max(2**20)}).strict().parse(args);
         action=()=>this.publishArtifact(run,input.name,input.text);
       }else throw new ProtocolError('unsupported_tool','不支持的群聊工具');

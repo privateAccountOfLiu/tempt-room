@@ -296,6 +296,42 @@
       "maxLength": 128,
       "pattern": "^[a-zA-Z0-9_-]+$"
     },
+    "discussionRole": {
+      "type": "string",
+      "const": "summary"
+    },
+    "discussionBallot": {
+      "type": "object",
+      "properties": {
+        "proposalId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "agree": {
+          "type": "boolean"
+        },
+        "proposal": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 12000
+        }
+      },
+      "required": [
+        "proposalId",
+        "agree",
+        "proposal"
+      ],
+      "additionalProperties": false
+    },
     "round": {
       "type": "integer",
       "exclusiveMinimum": 0,
