@@ -188,6 +188,13 @@ try {
     await evaluate("(()=>{const button=[...document.querySelectorAll('dialog.modal button')].find(item=>(item.textContent??'').trim()==='知道了');if(button)button.click();return !!button;})()");
     await waitFor('关闭快捷键帮助', async () => !(await bodyText()).includes('打开本帮助'), 10000);
     step('shortcut-help');
+    const searchSet = await evaluate("(()=>{const input=document.querySelector('.room-search');if(!input)return false;const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(input,'NoSuchRoomQuery');input.dispatchEvent(new Event('input',{bubbles:true}));return true;})()");
+    if (!searchSet) fail('找不到房间搜索框');
+    await waitFor('房间搜索过滤', async () => { const count = await evaluate("document.querySelectorAll('.room-list .room-link').length"); return count === 0 && (await bodyText()).includes('没有匹配的房间'); }, 10000);
+    await evaluate("(()=>{const input=document.querySelector('.room-search');if(!input)return false;const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(input,'');input.dispatchEvent(new Event('input',{bubbles:true}));return true;})()");
+    await waitFor('房间搜索清空', async () => { const count = await evaluate("document.querySelectorAll('.room-list .room-link').length"); return count > 0; }, 10000);
+    step('room-search');
+
 
 
     const titleBefore = await waitFor('房间标题', async () => { const title = String(await evaluate("document.querySelector('.room-title h1')?.textContent?.trim() ?? ''")); return title && title !== '正在打开房间' ? title : undefined; }, 15000);

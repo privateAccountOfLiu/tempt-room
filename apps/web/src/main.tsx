@@ -43,6 +43,7 @@ function App(){
  const [runDetailId,setRunDetailId]=useState<string>();
  const [discussionDetailId,setDiscussionDetailId]=useState<string>();
  const [helpOpen,setHelpOpen]=useState(false);
+ const [roomQuery,setRoomQuery]=useState('');
  const [streaming,setStreaming]=useState<Record<string,DraftStream>>({}),[sandbox,setSandbox]=useState<Diagnostic>(),[probing,setProbing]=useState(false);
  const messagesEnd=useRef<HTMLDivElement>(null),fileInput=useRef<HTMLInputElement>(null),textarea=useRef<HTMLTextAreaElement>(null),generation=useRef(0),pendingSend=useRef<{body:string;id:string}|undefined>(undefined);
  const notify=useCallback((message:string)=>{setNotice(message);},[]);
@@ -65,6 +66,7 @@ function App(){
  const activeRuns=runs.filter(r=>!terminalStates.has(r.status)),discussion=snapshot?.discussions.find(d=>d.status==='active');
   const runDetail=runs.find(item=>item.id===runDetailId);
   const discussions=snapshot?.discussions??[],discussionDetail=discussions.find(item=>item.id===discussionDetailId);
+  const visibleRooms=rooms.filter(room=>room.name.toLowerCase().includes(roomQuery.trim().toLowerCase()));
   useEffect(()=>{if(!roomId)return;const url=new URL(location.href);url.searchParams.set('room',roomId);history.replaceState(null,'',url.toString());},[roomId]);
   useEffect(()=>{const prefix=activeRuns.length?'('+activeRuns.length+') ':'';document.title=snapshot?.room.name?(prefix+snapshot.room.name+' · Tempt Room'):'Tempt Room';},[snapshot?.room.name,activeRuns.length]);
  useEffect(()=>{const handler=(event:KeyboardEvent)=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();textarea.current?.focus();}if(event.key==='Escape')setShowMentions(false);if((event.ctrlKey||event.metaKey)&&event.key==='/'){event.preventDefault();setHelpOpen(true);}const target=event.target as HTMLElement|undefined;if(event.key==='?'&&!(target&&['INPUT','TEXTAREA','SELECT'].includes(target.tagName)))setHelpOpen(true);};window.addEventListener('keydown',handler);return()=>window.removeEventListener('keydown',handler);},[]);
@@ -86,8 +88,8 @@ function App(){
   <aside className="sidebar">
    <a className="brand" href="/" aria-label="Tempt Room"><span className="brand-mark">T</span><span>tempt<span className="brand-light">room</span><small>一起想清楚，一起完成。</small></span></a>
    <div className="workspace-label"><Icon name="grid" size={16}/><span>本地工作空间</span><span className="local-tag">LOCAL</span></div>
-   <div className="section-heading"><span>房间</span><button className="icon-button" aria-label="创建房间" onClick={()=>setDialog('room')}><Icon name="plus" size={16}/></button></div>
-   <nav className="room-list" aria-label="房间">{rooms.map(room=><button key={room.id} className={`room-link ${room.id===roomId?'selected':''}`} onClick={()=>setRoomId(room.id)}><Icon name="chat" size={17}/><span>{room.name}</span>{room.id===roomId&&<span className="room-indicator"/>}</button>)}</nav>
+   <div className="section-heading"><span>房间</span><button className="icon-button" aria-label="创建房间" onClick={()=>setDialog('room')}><Icon name="plus" size={16}/></button></div><input className="room-search" value={roomQuery} onChange={event=>setRoomQuery(event.target.value)} placeholder="搜索房间…" aria-label="搜索房间"/>
+   <nav className="room-list" aria-label="房间">{visibleRooms.map(room=><button key={room.id} className={`room-link ${room.id===roomId?'selected':''}`} onClick={()=>setRoomId(room.id)}><Icon name="chat" size={17}/><span>{room.name}</span>{room.id===roomId&&<span className="room-indicator"/>}</button>)}{!visibleRooms.length&&<p className="room-search-empty">没有匹配的房间</p>}</nav>
    <button className="new-room" onClick={()=>setDialog('room')}><Icon name="plus" size={15}/> 新建一个房间</button>
    <div className="sidebar-divider"/>
    <div className="section-heading"><span>连接与运行</span></div>

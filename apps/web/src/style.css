@@ -98,3 +98,8 @@
 .shortcut-list>div{display:flex;align-items:center;gap:8px;font-size:11px;color:#c1d0b5}
 .shortcut-list kbd{font-family:'IBM Plex Mono',Consolas,monospace;font-size:9px;border:1px solid #3d4a35;border-radius:4px;padding:3px 6px;background:#1a2117;color:#d5e4c9;box-shadow:0 1px 0 #0e120c}
 .shortcut-list span{color:#93a487}
+/* Sidebar room search. */
+.room-search{width:100%;margin:0 0 7px;background:#101510;border:1px solid #2b3428;border-radius:5px;padding:6px 8px;color:#c2d0b8;font-size:10px}
+.room-search::placeholder{color:#5d6c54}
+.room-search:focus{border-color:#52683f;outline:none}
+.room-search-empty{font-size:9px;color:#6e7c64;padding:6px 8px}
