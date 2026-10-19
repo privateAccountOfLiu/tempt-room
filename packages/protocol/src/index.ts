@@ -76,7 +76,7 @@ export const payloadSchemas={
   'room.update':z.object({name:z.string().trim().min(1).max(80),description:z.string().max(300).default('')}).strict(),
   'room.members.set':z.object({members:z.array(idSchema).max(30)}).strict(),
   'message.send':z.object({text:z.string().trim().min(1).max(32000),mentions:z.array(idSchema).max(20).default([]),replyTo:idSchema.optional(),attachments:z.array(idSchema).max(10).default([])}).strict(),
-  'discussion.start':z.object({goal:title,participants:z.array(idSchema).min(1).max(20),rounds:z.number().int().min(1).max(20).default(3),maxResponses:z.number().int().min(1).max(100).default(9),maxDurationMs:z.number().int().min(1000).max(7200000).default(600000),stopOnConvergence:z.boolean().optional(),summarizerId:idSchema.optional(),quorum:z.number().int().min(1).max(20).optional()}).strict(),
+  'discussion.start':z.object({goal:title,participants:z.array(idSchema).min(1).max(20),rounds:z.number().int().min(1).max(20).default(3),maxResponses:z.number().int().min(1).max(100).default(9),maxDurationMs:z.number().int().min(1000).max(7200000).default(600000),activationLimit:z.number().int().min(1).max(1000).optional(),stopOnConvergence:z.boolean().optional(),summarizerId:idSchema.optional(),quorum:z.number().int().min(1).max(20).optional()}).strict(),
   'discussion.stop':z.object({discussionId:idSchema}).strict(),
   'discussion.pause':z.object({discussionId:idSchema}).strict(),
   'discussion.resume':z.object({discussionId:idSchema}).strict(),

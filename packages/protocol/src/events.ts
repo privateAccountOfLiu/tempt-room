@@ -53,7 +53,7 @@ for(const [type,status] of Object.entries({'operation.started':'started','operat
 register(['operation.reconciled'],'operation.reconciled','run','operation',body({operation:toolOperationSchema.extend({status:z.literal('completed')}),proof:nativeReconciliationSchema}));
 register(['artifact.created','artifact.published'],'artifact.published','artifact','artifact',body({artifact:artifactSchema.passthrough()}));
 register(['artifact.applied'],'artifact.applied','artifact','artifact',body({artifact:artifactSchema.extend({applied:z.literal(true)}).passthrough()}));
-register(['discussion.started','discussion.round','discussion.scheduled','discussion.completed','discussion.stopped','discussion.summary.updated'],'discussion.state','room','discussion',body({discussion}));
+register(['discussion.started','discussion.paused','discussion.resumed','discussion.round','discussion.scheduled','discussion.completed','discussion.stopped','discussion.summary.updated'],'discussion.state','room','discussion',body({discussion}));
 register(['decision.proposed','decision.accepted'],'decision.state','room','decision',body({decision}));
 register(['settings.updated'],'settings.updated','room','settings',body({settings:executionSettingsSchema}));
 register(['sandbox.verified'],'run.sandbox','run','sandbox',body({runId:id,sandbox:sandboxProfileSchema.extend({verifiedAt:z.string().datetime()})}));

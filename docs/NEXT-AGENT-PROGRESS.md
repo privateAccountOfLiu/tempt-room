@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 011ac59b65c0872806e6d4fddb91c1dc07465d5c (dirty)
+source HEAD: 5d56d298fa6d75409609d15ba366e264a6ebd4b9 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-19T15-57-40-945Z-5adc4514/report.json
+report: .state/collaboration-baseline/run-2026-10-19T16-06-27-742Z-937dce15/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -54,6 +54,16 @@ report: .state/collaboration-baseline/run-2026-10-19T15-57-40-945Z-5adc4514/repo
 - host 任务仍使用真实项目目录（D01a 尚未接入），报告只做内容变化清单，不改写用户工作树
 - 新增 `tests/host-workspace-isolation.test.ts` 3 项；`npm test` **295/295**
 
+### B03 — 讨论生命周期主体（pause/resume/激活额度）
+
+- discussion.start 在同一事务创建参与成员 AgentSession、首轮 Run（带唯一 responseSlotId）并冻结 activationLimit/activationsUsed
+- 新增 discussion.paused / discussion.resumed 事件；pause 只允许 active→paused，resume 只允许 paused→active；AgentSession 同步 paused/active
+- pause 持久化：重启后仍为 paused，Worker 不派发非 summary 的讨论 Run；恢复后允许原 queued Run 继续
+- settleDiscussion 在 paused 时不推进轮次/不取消未完成者；summary Run 仍可结算
+- 讨论 Run 禁止普通 run.retry；summary retry 保持可见（既有测试）
+- 激活额度：scheduleRound 在 enqueue 前检查 activationLimit；超额以 activation_limit 停止，不静默继续；responses 与 activationsUsed 同时计数
+- 新增 tests/discussion-lifecycle.test.ts 3 项：AgentSession/responseSlot、pause 持久化与 Worker 不派发、激活额度
+- 尚未完成：sessionKey 加入 agentSessionId、额外对账轮次计费、总结独立授权额度与 UI（留给后续 B03 余项/B09）
 ### B02 — 可重放投影与 v10 迁移
 
 - 数据库版本 v9→v10；新增投影表：agent_sessions、subscriptions、inbox_deliveries、input_batches、wake_intents、capability_evidence、discussion_rounds
@@ -114,20 +124,20 @@ report: .state/collaboration-baseline/run-2026-10-19T15-57-40-945Z-5adc4514/repo
 
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
-- `npm test`：305/305
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-8fYmvH/report.json`，256.3s）
+- `npm test`：308/308
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-3Ta0id/report.json`，278.4s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-NaqQqK/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-Ewsw1U/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-19T15-57-40-945Z-5adc4514/report.json`
-- `.state/collaboration-baseline/run-2026-10-19T15-57-40-945Z-5adc4514/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-19T15-57-40-945Z-5adc4514/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-19T15-57-40-945Z-5adc4514/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T16-06-27-742Z-937dce15/report.json`
+- `.state/collaboration-baseline/run-2026-10-19T16-06-27-742Z-937dce15/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T16-06-27-742Z-937dce15/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T16-06-27-742Z-937dce15/replay.stdout.txt`
 
 ## 未完成 / 下一波
 

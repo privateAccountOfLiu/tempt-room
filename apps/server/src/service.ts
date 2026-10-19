@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {discussionPrompt,assessConvergence,discussionSummaryPrompt} from './discussions.ts';
-import { agentSchema,contextSeqOf, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type Task, type Decision } from '../../../packages/protocol/src/index.ts';
+import { agentSchema,contextSeqOf, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type Task, type Decision, type AgentSession } from '../../../packages/protocol/src/index.ts';
 import { digest, now, OWNER, Store, SYSTEM, uid } from './store.ts';
 import {assertContextCurrent} from './context-reconciliation.ts';
 import { assertRunFence } from './execution.ts';
@@ -95,14 +95,18 @@ export class RoomService {
         const roomId = this.requireRoom(command);
         const input = payloadSchemas['discussion.start'].parse(p);
         input.participants = [...new Set(input.participants)]; input.participants.forEach(id => {if(this.checkAgent(roomId,id).connectionMode==='external')throw new ProtocolError('external_discussion_unavailable','外部会话需自行在线回应；当前自动轮次仅支持托管成员',409);});
-        if (this.store.list<Discussion>('discussions', roomId).some(d => d.status === 'active'||d.summary?.status==='queued')) throw new ProtocolError('discussion_active', '请先停止当前讨论', 409);
+        if (this.store.list<Discussion>('discussions', roomId).some(d => d.status === 'active'||d.status === 'paused'||d.summary?.status==='queued')) throw new ProtocolError('discussion_active', '请先停止当前讨论', 409);
         if (input.quorum !== undefined && input.quorum > input.participants.length) throw new ProtocolError('quorum_invalid', 'quorum 不能超过参与成员数', 400);
         if(input.summarizerId&&this.checkAgent(roomId,input.summarizerId).connectionMode==='external')throw new ProtocolError('external_summary_unavailable','总结人必须是可调度的托管成员',409);
         const quorum = input.quorum ?? input.participants.length;
         if (input.maxResponses < quorum) throw new ProtocolError('quorum_unreachable', '最多响应次数小于 quorum，讨论无法推进', 400);
-        const {maxDurationMs,...fields}=input;delete (fields as {quorum?:number}).quorum;
-        const discussion: Discussion = { id: uid('disc'), roomId, ...fields, participants: input.participants, quorum, round: 1, responses: 0, deadline: new Date(Date.now() + maxDurationMs).toISOString(), status: 'active' };
-         const event = this.store.event(roomId, 'discussion.started', actor, { discussion });
+        const {maxDurationMs,activationLimit,...fields}=input;delete (fields as {quorum?:number}).quorum;
+        const discussion: Discussion = { id: uid('disc'), roomId, ...fields, participants: input.participants, quorum, round: 1, responses: 0, activationsUsed: 0, ...(activationLimit !== undefined ? {activationLimit} : {}), deadline: new Date(Date.now() + maxDurationMs).toISOString(), status: 'active' };
+        for (const agentId of discussion.participants) {
+          const agentSession = this.createAgentSession(roomId, agentId, discussion.id, actor);
+          this.store.event(roomId, 'agent_session.created', actor, {agentSession});
+        }
+        const event = this.store.event(roomId, 'discussion.started', actor, { discussion });
         discussion.startedSeq=event.seq;this.scheduleRound(discussion, event.seq); return { discussionId: discussion.id };
       }
       case 'discussion.stop': {
@@ -110,8 +114,26 @@ export class RoomService {
         if (!discussion || discussion.roomId !== roomId) throw new ProtocolError('not_found', '讨论不存在', 404);
         this.stopDiscussion(discussion, '用户停止'); return {};
       }
-      case 'discussion.pause': case 'discussion.resume': case 'subscription.set': case 'input.ack':
-        throw new ProtocolError('not_implemented', '该协作命令的协议已冻结，服务端实现将随 B03/B04 接入', 501);
+      case 'discussion.pause': {
+        const roomId = this.requireRoom(command), id = z.string().parse(p.discussionId), discussion = this.store.get<Discussion>('discussions', id);
+        if (!discussion || discussion.roomId !== roomId) throw new ProtocolError('not_found', '讨论不存在', 404);
+        if (discussion.status !== 'active') throw new ProtocolError('invalid_state', '只有进行中的讨论可以暂停', 409);
+        discussion.status = 'paused';
+        this.store.event(roomId, 'discussion.paused', actor, {discussion});
+        this.transitionDiscussionSessions(discussion, 'paused', actor);
+        return {discussionId: discussion.id, status: discussion.status};
+      }
+      case 'discussion.resume': {
+        const roomId = this.requireRoom(command), id = z.string().parse(p.discussionId), discussion = this.store.get<Discussion>('discussions', id);
+        if (!discussion || discussion.roomId !== roomId) throw new ProtocolError('not_found', '讨论不存在', 404);
+        if (discussion.status !== 'paused') throw new ProtocolError('invalid_state', '只有已暂停的讨论可以恢复', 409);
+        discussion.status = 'active';
+        this.store.event(roomId, 'discussion.resumed', actor, {discussion});
+        this.transitionDiscussionSessions(discussion, 'active', actor);
+        return {discussionId: discussion.id, status: discussion.status};
+      }
+      case 'subscription.set': case 'input.ack':
+        throw new ProtocolError('not_implemented', '该协作命令的协议已冻结，服务端实现将随 B04 接入', 501);
       case 'task.create': {
         const roomId = this.requireRoom(command);
         const input = z.object({ title: z.string().trim().min(1).max(5000), agentId: z.string().optional(), projectPath: z.string().max(1500).default(''), dependencies: z.array(z.string()).max(20).default([]), open: z.boolean().default(false) }).parse(p);
@@ -227,6 +249,7 @@ export class RoomService {
       case 'run.retry': {
         const roomId = this.requireRoom(command), input = payloadSchemas['run.retry'].parse(p), previous = this.store.get<Run>('runs', input.runId);
         if (!previous || previous.roomId !== roomId) throw new ProtocolError('not_found', '运行不存在', 404);
+        if (previous.discussionId && previous.discussionRole !== 'summary') throw new ProtocolError('discussion_retry_unavailable', '讨论响应不能使用普通 run.retry；请恢复或重新开始讨论', 409);
         if (!['failed', 'canceled', 'interrupted', 'unknown'].includes(previous.status)) throw new ProtocolError('run_not_retryable', '只有失败、取消、中断或状态待核实的运行可以重试', 409);
         const agent = this.checkAgent(roomId, previous.agentId);
         if (agent.connectionMode === 'external') throw new ProtocolError('external_agent', '外部会话的运行不能由服务端重试，请在原会话中处理', 409);
@@ -324,12 +347,25 @@ export class RoomService {
      this.store.event(roomId, 'run.created', SYSTEM, { run }, causationId ?? null, run.id); return run;
   }
   private saveContext(roomId:string,throughSeq:number){const id=uid('context');this.store.put('contexts',{id,roomId,...captureContext(this.store,roomId,throughSeq)});return id;}
+  private createAgentSession(roomId:string,agentId:string,discussionId:string,actor:Actor):AgentSession{
+    return {id:uid('as'),roomId,agentId,discussionId,status:'active',createdAt:now(),updatedAt:now()};
+  }
+  private transitionDiscussionSessions(discussion:Discussion,status:'active'|'paused'|'ended',actor:Actor){
+    const type=status==='active'?'agent_session.resumed':status==='paused'?'agent_session.paused':'agent_session.ended';
+    for(const candidate of this.store.list<AgentSession>('agent_sessions',discussion.roomId).filter(session=>session.discussionId===discussion.id)){
+      const agentSession:AgentSession={...candidate,status,updatedAt:now()};
+      this.store.event(discussion.roomId,type,actor,{agentSession});
+    }
+  }
   private scheduleRound(discussion: Discussion, basedOnSeq: number) {
+    if(discussion.status!=='active'&&discussion.status!=='paused')return;
     const contextId=this.saveContext(discussion.roomId,basedOnSeq);
+    const limit=discussion.activationLimit??discussion.maxResponses;
     for (const agentId of discussion.participants) {
       if (discussion.responses >= discussion.maxResponses) break;
-      this.enqueue(discussion.roomId, agentId, discussionPrompt(discussion), basedOnSeq, { discussionId: discussion.id, round: discussion.round,contextId });
-      discussion.responses++;
+      if ((discussion.activationsUsed??0) >= limit) { this.endDiscussion(discussion,'activation_limit','stopped',`讨论激活额度已达上限（${limit}）`); break; }
+      this.enqueue(discussion.roomId, agentId, discussionPrompt(discussion), basedOnSeq, { discussionId: discussion.id, round: discussion.round,contextId,responseSlotId:`${discussion.id}_r${discussion.round}_${agentId}` });
+      discussion.responses++; discussion.activationsUsed=(discussion.activationsUsed??0)+1;
     }
     this.store.event(discussion.roomId,'discussion.scheduled',SYSTEM,{discussion});
   }
@@ -367,11 +403,12 @@ export class RoomService {
     });
   }
   private endDiscussion(discussion:Discussion,reason:NonNullable<Discussion['endReason']>,status:'completed'|'stopped',detail?:string){
-    if(discussion.status!=='active')return;
+    if(discussion.status!=='active'&&discussion.status!=='paused')return;
     discussion.status=status;discussion.endReason=reason;discussion.endedAt=now();
     for(const run of this.store.list<Run>('runs',discussion.roomId).filter(r=>r.discussionId===discussion.id&&r.discussionRole!=='summary'&&!terminalStates.has(r.status)))this.cancel(run,status==='completed'?'superseded':'user_cancel');
     discussion.endedSeq=this.store.room(discussion.roomId)!.seq;
     this.store.event(discussion.roomId,status==='completed'?'discussion.completed':'discussion.stopped',SYSTEM,{discussion,...(detail?{reason:detail}:{})});
+    this.transitionDiscussionSessions(discussion,'ended',SYSTEM);
     if(discussion.summarizerId){
       try{
         const prompt=discussionSummaryPrompt(this.store,discussion);
@@ -383,7 +420,7 @@ export class RoomService {
   }
   stopDiscussion(discussion: Discussion, reason: string) {
     this.store.atomic(()=>{
-      if(discussion.status==='active'){
+      if(discussion.status==='active'||discussion.status==='paused'){
         this.endDiscussion(discussion,reason==='讨论时间上限'?'time_limit':'user_stop','stopped',reason);
       }else if(discussion.summary?.status==='queued'&&discussion.summary.runId){
         const run=this.store.get<Run>('runs',discussion.summary.runId);if(run)this.cancel(run);

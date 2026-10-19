@@ -507,6 +507,26 @@
     ]
   },
   {
+    "type": "discussion.paused",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "discussion",
+    "schemaVersion": 1,
+    "kinds": [
+      "discussion.state"
+    ]
+  },
+  {
+    "type": "discussion.resumed",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "discussion",
+    "schemaVersion": 1,
+    "kinds": [
+      "discussion.state"
+    ]
+  },
+  {
     "type": "discussion.round",
     "durability": "durable",
     "aggregate": "room",

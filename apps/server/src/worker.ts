@@ -125,6 +125,7 @@ export class Worker {
     const runs=this.store.list<Run>('runs'),candidates:Run[]=[];
     for(const run of runs){
       if(run.status!=='queued'||this.active.has(run.id))continue;
+      if(run.discussionId&&run.discussionRole!=='summary'){const discussion=this.store.get<Discussion>('discussions',run.discussionId);if(!discussion||discussion.status!=='active')continue;}
       const thread=this.threadKey(run);
       if(thread&&runs.some(other=>other.id!==run.id&&this.threadKey(other)===thread&&(this.active.has(other.id)||(other.codex&&!['completed','canceled'].includes(other.codex.phase)&&['unknown','interrupted'].includes(other.status)))))continue;
       if([...this.active.keys()].some(id=>{const active=this.store.get<Run>('runs',id);return active?.agentId===run.agentId&&active.roomId===run.roomId;}))continue;
