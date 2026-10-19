@@ -127,6 +127,7 @@ T03 已完成重启后的真实复测：当前 Codex 会话以外部成员接入
 - 新增可配置工具结果上限：`maxToolResultBytes`（默认 2 MiB），超限写入操作标记 unknown 并返回错误，不静默截断；`tests/tool-output-limit.test.ts` 1 项，测试总数 221/221。
 - 新增受限沙箱聊天自动重试：默认关闭，仅对无任务/无讨论、无工具操作与 artifact、timeout/network/provider 失败的 sandbox chat 运行重试，最多 3 次；`tests/auto-retry.test.ts` 1 项，测试总数 220/220。
 - 新增单成员每分钟运行上限：`maxAgentRunsPerMinute`（默认 30）入队前限流，超限 429 原子失败；`tests/rate-limit.test.ts` 1 项，测试总数 220/220。
+- 用量面板新增「失败分类」聚合，按失败标签统计失败/中断/待核实运行数量；浏览器 E2E `usage-tab` 增加断言。
 - 新增消息密度切换：舒适/紧凑布局可在房间头部切换并持久化到 localStorage；浏览器 E2E `density-toggle`，全量 45/45。
 - 新增移动端协作面板：窄屏隐藏右侧详情栏后，可从房间头部打开包含成员、任务、交付物、讨论与用量的面板；浏览器 E2E `mobile-collaboration-panel`，全量 44/44。
 - 新增侧边栏房间搜索：按名称即时过滤并在无匹配时显示空态；浏览器 E2E `room-search`，全量 43/43。

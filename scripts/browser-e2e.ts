@@ -348,7 +348,7 @@ try {
     step('ui-task-revise', {revisedTitle});
     const usageClicked = await evaluate("(()=>{const button=[...document.querySelectorAll('.detail-tabs button')].find(item=>item.textContent&&item.textContent.includes('用量'));if(!button)return false;button.click();return true;})()");
     if (!usageClicked) fail('找不到用量标签');
-    await waitFor('用量面板', async () => { const text = await bodyText(); return text.includes('输入 Token') && text.includes('已记录运行'); }, 10000);
+    await waitFor('用量面板', async () => { const text = await bodyText(); return text.includes('输入 Token') && text.includes('已记录运行') && text.includes('失败分类'); }, 10000);
     step('usage-tab');
     await evaluate("(()=>{const details=document.querySelector('.usage-history');if(details)details.open=true;return !!details;})()");
     const detailClicked = await evaluate("(()=>{const button=[...document.querySelectorAll('.usage-history button')].find(item=>(item.textContent??'').includes('详情'));if(!button)return false;button.click();return true;})()");
