@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {discussionPrompt,assessConvergence,discussionSummaryPrompt} from './discussions.ts';
-import { agentSchema,contextSeqOf, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type Task, type Decision, type AgentSession } from '../../../packages/protocol/src/index.ts';
+import { agentSchema,contextSeqOf, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type Task, type Decision, type AgentSession, type Subscription } from '../../../packages/protocol/src/index.ts';
 import { digest, now, OWNER, Store, SYSTEM, uid } from './store.ts';
 import {assertContextCurrent} from './context-reconciliation.ts';
 import { assertRunFence } from './execution.ts';
@@ -103,7 +103,7 @@ export class RoomService {
         const {maxDurationMs,activationLimit,...fields}=input;delete (fields as {quorum?:number}).quorum;
         const discussion: Discussion = { id: uid('disc'), roomId, ...fields, participants: input.participants, quorum, round: 1, responses: 0, activationsUsed: 0, ...(activationLimit !== undefined ? {activationLimit} : {}), deadline: new Date(Date.now() + maxDurationMs).toISOString(), status: 'active' };
         for (const agentId of discussion.participants) {
-          const agentSession = this.createAgentSession(roomId, agentId, discussion.id, actor);
+          const agentSession = this.createAgentSession(roomId, agentId, discussion.id);
           this.store.event(roomId, 'agent_session.created', actor, {agentSession});
         }
         const event = this.store.event(roomId, 'discussion.started', actor, { discussion });
@@ -132,8 +132,22 @@ export class RoomService {
         this.transitionDiscussionSessions(discussion, 'active', actor);
         return {discussionId: discussion.id, status: discussion.status};
       }
-      case 'subscription.set': case 'input.ack':
-        throw new ProtocolError('not_implemented', '该协作命令的协议已冻结，服务端实现将随 B04 接入', 501);
+      case 'subscription.set': {
+        const roomId = this.requireRoom(command);
+        const input = payloadSchemas['subscription.set'].parse(p);
+        const subscription = input.subscription;
+        if (subscription.roomId !== roomId) throw new ProtocolError('invalid_subscription', '订阅必须属于当前房间', 400);
+        const session = this.store.get<AgentSession>('agent_sessions', subscription.agentSessionId);
+        if (!session || session.roomId !== roomId) throw new ProtocolError('not_found', 'AgentSession 不存在', 404);
+        if (!this.store.room(roomId)?.members.includes(session.agentId)) throw new ProtocolError('forbidden', 'Agent 不是当前房间成员', 403);
+        if (subscription.scanSeq > this.store.room(roomId)!.seq) throw new ProtocolError('invalid_cursor', '订阅水位超过当前房间 head', 400);
+        const previous = this.store.get<Subscription>('subscriptions', subscription.id);
+        if (previous && (previous.roomId !== roomId || previous.agentSessionId !== subscription.agentSessionId)) throw new ProtocolError('subscription_conflict', '订阅 ID 已绑定其他会话', 409);
+        this.store.event(roomId, 'subscription.updated', actor, {subscription});
+        return {subscriptionId: subscription.id, scanSeq: subscription.scanSeq};
+      }
+      case 'input.ack':
+        throw new ProtocolError('not_implemented', '输入回执将随 B06 接入', 501);
       case 'task.create': {
         const roomId = this.requireRoom(command);
         const input = z.object({ title: z.string().trim().min(1).max(5000), agentId: z.string().optional(), projectPath: z.string().max(1500).default(''), dependencies: z.array(z.string()).max(20).default([]), open: z.boolean().default(false) }).parse(p);
@@ -347,7 +361,7 @@ export class RoomService {
      this.store.event(roomId, 'run.created', SYSTEM, { run }, causationId ?? null, run.id); return run;
   }
   private saveContext(roomId:string,throughSeq:number){const id=uid('context');this.store.put('contexts',{id,roomId,...captureContext(this.store,roomId,throughSeq)});return id;}
-  private createAgentSession(roomId:string,agentId:string,discussionId:string,actor:Actor):AgentSession{
+  private createAgentSession(roomId:string,agentId:string,discussionId:string):AgentSession{
     return {id:uid('as'),roomId,agentId,discussionId,status:'active',createdAt:now(),updatedAt:now()};
   }
   private transitionDiscussionSessions(discussion:Discussion,status:'active'|'paused'|'ended',actor:Actor){

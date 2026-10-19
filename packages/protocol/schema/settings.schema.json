@@ -108,6 +108,18 @@
       "minimum": 1,
       "maximum": 1000
     },
+    "maxInboxDeliveries": {
+      "default": 1000,
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100000
+    },
+    "maxInboxBytes": {
+      "default": 1048576,
+      "type": "integer",
+      "minimum": 1024,
+      "maximum": 67108864
+    },
     "allowAgentMentionsToWake": {
       "default": false,
       "type": "boolean"
@@ -181,6 +193,8 @@
     "maxQueuedRunsPerRoom",
     "maxAgentRunsPerMinute",
     "maxBypassDispatches",
+    "maxInboxDeliveries",
+    "maxInboxBytes",
     "allowAgentMentionsToWake",
     "maxWakeChainDepth",
     "maxToolResultBytes",

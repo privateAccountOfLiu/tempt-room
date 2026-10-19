@@ -18,6 +18,8 @@ export const executionSettingsSchema=z.object({
   maxQueuedRunsPerRoom:z.number().int().min(1).max(500).default(20),
   maxAgentRunsPerMinute:z.number().int().min(1).max(1000).default(30),
   maxBypassDispatches:z.number().int().min(1).max(1000).default(5),
+  maxInboxDeliveries:z.number().int().min(1).max(100000).default(1000),
+  maxInboxBytes:z.number().int().min(1024).max(64*1024*1024).default(1024*1024),
   allowAgentMentionsToWake:z.boolean().default(false),
   maxWakeChainDepth:z.number().int().min(1).max(10).default(2),
   maxToolResultBytes:z.number().int().min(65536).max(8388608).default(2097152),

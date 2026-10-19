@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 5d56d298fa6d75409609d15ba366e264a6ebd4b9 (dirty)
+source HEAD: ce2f39ca9f17cec6b6ea4426220f82cd68600213 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-19T16-06-27-742Z-937dce15/report.json
+report: .state/collaboration-baseline/run-2026-10-19T16-21-46-269Z-9dbc1aa6/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -54,6 +54,16 @@ report: .state/collaboration-baseline/run-2026-10-19T16-06-27-742Z-937dce15/repo
 - host 任务仍使用真实项目目录（D01a 尚未接入），报告只做内容变化清单，不改写用户工作树
 - 新增 `tests/host-workspace-isolation.test.ts` 3 项；`npm test` **295/295**
 
+### B04 — 订阅投递与幂等唤醒主体
+
+- 新增 apps/server/src/wake-policy.ts：纯触发策略；typing/partial/ACK/audit/状态/自身消息默认不唤醒，显式点名与 assigned-task 触发
+- 新增 apps/server/src/inbox.ts：InboxService 扫描订阅、持久 InboxDelivery 与 WakeIntent；确定性 ID + B02 唯一键保证重复扫描不重复投递
+- subscription.set 命令接入：owner 设置订阅，校验房间、AgentSession、成员资格与 scanSeq
+- Worker.tick 接入订阅扫描；扫描水位用 head 记忆避免自身 subscription.updated 造成空转
+- 队列上限：maxInboxDeliveries / maxInboxBytes；超限返回 429 inbox_full 并在事务内回滚本次扫描
+- 权限/会话/成员撤销立即阻断；scanSeq 与 pending delivery 分开保存
+- 新增 tests/inbox-subscription.test.ts 3 项：唤醒白名单、幂等扫描、队列上限与禁用
+- 尚未完成：InputBatch 与输入回执（B06）、wake 到执行的实际派工、UI 订阅管理
 ### B03 — 讨论生命周期主体（pause/resume/激活额度）
 
 - discussion.start 在同一事务创建参与成员 AgentSession、首轮 Run（带唯一 responseSlotId）并冻结 activationLimit/activationsUsed
@@ -124,20 +134,20 @@ report: .state/collaboration-baseline/run-2026-10-19T16-06-27-742Z-937dce15/repo
 
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
-- `npm test`：308/308
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-3Ta0id/report.json`，278.4s）
+- `npm test`：311/311
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-7M0kCV/report.json`，271.3s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-Ewsw1U/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-WE1UhD/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-19T16-06-27-742Z-937dce15/report.json`
-- `.state/collaboration-baseline/run-2026-10-19T16-06-27-742Z-937dce15/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-19T16-06-27-742Z-937dce15/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-19T16-06-27-742Z-937dce15/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T16-21-46-269Z-9dbc1aa6/report.json`
+- `.state/collaboration-baseline/run-2026-10-19T16-21-46-269Z-9dbc1aa6/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T16-21-46-269Z-9dbc1aa6/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T16-21-46-269Z-9dbc1aa6/replay.stdout.txt`
 
 ## 未完成 / 下一波
 

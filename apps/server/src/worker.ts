@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync } from 'no
 import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
-import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type Artifact, type Discussion, type ExecutionSettings, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
+import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type Artifact, type Discussion, type ExecutionSettings, type Subscription, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { diagnose, ExecutionUnknown, RemoteCanceled, runAdapter } from './adapters.ts';
 import { SandboxHost } from './sandbox.ts';
 import { digest, now, Store, SYSTEM, uid } from './store.ts';
@@ -18,6 +18,7 @@ import { trustForActor } from './trust.ts';
 import { assertRoomPostLength, assertRoomToolAllowed, assertTaskTitleLength } from './tool-policy.ts';
 import { formatContextMessage, UNTRUSTED_CONTEXT_NOTICE } from './context-format.ts';
 import { dependencyInputs } from './dependencies.ts';
+import { InboxService } from './inbox.ts';
 import { prepareHostChatWorkspace, hostStatus, hostChangeReport } from './host-workspace.ts';
 import { codexThreadKey, reconcileAttachedRun } from './codex-attach.ts';
 import { assertRunFence,assertRunIdentity,executionFence } from './execution.ts';
@@ -50,6 +51,8 @@ export class Worker {
   private active = new Map<string, AbortController>();
   private executions=new Map<string,Readonly<RunFence>>();
   private operations:ToolOperations;
+  private inbox:InboxService;
+  private inboxScanHeads = new Map<string,number>();
   private nativeOperations:NativeOperations;
   private inputs = new Map<string,{fence:RunFence;receive:(text:string)=>void}>();
   private timer?: NodeJS.Timeout;
@@ -59,6 +62,7 @@ export class Worker {
   readonly streamListeners = new Set<(delta: StreamDelta) => void>();
   constructor(public store: Store, public service: RoomService, public root: string,private options:{adapter?:typeof runAdapter}={}) {
     this.operations=new ToolOperations(store,()=>store.settings().maxToolResultBytes);
+    this.inbox=new InboxService(store);
     this.nativeOperations=new NativeOperations(store);
     this.host = new SandboxHost(root, resolve('sandbox/RoomSandbox/bin/Release/net10.0-windows/RoomSandbox.exe'));
     this.workspaces = new Workspaces(root);
@@ -119,6 +123,14 @@ export class Worker {
       const next=this.scheduler.pick(candidates,this.schedulerWeights(),settings.maxBypassDispatches);
       if(!next)break;
       if(this.startRun(next,settings))this.scheduler.recordServed(next);
+    }
+    this.scanSubscriptions();
+  }
+  private scanSubscriptions(){
+    for(const subscription of this.store.list<Subscription>('subscriptions')){
+      const head=this.store.room(subscription.roomId)?.seq??0;
+      if(this.inboxScanHeads.get(subscription.id)===head)continue;
+      try{this.inbox.scan(subscription.roomId,subscription.agentSessionId);this.inboxScanHeads.set(subscription.id,this.store.room(subscription.roomId)?.seq??head);}catch{/* Inbox pressure cannot stop dispatch; the pending cursor remains retryable. */}
     }
   }
   private dispatchCandidates():Run[]{

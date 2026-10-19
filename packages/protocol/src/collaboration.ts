@@ -41,7 +41,8 @@ export const inboxDeliverySchema = z.object({
   sourceEventId: id,
   sourceSeq: z.number().int().nonnegative(),
   status: inboxDeliveryStatusSchema,
-  batchId: id.optional()
+  batchId: id.optional(),
+  sourceBytes: z.number().int().nonnegative().optional()
 }).strict();
 export type InboxDelivery = z.infer<typeof inboxDeliverySchema>;
 
