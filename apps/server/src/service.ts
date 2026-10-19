@@ -6,6 +6,7 @@ import { assertRunFence } from './execution.ts';
 import { captureContext } from './context.ts';
 import { adaptiveTimeoutMs } from './adaptive.ts';
 import { trustForActor } from './trust.ts';
+import {provideTaskContext,assertExternalContextCurrent} from './external-context.ts';
 
 /** External (non-managed) claims must heartbeat within this window or the worker recycles the task. */
 const externalTaskLeaseMs = (store: Store) => store.settings().taskLeaseMs;
@@ -25,7 +26,7 @@ export class RoomService {
       if (command.roomId && !this.store.room(command.roomId)) throw new ProtocolError('not_found', '房间不存在', 404);
       if (actor.kind === 'agent') {
         if (!command.roomId || !this.store.room(command.roomId)?.members.includes(actor.id)) throw new ProtocolError('forbidden', '不是该房间的成员', 403);
-        if (!['message.send', 'decision.propose', 'task.create', 'task.claim', 'task.complete', 'task.heartbeat'].includes(command.type)) throw new ProtocolError('forbidden', 'Agent 无权执行此命令', 403);
+        if (!['message.send', 'decision.propose', 'task.create', 'task.claim', 'task.context', 'task.complete', 'task.heartbeat'].includes(command.type)) throw new ProtocolError('forbidden', 'Agent 无权执行此命令', 403);
       }
       if(scope){const run=this.store.get<Run>('runs',scope.runId);if(actor.kind!=='agent'||!run||run.roomId!==command.roomId||run.agentId!==actor.id||!['running','waiting_input'].includes(run.status))throw new ProtocolError('forbidden','工具消息不属于当前活动运行',403);}
       if(scope&&['message.send','task.create','task.claim'].includes(command.type))assertContextCurrent(this.store,this.store.get<Run>('runs',scope.runId)!);
@@ -137,10 +138,21 @@ export class RoomService {
         // Managed Agents let Tempt Room start a run. External Agents execute the
         // work in their own process and report back with task.complete.
         task.status = input.managed ? 'queued' : 'running';
-        if (!input.managed) task.leaseUntil = new Date(Date.now() + externalTaskLeaseMs(this.store)).toISOString();
+        let provided:ReturnType<typeof provideTaskContext>|undefined;
+        delete task.externalContext;
+        if (!input.managed){task.leaseUntil = new Date(Date.now() + externalTaskLeaseMs(this.store)).toISOString();provided=provideTaskContext(this.store,task);task.externalContext=provided.receipt;}
          const event = this.store.event(roomId, 'task.claimed', actor, { task, managed: input.managed }, command.commandId);
         if (input.managed) this.enqueue(roomId, task.agentId, task.title, event.seq, { taskId: task.id, taskVersion: task.version });
-        return { taskId: task.id, agentId: task.agentId, version: task.version,generation:task.generation, managed: input.managed, leaseUntil: task.leaseUntil };
+        return { taskId: task.id, agentId: task.agentId, version: task.version,generation:task.generation, managed: input.managed, leaseUntil: task.leaseUntil,...(provided?{contextToken:provided.receipt.token,baseSeq:provided.receipt.baseSeq,throughSeq:provided.receipt.throughSeq,hasMore:false,context:provided.context}:{}) };
+      }
+      case 'task.context': {
+        const roomId=this.requireRoom(command),input=payloadSchemas['task.context'].parse(p),task=this.store.get<Task>('tasks',input.taskId);
+        if(!task||task.roomId!==roomId)throw new ProtocolError('not_found','任务不存在',404);
+        if(actor.kind!=='agent'||task.agentId!==actor.id)throw new ProtocolError('forbidden','只能读取自己认领任务的上下文',403);
+        this.requireExternalLease(task,input.taskVersion,input.generation);
+        const provided=provideTaskContext(this.store,task);task.externalContext=provided.receipt;
+        this.store.event(roomId,'task.context.advanced',actor,{task,...(provided.delta?{delta:provided.delta}:{})},command.commandId);
+        return {taskId:task.id,version:task.version,generation:task.generation,contextToken:provided.receipt.token,baseSeq:provided.receipt.baseSeq,throughSeq:provided.receipt.throughSeq,headSeq:provided.delta?.headSeq??provided.receipt.throughSeq,hasMore:provided.receipt.hasMore,...(provided.delta?{delta:provided.delta}:{context:provided.context})};
       }
       case 'task.complete': {
         const roomId = this.requireRoom(command), input = payloadSchemas['task.complete'].parse(p), task = this.store.get<Task>('tasks', input.taskId);
@@ -149,10 +161,11 @@ export class RoomService {
         if (task.agentId !== actor.id) throw new ProtocolError('forbidden', '只能完成分配给自己的任务', 403);
         if (!['running', 'queued', 'waiting_input'].includes(task.status)) throw new ProtocolError('task_not_active', '任务已经结束', 409);
         this.requireExternalLease(task, input.taskVersion,input.generation);
+        assertExternalContextCurrent(this.store,task,input.contextToken);
         task.status = input.ok ? 'completed' : 'failed'; delete task.leaseUntil;
-         this.store.event(roomId, 'task.completed', actor, { task, ok: input.ok, summary: input.summary }, command.commandId);
+         this.store.event(roomId, 'task.completed', actor, { task, ok: input.ok, summary: input.summary,contextToken:input.contextToken }, command.commandId);
         if (input.summary.trim()) {
-          const message: Message = { id: uid('msg'), roomId, actor, text: input.summary.trim(), mentions: [], attachments: [], createdAt: now(),taskId:task.id,taskVersion:task.version,trust:trustForActor(this.store,actor) };
+          const message: Message = { id: uid('msg'), roomId, actor, text: input.summary.trim(), mentions: [], attachments: [], createdAt: now(),taskId:task.id,taskVersion:task.version,basedOnSeq:task.externalContext!.throughSeq,generation:task.generation,trust:trustForActor(this.store,actor) };
            this.store.event(roomId, 'chat.message.created', actor, { message }, command.commandId);
         }
         return { taskId: task.id, status: task.status,generation:task.generation };
@@ -174,7 +187,7 @@ export class RoomService {
         if (actor.kind !== 'human') throw new ProtocolError('forbidden', '只有人类可以回收外部任务', 403);
         if (task.status !== 'running' || !task.leaseUntil) throw new ProtocolError('task_not_active', '只有带外部租约的进行中任务可以回收', 409);
         const previousAgentId = task.agentId;
-        task.status = 'proposed'; task.agentId = 'unassigned'; task.open = true; task.version += 1;task.generation=(task.generation??1)+1; delete task.leaseUntil;
+        task.status = 'proposed'; task.agentId = 'unassigned'; task.open = true; task.version += 1;task.generation=(task.generation??1)+1; delete task.leaseUntil;delete task.externalContext;
         
         this.store.event(roomId, 'task.released', actor, { task, previousAgentId, reason: 'owner' }, command.commandId);
         return { taskId: task.id, previousAgentId, version: task.version };
@@ -259,7 +272,7 @@ export class RoomService {
     for(const current of affected.values()){
       const isRoot=current.id===task.id,proposed=current.status==='proposed'&&(!isRoot||rootEvent.type!=='task.handoff');
       for(const run of this.store.list<Run>('runs',roomId).filter(run=>run.taskId===current.id&&!terminalStates.has(run.status)))this.cancel(run,'superseded');
-      if(isRoot)updateRoot(current);current.version++;current.generation=(current.generation??1)+1;delete current.workspaceId;delete current.leaseUntil;
+      if(isRoot)updateRoot(current);current.version++;current.generation=(current.generation??1)+1;delete current.workspaceId;delete current.leaseUntil;delete current.externalContext;
       const member=this.store.get<AgentDescriptor>('agents',current.agentId),available=member?.enabled&&this.store.room(roomId)!.members.includes(current.agentId),open=Boolean(current.open&&current.agentId==='unassigned');
       current.status=proposed||open?'proposed':available?'queued':'interrupted';
       const event=this.store.event(roomId,isRoot?rootEvent.type:'task.revised',actor,{task:current,...(isRoot?rootEvent.payload:{dependencyTaskId:task.id,reason:'依赖任务版本已变化'})},commandId);
@@ -284,7 +297,8 @@ export class RoomService {
     return agent;
   }
   enqueue(roomId: string, agentId: string, prompt: string, basedOnSeq: number, extra: Partial<Run> & { causationId?: string } = {}): Run {
-    if(this.checkAgent(roomId,agentId).connectionMode==='external')throw new ProtocolError('external_agent','外部会话不创建托管运行',409);
+    const executionAgent=this.checkAgent(roomId,agentId);
+    if(executionAgent.connectionMode==='external')throw new ProtocolError('external_agent','外部会话不创建托管运行',409);
     const { causationId, ...fields } = extra;
     const settings=this.store.settings();
     const backlog=this.store.list<Run>('runs',roomId).filter(run=>!terminalStates.has(run.status));
@@ -294,7 +308,7 @@ export class RoomService {
     const recentRuns=this.store.list<Run>('runs',roomId).filter(run=>run.agentId===agentId&&Date.now()-Date.parse(run.createdAt)<60000);if(recentRuns.length>=settings.maxAgentRunsPerMinute)throw new ProtocolError('agent_rate_limited',`该成员一分钟内启动的运行已达上限（${settings.maxAgentRunsPerMinute}）`,429);
     const baseTimeoutMs=fields.taskId?settings.taskTimeoutMs:settings.chatTimeoutMs;
     const timeoutMs=settings.adaptiveTimeouts?adaptiveTimeoutMs(this.store.list<Run>('runs',roomId),agentId,fields.taskId?'task':'chat',baseTimeoutMs):baseTimeoutMs;
-    const run: Run = { id: uid('run'), roomId, agentId, prompt, basedOnSeq, status: 'queued',lifecycleVersion:1,generation:1,contextPolicy:structuredClone(settings.contextPolicy), createdAt: now(), updatedAt: now(),contextId:fields.contextId??this.saveContext(roomId,basedOnSeq),limits:{memoryMb:settings.memoryMb,maxProcesses:settings.maxProcesses,timeoutMs,tokenBudget:settings.tokenBudget,costBudgetUsd:settings.costBudgetUsd}, ...fields };
+    const run: Run = { id: uid('run'), roomId, agentId, prompt, effectScope:['demo','api'].includes(executionAgent.provider)?'conversation-only':'unrestricted', basedOnSeq, status: 'queued',lifecycleVersion:1,generation:1,contextPolicy:structuredClone(settings.contextPolicy), createdAt: now(), updatedAt: now(),contextId:fields.contextId??this.saveContext(roomId,basedOnSeq),limits:{memoryMb:settings.memoryMb,maxProcesses:settings.maxProcesses,timeoutMs,tokenBudget:settings.tokenBudget,costBudgetUsd:settings.costBudgetUsd}, ...fields };
      this.store.event(roomId, 'run.created', SYSTEM, { run }, causationId ?? null, run.id); return run;
   }
   private saveContext(roomId:string,throughSeq:number){const id=uid('context');this.store.put('contexts',{id,roomId,...captureContext(this.store,roomId,throughSeq)});return id;}

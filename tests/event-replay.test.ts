@@ -71,6 +71,11 @@ test('every registered durable event declares and passes its payload contract an
       payload.run=contextContractRun;payload.delta={fromSeq:previous.basedOnSeq,throughSeq,headSeq:throughSeq,hasMore:false,reasons:['lag'],changes:[]};
     }
     if(entry.type==='run.context.confirmed'){delete payload.run;payload.runId=contextContractRun!.id;payload.generation=2;payload.executionId='context_new';payload.throughSeq=contextContractRun!.contextSeq;}
+    if(entry.type==='task.context.advanced'){
+      const id='contract_external_context_task';store.event(roomId,'task.created',SYSTEM,{task:{...task,id,status:'running',leaseUntil:stamp}});
+      const throughSeq=store.room(roomId)!.seq,token='contract_task_input',input={...context,id:token,throughSeq};store.put('contexts',input);
+      payload.task={...task,id,status:'running',leaseUntil:stamp,externalContext:{token,baseSeq:throughSeq,throughSeq,hasMore:false,policy:store.settings().contextPolicy}};
+    }
     if(entry.type==='artifact.applied')payload.artifact={...artifact,applied:true};
     assert.equal(definition.payload.safeParse(payload).success,true,entry.type);
     const event=store.event(roomId,entry.type,SYSTEM,payload);assert.equal(event.schemaVersion,entry.schemaVersion);assert.equal(event.aggregate.type,entry.aggregate);assert.ok(entry.kinds.includes(event.kind));if(entry.type==='run.recovered')run.generation=2;
@@ -85,7 +90,7 @@ test('live projections and full replay match byte for byte, including leases, co
   const actor={id:'codex',kind:'agent'} as const;
   const execute=(type:any,payload:any)=>new RoomService(store).execute({version:'0.1',commandId:uid(),roomId,type,payload},actor);
   const claimed=execute('task.claim',{taskId,managed:false});execute('task.heartbeat',{taskId,taskVersion:claimed.result.version});
-  execute('task.complete',{taskId,taskVersion:claimed.result.version,summary:'Versioned summary'});
+  execute('task.complete',{taskId,taskVersion:claimed.result.version,contextToken:claimed.result.contextToken,summary:'Versioned summary'});
   command('task.revise',{taskId,title:'Revised goal'});
   assert.equal(store.list<Message>('messages',roomId).find(message=>message.taskId===taskId)!.stale,true);
   store.put('artifacts',{id:'replay_report',roomId,runId:run.id,generation:run.generation,executionId:run.executionId,name:'report',kind:'report',mediaType:'text/plain',size:4,createdAt:new Date().toISOString()} as any);
@@ -109,6 +114,14 @@ test('room metadata bytes do not depend on the mutable head during membership re
   for(let i=0;i<4;i++)command('message.send',{text:'After '+i});
   const before=store.projectionBytes(roomId);store.rebuildProjections(roomId);assert.equal(store.projectionBytes(roomId),before);
   const row=store.db.prepare('SELECT body FROM rooms WHERE id=?').get(roomId) as any;assert.equal(JSON.parse(row.body).seq,metadataSeq);assert.ok(store.room(roomId)!.seq>metadataSeq);
+});
+
+test('historic run limits preserve absent budget fields instead of gaining new schema defaults',t=>{
+  const {store,roomId}=fixture(t),stamp=new Date().toISOString(),limits={memoryMb:4096,maxProcesses:64,timeoutMs:300000};
+  const run:Run={id:'legacy_budget_run',roomId,agentId:'demo-planner',status:'queued',prompt:'Original facts',basedOnSeq:store.room(roomId)!.seq,limits,createdAt:stamp,updatedAt:stamp};
+  const event=store.event(roomId,'run.created',SYSTEM,{run});assert.deepEqual((event.payload.run as Run).limits,limits);
+  const before=store.projectionBytes(roomId);store.rebuildProjections(roomId);assert.equal(store.projectionBytes(roomId),before);
+  assert.deepEqual(store.get<Run>('runs',run.id)!.limits,limits);
 });
 test('a sequence gap aborts a rebuild and restores every preexisting projection row',t=>{
   const {store,roomId,command}=fixture(t);command('message.send',{text:'One'});command('message.send',{text:'Two'});
@@ -172,7 +185,7 @@ test('v2 migration preserves raw history and seals unlogged old rows into a repl
   const oldTask={id:'old_task',roomId:room.id,title:'Unlogged lease',agentId:'legacy-agent',projectPath:'',version:3,status:'running',dependencies:[],leaseUntil:new Date(Date.now()+600000).toISOString(),createdAt:stamp};
   legacy.prepare('INSERT INTO tasks VALUES(?,?,?)').run(oldTask.id,room.id,JSON.stringify(oldTask));legacy.prepare('INSERT INTO agents VALUES(?,?,?)').run('legacy-agent',null,JSON.stringify({id:'legacy-agent',name:'Legacy',provider:'demo',enabled:true}));legacy.exec('PRAGMA user_version=2');legacy.close();
   const store=new Store(path);t.after(()=>{store.close();removeDirectory(root);});
-  assert.equal((store.db.prepare('PRAGMA user_version').get() as any).user_version,6);assert.equal((store.db.prepare('SELECT body FROM events WHERE event_id=?').get('old_fact') as any).body,raw);
+  assert.equal((store.db.prepare('PRAGMA user_version').get() as any).user_version,7);assert.equal((store.db.prepare('SELECT body FROM events WHERE event_id=?').get('old_fact') as any).body,raw);
   const checkpoint=store.events(room.id).at(-1)!;assert.equal(checkpoint.type,'projection.checkpoint');assert.equal(store.projectionStatus(room.id).historyFloor,checkpoint.seq);
   const before=store.projectionBytes(room.id);store.rebuildProjections(room.id);assert.equal(store.projectionBytes(room.id),before);assert.equal(store.get<Task>('tasks',oldTask.id)!.leaseUntil,oldTask.leaseUntil);
   assert.throws(()=>store.snapshotAt(room.id,1),/cursor/);assert.equal(store.snapshotWithTail(room.id,1).reset,true);

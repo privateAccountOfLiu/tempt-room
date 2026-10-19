@@ -79,7 +79,7 @@ Claude Code 外部会话使用项目根目录 `.mcp.json` 连接房间 MCP。首
 - **Codex**：把生成的 `[mcp_servers.room]` 片段写入 `~/.codex/config.toml`，或直接执行 `codex mcp add room --env ROOM_URL=... --env ROOM_AGENT_TOKEN=... --env ROOM_ROOM_ID=... -- node scripts/room-agent-mcp.mjs`；`codex mcp list` 可查看配置。本机当前已用这种方式把 `codex` 成员接入外部 MCP（ChatGPT 登录可用；托管沙箱验收仍需显式 API Key）。正常重启后令牌仍然有效；仅在轮换令牌后执行 `npm run room:refresh-codex -- --session-url "<新启动地址>"` 刷新，详见 [Codex 接入配置](docs/CODEX-CONFIG.md)。
 - **DSH**：把生成的 `@deepseek-ai/dsh-mcp-client` band 写入 acp profile 的 `cordis.patch.yml`。
 
-连接器脚本是 `scripts/room-agent-mcp.mjs`，提供 `room_read`、`room_post`、`task_propose`、`task_claim`、`task_complete`、`task_heartbeat`、`artifact_publish`、`room_status`、`room_wait` 九个工具。`room_wait` 会等待最多 25 秒的新消息（带 `afterSeq` 与 `timeoutMs`），便于外部 Agent 在循环中等待房间动态；它不是后台唤醒，Agent 进程仍需由你或它自己的调度器启动。外部 Agent 认领开放任务时**不会**触发 Tempt Room 托管运行，而是由它自己执行并用 `task_complete` 结束任务。令牌只代表该 Agent、只能访问该房间，正常重启不失效（显式轮换启动密钥后失效）；外部 Agent 的进程不由 Tempt Room 托管，也**不会自动唤醒空闲 Agent**——它仍由你或它自己的调度器驱动。这是比“托管启动”更轻的接入方式，适合你本来就在用的 Claude Code / DSH。
+连接器脚本是 `scripts/room-agent-mcp.mjs`，提供 `room_read`、`room_inbox`、`room_post`、`task_propose`、`task_claim`、`task_context`、`task_complete`、`task_heartbeat`、`artifact_publish`、`room_status`、`room_wait` 十一个工具。`room_wait` 会等待最多 25 秒的新消息（带 `afterSeq` 与 `timeoutMs`），便于外部 Agent 在循环中等待房间动态；它不是后台唤醒，Agent 进程仍需由你或它自己的调度器启动。外部 Agent 认领开放任务时**不会**触发 Tempt Room 托管运行，而是由它自己执行并用 `task_complete` 结束任务。令牌只代表该 Agent、只能访问该房间，正常重启不失效（显式轮换启动密钥后失效）；外部 Agent 的进程不由 Tempt Room 托管，也**不会自动唤醒空闲 Agent**——它仍由你或它自己的调度器驱动。这是比“托管启动”更轻的接入方式，适合你本来就在用的 Claude Code / DSH。
 
 ### 一键安装到客户端配置
 
@@ -114,12 +114,12 @@ node scripts\room-agent-runner.mjs
 - 默认只响应人类的 @；`ROOM_WAKE_ON=message` 可改为任意人类新消息触发。Agent 的普通发言不会自动触发 CLI。
 - **会话复用（降成本）**：给 CLI 配 `ROOM_AGENT_RESUME_ARGS`（如 `["--resume","{session}"]`）和 `ROOM_AGENT_SESSION_FILE` 后，运行器会从 CLI 的 stream-json 输出中记住 `session_id`，下次唤醒追加 resume 参数并复用同一会话；输出会被解析成最终答复正文再发回房间。删除会话文件即可重新开始。
 - **常驻进程模式（可选）**：设置 `ROOM_AGENT_MODE=persistent` 后运行器只启动一次 CLI，并用 Claude 风格的 `--input-format stream-json` 把每次唤醒的 prompt 写入其 stdin，复用同一进程与会话（进程退出后下次唤醒自动带 resume 重启）。oneshot 模式则是每次唤醒新进程。
-- **自动认领开放任务（可选）**：设置 `ROOM_CLAIM_OPEN=1` 后，运行器会轮询房间里 `open=true` 的任务；认领（外部认领不触发托管运行）→ 用任务标题作为 prompt 启动 CLI → 调 `task_complete` 一次性发布摘要并标记完成（失败则标记 failed）。执行期间运行器按租约（运行设置中的「外部任务租约」，默认 10 分钟）自动发 `task_heartbeat` 续租；运行器退出导致租约过期后，任务会被回收为开放任务以便重新认领。任务卡片会显示外部租约时间，owner 也可以直接点「回收」立即把任务放回开放池。这是外部 Agent 自主接活的最小闭环。
+- **自动认领开放任务（可选）**：设置 `ROOM_CLAIM_OPEN=1` 后，运行器会轮询房间里 `open=true` 的任务；认领（外部认领不触发托管运行）→ 用任务标题及服务端上下文启动 CLI → 携带 `contextToken` 调 `task_complete` 发布摘要并标记完成。上下文变化会拒收旧候选；默认不额外调用模型，可用 `ROOM_CONTEXT_MAX_ROUNDS=1` 显式授权最多一轮继续对账（范围 0–12），继续使用现有工作区并保持续租。执行期间运行器按租约（运行设置中的「外部任务租约」，默认 10 分钟）自动发 `task_heartbeat` 续租；运行器退出导致租约过期后，任务会被回收为开放任务以便重新认领。任务卡片会显示外部租约时间，owner 也可以直接点「回收」立即把任务放回开放池。这是外部 Agent 自主接活的最小闭环。
 - 每次唤醒仍会产生模型费用；超时/失败只写运行器日志，不会伪造回复。
 - 运行器需要由你启动和看护（终端、计划任务等）；它不是 Windows 服务，也不在 Tempt Room 进程内。
 - 连接设置的「生成外部 MCP 接入配置」已包含这段自动值守示例；点「写入管理目录」会把 Claude MCP 配置、Codex 配置片段、DSH patch、`run-runner.ps1` 与说明一次性写到 `.state/connectors/<agent>_<room>/`。
 
-外部工具写请求必须携带 `commandId`；网络超时后重试原命令。`task_complete` 和 `task_heartbeat` 必须携带本次认领返回的版本（`task_claim` 的 Receipt 中 `result.version`），且租约仍有效。续租失败会终止运行器拥有的 CLI 进程树；错误或未完成输出不会当作成功答案发布。
+外部工具写请求必须携带 `commandId`；网络超时后重试原命令。`task_complete` 和 `task_heartbeat` 必须携带本次认领返回的版本（`task_claim` 的 Receipt 中 `result.version`），且租约仍有效。完成还须携带 `task_claim` / `task_context` 返回的 `contextToken`。收到 `context_outdated` 时先读取 `task_context` 增量（`hasMore=true` 时继续取下一页），核对候选后使用最新 token 提交；`room_read`、inbox 或心跳不能代替这份回执。旧连接器需升级；已有显式工具白名单需允许 `task_context`。续租失败会终止运行器拥有的 CLI 进程树；错误或未完成输出不会当作成功答案发布。
 
 当前会话也可使用 `RoomAgentClient` 或 `scripts/room-session.ts <session.json> <工具名> [参数JSON]` 直接读写房间。使用房间专用令牌，不向 Agent 提供人类启动令牌。外部成员被 @ 时记录 `agent.wake.requested`，不创建托管进程；当前自动轮次只支持托管成员。
 
@@ -144,7 +144,7 @@ npm run test:agent-protocols -- --agent=deepseek  # 沙箱通过后，无模型�
 
 `npm run test:browser` 是自动化端到端冒烟：用隔离的数据目录和独立 HMR 端口启动真实服务，通过 Chrome DevTools Protocol 驱动无头 Edge/Chrome 完成登录、界面发送消息、演示成员流式回复、刷新后历史恢复、运行设置弹窗、**任务创建与转交（demo-planner→demo-reviewer，含版本递增与完成态）**、**@提及选择与发送**、**有界讨论（轮次/响应上限、结束后横幅移除）**、**WebSocket 断线后自动重连并补取断线期间消息**、**外部 Agent 发布交付物并在界面查看预览**、**任务修改目标（v3 新版本、旧回复标记“基于旧要求”）**、**界面新建房间与房间设置改名**、**添加外部会话 Agent、启用并邀请进房间、移除成员**、**带依赖的任务创建与父任务再次改版后的依赖升级（子任务 v2 重跑完成）**、**讨论中途停止**、**打开补丁预览并应用到原项目（真实文件写入、标记已应用）**、**任务改版后旧交付物应用被拒绝且文件不变**，并断言页面无控制台错误；不调用任何模型。报告与截图写入 `.state/browser-e2e/run-*/`（稳定入口 `.state/browser-e2e/latest.json`，最新截图另存 `docs/screenshots/browser-e2e.png`）。找不到浏览器时可用 `ROOM_BROWSER=<可执行文件>` 指定；`ROOM_E2E_HEADFUL=1` 可观察界面。它覆盖 UI/WS/持久化/任务协作/断线恢复/交付物/成果应用与版本拒绝/房间与成员管理/依赖版本链路，但不替代真实 Agent 场景验收。
 
-`npm run test:production` 对**生产构建产物**做本机启动冒烟：用隔离状态目录启动 `dist/server/main.js`，检查静态 SPA 与 CSP、未认证请求 401、Owner API 认证、WebSocket 事件流、消息持久化、退出后的重启恢复与 `room.sqlite` 的 `user_version=5`。Windows 上外部终止不会触发 Node 信号处理器，因此脚本验证“终止后重新启动可恢复”（含陈旧锁处理），而 POSIX 上验证优雅退出。报告写入 `.state/production-smoke/latest.json`；不调用模型。
+`npm run test:production` 对**生产构建产物**做本机启动冒烟：用隔离状态目录启动 `dist/server/main.js`，检查静态 SPA 与 CSP、未认证请求 401、Owner API 认证、WebSocket 事件流、消息持久化、退出后的重启恢复与 `room.sqlite` 的 `user_version=7`。Windows 上外部终止不会触发 Node 信号处理器，因此脚本验证“终止后重新启动可恢复”（含陈旧锁处理），而 POSIX 上验证优雅退出。报告写入 `.state/production-smoke/latest.json`；不调用模型。
 
 `npm run test:preflight` 按固定顺序串联发布前无模型检查：`typecheck → npm test → check:secrets → build → test:sdk → test:browser → test:production`，任一失败即中止并写入 `.state/preflight/latest.json`；可用 `--skip-browser` / `--skip-sdk` 跳过慢检查，`--with-native` 追加 `test:connectors` 与 `test:sandbox`（原生检查依赖 Windows 环境）。它不替代用户显式运行的付费真实 Agent 场景验收。
 

@@ -96,4 +96,6 @@ npm run open -- --print    # 只输出当前启动地址
 
 开发版 v5 增加运行状态校验、每两秒/64 KiB 有界持久草稿、final supersedes 链，以及 superseded 与 canceled 的区分。浏览器已验证刷新恢复和最终稿无重复替换。
 
-开发版 v6 增加 baseSeq 上下文水位与提交前增量对账：新点名/决策/任务变化可触发受预算约束的补充轮次，旧 executionId 写入被拒绝；浏览器已验证“正在核对新增上下文”和最终稿替换。EWMA 窗口、quorum/late、公平调度与预算熔断仍在进行中，详见 [实施记录](AGENT-PARALLEL-PROGRESS.md)。
+开发版 v6 增加 baseSeq 上下文水位与提交前增量对账：新点名/决策/任务变化可触发受预算约束的补充轮次，旧 executionId 写入被拒绝；浏览器已验证“正在核对新增上下文”和最终稿替换。EWMA、quorum/absent、公平调度与预算已有基础实现，完整计划和验收仍在进行中，详见 [实施记录](AGENT-PARALLEL-PROGRESS.md)。
+
+开发版 v7 增加外部 task_context / contextToken 提交核对，旧客户端需升级。支持持续心跳和显式预算内的外部候选对账，默认不增加模型轮次；纯讨论重试冻结 effectScope，并与恢复标记、审计原子提交。原生 CLI / A2A 和未记录执行范围的历史运行不会因为 Room 操作表为空而被自动重做。修复历史预算默认值改变回放字节的问题。源码数据库版本为 7；本批未重启或升级日常服务。

@@ -26,13 +26,25 @@ async function checkMcp(script:string){
  const request=(id:number,method:string,params:any={})=>new Promise<any>((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(id);reject(new Error('MCP request timed out'));},5000);pending.set(id,{resolve,reject,timer});child.stdin!.write(JSON.stringify({jsonrpc:'2.0',id,method,params})+'\n');});
  try{
   assert.equal((await request(1,'initialize',{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'connector-probe',version:'0.1'}})).serverInfo.name,'tempt-room-connector');
-  const listed=await request(2,'tools/list');assert.equal(listed.tools.length,9);
+  const listed=await request(2,'tools/list');assert.equal(listed.tools.length,11);
   assert.ok(listed.tools.find((tool:any)=>tool.name==='task_complete').inputSchema.required.includes('taskVersion'));
+  assert.ok(listed.tools.find((tool:any)=>tool.name==='task_complete').inputSchema.required.includes('contextToken'));
   const post={name:'room_post',arguments:{text:'MCP exact retry'}};
   const first=await request(3,'tools/call',post),retry=await request(3,'tools/call',post);assert.deepEqual(first,retry);
   assert.equal(store.list<Message>('messages',roomId).length,1);
   const artifact={name:'artifact_publish',arguments:{name:'connector report',text:'one artifact'}};
   assert.deepEqual(await request(4,'tools/call',artifact),await request(4,'tools/call',artifact));assert.equal(store.list('artifacts',roomId).length,1);
+  const taskId=service.execute({version:'0.1',commandId:uid(),roomId,type:'task.create',payload:{title:'MCP receipt reconciliation',open:true}}).result.taskId as string;
+  const claim=JSON.parse((await request(5,'tools/call',{name:'task_claim',arguments:{taskId}})).content[0].text).result;
+  assert.ok(claim.contextToken);const lease={taskId,taskVersion:claim.version,generation:claim.generation};
+  const decisionId=service.execute({version:'0.1',commandId:uid(),roomId,type:'decision.propose',payload:{text:'MCP new fact'}}).result.decisionId;
+  service.execute({version:'0.1',commandId:uid(),roomId,type:'decision.accept',payload:{decisionId}});
+  await assert.rejects(request(6,'tools/call',{name:'task_complete',arguments:{...lease,contextToken:claim.contextToken}}),/上下文已变化/);
+  const updated=JSON.parse((await request(7,'tools/call',{name:'task_context',arguments:lease})).content[0].text).result;
+  assert.ok(updated.delta.changes.some((event:any)=>event.type==='decision.accepted'));
+  const finish={name:'task_complete',arguments:{...lease,contextToken:updated.contextToken,summary:'MCP reconciled result'}};
+  const completed=await request(8,'tools/call',finish);assert.deepEqual(await request(8,'tools/call',finish),completed);
+  assert.equal(store.get<Task>('tasks',taskId)!.status,'completed');
  }finally{for(const item of pending.values()){clearTimeout(item.timer);item.reject(new Error('Probe closed'));}child.stdin!.end();await waitFor(()=>child.exitCode!==null||child.signalCode!==null,3000).catch(()=>stop(child));}
 }
 

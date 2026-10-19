@@ -154,7 +154,7 @@ test('the external lease generation rejects stale completion and heartbeat even 
   const execute=(type:any,payload:any)=>f.service.execute({version:'0.1',commandId:uid(),roomId:f.roomId,type,payload},actor);
   const claim=execute('task.claim',{taskId,managed:false}).result;
   for(const type of ['task.complete','task.heartbeat'])assert.throws(()=>execute(type,{taskId,taskVersion:claim.version,generation:Number(claim.generation)-1}),(e:any)=>e.code==='stale_generation');
-  execute('task.heartbeat',{taskId,taskVersion:claim.version,generation:claim.generation});execute('task.complete',{taskId,taskVersion:claim.version,generation:claim.generation,summary:'done'});
+  execute('task.heartbeat',{taskId,taskVersion:claim.version,generation:claim.generation});execute('task.complete',{taskId,taskVersion:claim.version,generation:claim.generation,contextToken:claim.contextToken,summary:'done'});
   assert.equal(f.store.get<Task>('tasks',taskId)!.status,'completed');
 });
 
@@ -212,7 +212,7 @@ test('v3 upgrade preserves event bytes and cursors while adding the operation pr
   // v3 has all prior projection columns and triggers, but no operation table.
   const old=new DatabaseSync(path);old.exec('DROP TABLE operations; PRAGMA user_version=3');old.close();
   const upgraded=new Store(path);
-  try{assert.equal((upgraded.db.prepare('PRAGMA user_version').get() as any).user_version,6);assert.deepEqual(upgraded.db.prepare('SELECT body FROM events ORDER BY seq').all(),bytes);assert.equal(upgraded.room(roomId)!.seq,history.at(-1)!.seq);assert.equal(upgraded.list('operations').length,0);const before=upgraded.projectionBytes(roomId);upgraded.rebuildProjections(roomId);assert.equal(upgraded.projectionBytes(roomId),before);assert.ok(readdirSync(root).some(name=>name.includes('.v3.')&&name.endsWith('.bak')));}finally{upgraded.close();}
+  try{assert.equal((upgraded.db.prepare('PRAGMA user_version').get() as any).user_version,7);assert.deepEqual(upgraded.db.prepare('SELECT body FROM events ORDER BY seq').all(),bytes);assert.equal(upgraded.room(roomId)!.seq,history.at(-1)!.seq);assert.equal(upgraded.list('operations').length,0);const before=upgraded.projectionBytes(roomId);upgraded.rebuildProjections(roomId);assert.equal(upgraded.projectionBytes(roomId),before);assert.ok(readdirSync(root).some(name=>name.includes('.v3.')&&name.endsWith('.bak')));}finally{upgraded.close();}
 });
 
 test('the authenticated HTTP API and SDK expose operation evidence for exactly one run',async t=>{

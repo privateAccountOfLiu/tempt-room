@@ -687,6 +687,64 @@
         },
         "type": {
           "type": "string",
+          "const": "task.context"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "taskId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "taskVersion": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "generation": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "taskId",
+            "taskVersion"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "commandId",
+        "type",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "const": "0.1"
+        },
+        "commandId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "roomId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "type": {
+          "type": "string",
           "const": "task.complete"
         },
         "payload": {
@@ -707,6 +765,12 @@
               "type": "integer",
               "exclusiveMinimum": 0,
               "maximum": 9007199254740991
+            },
+            "contextToken": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$"
             },
             "ok": {
               "default": true,
@@ -1382,6 +1446,7 @@
                 "room_post",
                 "task_propose",
                 "task_claim",
+                "task_context",
                 "task_complete",
                 "task_heartbeat",
                 "artifact_publish"
@@ -1397,6 +1462,7 @@
                   "room_post",
                   "task_propose",
                   "task_claim",
+                  "task_context",
                   "task_complete",
                   "task_heartbeat",
                   "artifact_publish"

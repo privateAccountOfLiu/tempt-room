@@ -5,6 +5,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { parseAgentOutput,heartbeatDelayMs } from './room-runner-output.mjs';
+import {completeClaimedTask} from './room-task-context.mjs';
 
 /**
  * Optional "room duty" runner for external Agents.
@@ -27,6 +28,7 @@ import { parseAgentOutput,heartbeatDelayMs } from './room-runner-output.mjs';
  *   ROOM_WAKE_ON                              - human "mention" (default) or any human "message"
  *   ROOM_POST_RESULT                          - "0" disables posting stdout back
  *   ROOM_CLAIM_OPEN                           - "1" also claims open tasks and completes them
+ *   ROOM_CONTEXT_MAX_ROUNDS                   - explicit extra model-turn budget for task reconciliation (default 0, max 12)
  */
 const args = parseArgs({ options: {
   url: { type: 'string' }, token: { type: 'string' }, room: { type: 'string' },
@@ -62,13 +64,15 @@ let sessionId;
 try { sessionId = JSON.parse(readFileSync(sessionFile, 'utf8'))?.sessionId; } catch { /* first run */ }
 const persistentMode = (process.env.ROOM_AGENT_MODE ?? 'oneshot').toLowerCase() === 'persistent';
 const claimOpen = process.env.ROOM_CLAIM_OPEN === '1';
+const contextMaxRounds=Number(process.env.ROOM_CONTEXT_MAX_ROUNDS??0);
+if(!Number.isInteger(contextMaxRounds)||contextMaxRounds<0||contextMaxRounds>12)throw new Error('ROOM_CONTEXT_MAX_ROUNDS must be an integer from 0 to 12');
 const saveSession = id => { try { mkdirSync(dirname(sessionFile), { recursive: true }); writeFileSync(sessionFile, JSON.stringify({ sessionId: id, agentId, roomId, updatedAt: new Date().toISOString() })); } catch (error) { console.error('[room-runner] cannot save session:', error.message); } };
 
 const headers = { 'content-type': 'application/json', authorization: 'Bearer ' + token, 'room-protocol-version': '0.1' };
 async function tool(name, input = {}, commandId=randomUUID(),requestTimeoutMs=30000) {
   const response = await fetch(base + '/api/agent/tool', { method: 'POST', headers, signal:AbortSignal.timeout(requestTimeoutMs), body: JSON.stringify({ commandId, roomId, name, arguments: input }) });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.message ?? ('room tool HTTP ' + response.status));
+  if (!response.ok){const error=new Error(body.message ?? ('room tool HTTP ' + response.status));error.code=body.code;throw error;}
   return body.result?.accepted===true?body.result.result:body.result;
 }
 
@@ -200,14 +204,11 @@ while (running) {
         };
         renew(claim.leaseUntil);
         try {
-          const output = await runPrompt([`Tempt Room 开放任务（${open.id}）：`, open.title, '', '请在当前目录完成该任务，并输出要发回房间的结果摘要。'].join('\n'),leaseAbort.signal);
-          renewing=false;clearTimeout(heartbeat);
-          if(leaseError)throw leaseError;
-          const done = await tool('task_complete', { taskId: open.id, taskVersion: claim.version,generation:claim.generation, ok: true, summary: postResult?output.slice(0,8000):'' });
+          const done=await completeClaimedTask({taskId:open.id,title:open.title,claim,tool,runPrompt,signal:leaseAbort.signal,postResult,maxRounds:contextMaxRounds});
           log(`task completed ${open.id} status=${done.status}`);
         } catch (error) {
           log('claimed task failed: ' + error.message);
-          if(!leaseError)await tool('task_complete', { taskId: open.id, taskVersion: claim.version,generation:claim.generation, ok: false, summary: '外部执行失败：' + error.message }).catch(() => {});
+          if(!leaseError&&error.code!=='context_not_settled')await tool('task_complete', { taskId: open.id, taskVersion: claim.version,generation:claim.generation,contextToken:claim.contextToken, ok: false, summary: '外部执行失败：' + error.message }).catch(() => {});
         } finally { renewing=false;clearTimeout(heartbeat); }
         if (once) { log('once mode complete'); break; }
         continue;

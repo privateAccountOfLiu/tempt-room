@@ -7,8 +7,8 @@ export { executionSettingsSchema,runLimitsSchema,defaultExecutionSettings,budget
 export { actorSchema,sandboxProfileSchema,messageSchema,taskSchema,runSchema,artifactSchema } from './models.ts';
 export { runFenceSchema,toolOperationSchema,sameRunFence,type RunFence,type ToolOperation } from './execution.ts';
 export { classifyFailure, type FailureInfo, type FailureKind } from './failure.ts';
-export {contextPolicySchema,contextDeltaSchema,contextSeqOf,type ContextPolicy,type ContextDelta} from './reconciliation.ts';
-import {contextPolicySchema,type ContextPolicy} from './reconciliation.ts';
+export {contextPolicySchema,contextDeltaSchema,taskContextSchema,contextSeqOf,type ContextPolicy,type ContextDelta,type TaskContext} from './reconciliation.ts';
+import {contextPolicySchema,type ContextPolicy,type TaskContext} from './reconciliation.ts';
 export {runStatusSchema,terminalStates,runPartialSchema,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,validateRunTransition,type RunStatus,type RunPartial} from './run-state.ts';
 import type {RunStatus,RunPartial} from './run-state.ts';
 
@@ -21,7 +21,7 @@ export const capabilitiesSchema = z.object({
   execute: z.boolean(), artifacts: z.boolean(), input: z.boolean(), usage: z.boolean()
 });
 export type AgentCapabilities = z.infer<typeof capabilitiesSchema>;
-export const roomToolNames=['room_read','room_status','room_inbox','room_post','task_propose','task_claim','task_complete','task_heartbeat','artifact_publish'] as const;
+export const roomToolNames=['room_read','room_status','room_inbox','room_post','task_propose','task_claim','task_context','task_complete','task_heartbeat','artifact_publish'] as const;
 export const agentSchema = z.object({
   id: idSchema, name: z.string().min(1).max(60), provider: providerSchema,
   role: z.string().max(300).default('协作助手'), color: z.enum(['blue', 'green', 'orange', 'purple', 'teal']).default('blue'), schedulerWeight: z.number().min(0.1).max(10).default(1),
@@ -78,7 +78,8 @@ export const payloadSchemas={
   'task.accept':z.object({taskId:idSchema,projectPath:z.string().max(1500).optional()}).strict(),
   'task.handoff':z.object({taskId:idSchema,agentId:idSchema,note:z.string().max(300).default('')}).strict(),
   'task.claim':z.object({taskId:idSchema,managed:z.boolean().default(true)}).strict(),
-  'task.complete':z.object({taskId:idSchema,taskVersion:z.number().int().positive(),generation:z.number().int().positive().optional(),ok:z.boolean().default(true),summary:z.string().max(8000).default('')}).strict(),
+  'task.context':z.object({taskId:idSchema,taskVersion:z.number().int().positive(),generation:z.number().int().positive().optional()}).strict(),
+  'task.complete':z.object({taskId:idSchema,taskVersion:z.number().int().positive(),generation:z.number().int().positive().optional(),contextToken:idSchema.optional(),ok:z.boolean().default(true),summary:z.string().max(8000).default('')}).strict(),
   'task.heartbeat':z.object({taskId:idSchema,taskVersion:z.number().int().positive(),generation:z.number().int().positive().optional()}).strict(),
   'task.release':z.object({taskId:idSchema}).strict(),
   'settings.update':executionSettingsSchema.extend({contextPolicy:contextPolicySchema.optional()}),
@@ -93,7 +94,7 @@ export const payloadSchemas={
 export interface Command { version:typeof VERSION;commandId:string;roomId?:string;type:keyof typeof payloadSchemas;payload:Record<string,unknown> }
 export const commandSchema:z.ZodType<Command>=z.discriminatedUnion('type',Object.entries(payloadSchemas).map(([type,payload])=>commandEnvelope.extend({type:z.literal(type),payload})) as [z.ZodObject<any>,z.ZodObject<any>,...z.ZodObject<any>[]]) as unknown as z.ZodType<Command>;
 export interface Receipt { commandId: string; accepted: true; result: Record<string, unknown> }
-export const agentToolNameSchema=z.enum(['room_read','room_post','task_propose','task_claim','task_complete','task_heartbeat','artifact_publish','room_status','room_wait','room_inbox']);
+export const agentToolNameSchema=z.enum(['room_read','room_post','task_propose','task_claim','task_context','task_complete','task_heartbeat','artifact_publish','room_status','room_wait','room_inbox']);
 export type AgentToolName=z.infer<typeof agentToolNameSchema>;
 export const agentToolCallSchema=z.object({commandId:idSchema,roomId:idSchema,name:agentToolNameSchema,arguments:z.record(z.string(),z.unknown()).default({})}).strict();
 export type AgentToolCall=z.infer<typeof agentToolCallSchema>;
@@ -101,8 +102,8 @@ export interface ServerCapabilities {version:typeof VERSION;supportedVersions:(t
 export interface Room { id: string; name: string; description: string; members: string[]; createdAt: string; seq: number }
 export interface Message { supersedes?:string; final?:boolean; id: string; roomId: string; actor: Actor; text: string; mentions: string[]; replyTo?: string; attachments: string[]; createdAt: string; runId?: string;taskId?:string;taskVersion?:number; basedOnSeq?: number; generation?:number; executionId?:string; stale?: boolean; trust?: 'owner'|'managed'|'external'|'remote' }
 export interface RunContext { fromSeq:number;throughSeq:number;messages:Message[];decisions:Decision[];members:{id:string;name:string;role:string}[] }
-export interface Run { usageByGeneration?:Record<string,NonNullable<Run['usage']>>; contextPolicy?:ContextPolicy; contextSeq?:number; deltaContextId?:string; contextRound?:number; contextPending?:boolean; contextConfirmedSeq?:number; lifecycleVersion?:1; partial?:RunPartial; finalMessageId?:string; stopReason?:'superseded'|'user_cancel'; generation?:number; executionId?:string; leaseUntil?:string; id: string; roomId: string; agentId: string; status: RunStatus; prompt: string; basedOnSeq: number; contextId?:string; limits?:RunLimits; inputArtifacts?:string[];dependencyVersions?:Record<string,number>;taskId?: string; discussionId?: string; round?: number; taskVersion?: number; autoRetryOf?: string; autoRetryCount?: number; wakeChainDepth?: number; recoveryCount?: number; nativeSessionId?: string; codex?: CodexRunState; remoteTaskId?:string; sandbox?: SandboxProfile & { verifiedAt:string }; error?: string; createdAt: string; updatedAt: string; usage?: { inputTokens?: number; outputTokens?: number; costUsd?: number;scope?:'run'|'last-request'|'session-total' }; }
-export interface Task { generation?:number; id: string; roomId: string; title: string; agentId: string; projectPath: string; version: number; status: string; dependencies: string[]; workspaceId?: string; open?: boolean; leaseUntil?: string; createdAt: string }
+export interface Run { effectScope?:'conversation-only'|'unrestricted'; usageByGeneration?:Record<string,NonNullable<Run['usage']>>; contextPolicy?:ContextPolicy; contextSeq?:number; deltaContextId?:string; contextRound?:number; contextPending?:boolean; contextConfirmedSeq?:number; lifecycleVersion?:1; partial?:RunPartial; finalMessageId?:string; stopReason?:'superseded'|'user_cancel'; generation?:number; executionId?:string; leaseUntil?:string; id: string; roomId: string; agentId: string; status: RunStatus; prompt: string; basedOnSeq: number; contextId?:string; limits?:RunLimits; inputArtifacts?:string[];dependencyVersions?:Record<string,number>;taskId?: string; discussionId?: string; round?: number; taskVersion?: number; autoRetryOf?: string; autoRetryCount?: number; wakeChainDepth?: number; recoveryCount?: number; nativeSessionId?: string; codex?: CodexRunState; remoteTaskId?:string; sandbox?: SandboxProfile & { verifiedAt:string }; error?: string; createdAt: string; updatedAt: string; usage?: { inputTokens?: number; outputTokens?: number; costUsd?: number;scope?:'run'|'last-request'|'session-total' }; }
+export interface Task { externalContext?:TaskContext; generation?:number; id: string; roomId: string; title: string; agentId: string; projectPath: string; version: number; status: string; dependencies: string[]; workspaceId?: string; open?: boolean; leaseUntil?: string; createdAt: string }
 export interface Artifact { generation?:number; executionId?:string; id: string; roomId: string; runId?: string; taskId?: string; name: string; kind: 'file' | 'patch' | 'report'; mediaType: string; size: number; createdAt: string; applied?: boolean }
 export interface Discussion { id: string; roomId: string; goal: string; participants: string[]; rounds: number; round: number; maxResponses: number; responses: number; quorum: number; absent?: string[]; deadline: string; status: 'active' | 'completed' | 'stopped' }
 export interface Decision { id: string; text: string; accepted: boolean; actor: Actor }

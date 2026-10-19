@@ -33,6 +33,7 @@ register(['task.updated','task.accepted','task.completed','task.state'],'task.st
 register(['task.revised','task.version'],'task.version','task','task',body({task:taskSchema.passthrough()}));
 register(['task.handoff'],'task.handoff','task','task',body({task:taskSchema.passthrough()}));
 register(['task.claimed','task.claim'],'task.claim','task','task',body({task:taskSchema.passthrough()}));
+register(['task.context.advanced'],'task.context','task','task',body({task:taskSchema.passthrough(),delta:contextDeltaSchema.optional()}));
 register(['task.lease_expired','task.released','task.lease.renewed','task.lease'],'task.lease','task','task',body({task:taskSchema.passthrough()}));
 register(['run.created','run.queued'],'run.queued','run','run',body({run:runSchema.extend({status:z.literal('queued')}).passthrough(),context:runContextSchema.passthrough().optional()}));
 const runKind=(payload:Record<string,any>)=>({queued:'run.queued',running:'run.started',waiting_input:'run.blocked',cancel_requested:'run.cancel.requested',completed:'run.completed',failed:'run.failed',canceled:'run.cancelled',superseded:'run.superseded',interrupted:'run.interrupted',unknown:'run.unknown'}[payload.run.status as string]??'run.state');
@@ -78,7 +79,7 @@ export function eventMetadata(type:string,payload:Record<string,unknown>,roomId:
   const {definition,payload:parsed}=eventDefinition(type,payload);
   const entity=definition.aggregate==='task'?parsed.task:definition.aggregate==='artifact'?parsed.artifact:definition.aggregate==='run'?(parsed.run??(parsed.operation?{id:parsed.operation.runId}:undefined)):undefined;
   return {kind:typeof definition.kind==='function'?definition.kind(parsed):definition.kind,schemaVersion:definition.schemaVersion,durability:definition.durability,
-    aggregate:{type:definition.aggregate,id:entity?.id??parsed.runId??roomId},baseSeq:parsed.run?.contextSeq??parsed.run?.basedOnSeq??parsed.message?.basedOnSeq??parsed.baseSeq??parsed.throughSeq??0,
+    aggregate:{type:definition.aggregate,id:entity?.id??parsed.runId??roomId},baseSeq:parsed.run?.contextSeq??parsed.run?.basedOnSeq??parsed.message?.basedOnSeq??parsed.task?.externalContext?.throughSeq??parsed.baseSeq??parsed.throughSeq??0,
     generation:parsed.run?.generation??parsed.task?.generation??parsed.message?.generation??parsed.artifact?.generation??parsed.operation?.generation??parsed.generation??1,replyTo:parsed.message?.replyTo??null,idempotencyKey:parsed.operation?.operationId??null as string|null,traceId:parsed.run?.traceId??correlationId??null};
 }
 export const eventRegistryManifest=Object.entries(eventRegistry).map(([type,definition])=>({type,durability:definition.durability,aggregate:definition.aggregate,projector:definition.projector,schemaVersion:definition.schemaVersion,kinds:definition.kinds}));

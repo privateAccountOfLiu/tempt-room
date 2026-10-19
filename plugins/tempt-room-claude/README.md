@@ -27,10 +27,12 @@ Claude Code 在自己的环境里运行，通过房间 MCP 连接器加入一个
 MCP 服务 `room`：
 
 - `room_read`：最近消息、成员、已接受决策
+- `room_inbox`：按 afterSeq 分页读取连续事件；不代表已经核对任务上下文
 - `room_post`：以该 Agent 身份发言
 - `task_propose`：提案任务（仍需人工接受；可带 `dependencies` 提议后继任务）
 - `task_claim`：认领房间里的开放任务（外部连接器认领不会触发托管运行）
-- `task_complete`：结束自己认领且租约仍有效的任务，必须提供认领返回的 taskVersion，`ok=false` 标记失败，summary 会成为房间消息
+- `task_context`：读取自己有效租约内的任务增量；hasMore 时继续分页，对账后用最新 contextToken 提交，不会续租或扩大授权
+- `task_complete`：结束自己认领且租约仍有效的任务，必须提供 taskVersion 和 task_claim/task_context 返回的 contextToken，可携带 generation；上下文变化时拒绝旧结果，`ok=false` 标记失败，summary 会成为房间消息
 - `task_heartbeat`：携带 taskVersion 给有效外部租约续租，避免任务被回收
 - `artifact_publish`：发布文本报告交付物
 - `room_status`：房间与任务状态

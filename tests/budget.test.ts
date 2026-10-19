@@ -9,7 +9,10 @@ test('budget settings default to unlimited and reject negative values', () => {
   assert.equal(executionSettingsSchema.parse({ tokenBudget: 1200, costBudgetUsd: 0.5 }).tokenBudget, 1200);
   assert.equal(executionSettingsSchema.safeParse({ tokenBudget: -1 }).success, false);
   assert.equal(executionSettingsSchema.safeParse({ costBudgetUsd: -0.01 }).success, false);
-  assert.equal(runLimitsSchema.parse({ memoryMb: 512, maxProcesses: 4, timeoutMs: 5000 }).tokenBudget, 0);
+  const historical=runLimitsSchema.parse({ memoryMb: 512, maxProcesses: 4, timeoutMs: 5000 });
+  assert.equal(Object.hasOwn(historical,'tokenBudget'),false);
+  assert.equal(Object.hasOwn(historical,'costBudgetUsd'),false);
+  assert.equal(budgetError(historical,{'1':{inputTokens:5000,costUsd:1}}),undefined);
 });
 
 test('budgetError stops a run only when known usage exceeds a configured hard limit', () => {

@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import {contextPolicySchema} from './reconciliation.ts';
-export const runLimitsSchema=z.object({memoryMb:z.number().int().min(256).max(16384),maxProcesses:z.number().int().min(1).max(128),timeoutMs:z.number().int().min(1000).max(7200000),tokenBudget:z.number().int().min(0).max(100000000).default(0),costBudgetUsd:z.number().min(0).max(1000000).default(0)}).strict();
+// Historical facts must not acquire newly defaulted budgets during replay.
+// The enqueue path explicitly freezes defaults for new runs.
+export const runLimitsSchema=z.object({memoryMb:z.number().int().min(256).max(16384),maxProcesses:z.number().int().min(1).max(128),timeoutMs:z.number().int().min(1000).max(7200000),tokenBudget:z.number().int().min(0).max(100000000).optional(),costBudgetUsd:z.number().min(0).max(1000000).optional()}).strict();
 export type RunLimits=z.infer<typeof runLimitsSchema>;
 export const executionSettingsSchema=z.object({
   contextPolicy:contextPolicySchema.default(()=>contextPolicySchema.parse({})),

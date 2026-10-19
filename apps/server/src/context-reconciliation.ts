@@ -3,12 +3,13 @@ import {Store,uid,now,SYSTEM} from './store.ts';
 import {captureContext} from './context.ts';
 import {assertRunIdentity} from './execution.ts';
 
-function relevant(event:RoomEvent,run:Run){
+type Consumer=Pick<Run,'id'|'roomId'|'agentId'|'basedOnSeq'|'contextSeq'|'contextPolicy'>;
+function relevant(event:RoomEvent,run:Consumer){
   if(event.type==='chat.message.created'||event.type==='message.posted')return (event.payload.message as any)?.runId!==run.id;
   return ['decision.accepted','task.created','task.accepted','task.completed','task.revised','task.version','task.handoff','artifact.published','artifact.created'].includes(event.type)&&event.correlationId!==run.id&&(event.payload.artifact as any)?.runId!==run.id;
 }
 /** Read a complete prefix. Bound context bytes without pretending omitted facts were read. */
-export function contextDelta(store:Store,run:Run):ContextDelta|undefined {
+export function contextDelta(store:Store,run:Consumer,force=false):ContextDelta|undefined {
   if(!run.contextPolicy)return undefined;
   const fromSeq=contextSeqOf(run),headSeq=store.room(run.roomId)!.seq,changes:ContextDelta['changes']=[],reasons=new Set<ContextDelta['reasons'][number]>();let cursor=fromSeq,throughSeq=fromSeq,bytes=0,hasMore=false;
   if(fromSeq>headSeq)throw new ProtocolError('context_cursor_invalid','上下文水位超出房间历史',409);
@@ -32,7 +33,7 @@ export function contextDelta(store:Store,run:Run):ContextDelta|undefined {
   if(changes.length&&(changes.at(-1)?.seq??fromSeq)-fromSeq>run.contextPolicy.maxLag)reasons.add('lag');
   // An important change in a later page must not be hidden by a full first page.
   if(hasMore)reasons.add('lag');
-  if(!reasons.size)return undefined;
+  if(!reasons.size&&!force)return undefined;
   return {fromSeq,throughSeq,headSeq,hasMore,reasons:[...reasons],changes};
 }
 export function assertContextCurrent(store:Store,run:Run){

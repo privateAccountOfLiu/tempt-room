@@ -57,7 +57,7 @@ test('discussion participants share one frozen context and the next round includ
 });
 test('v1 databases get a checkpointed backup before settings/context migration',t=>{
  const {store,root}=fixture(t),path=join(root,'room.sqlite');store.db.exec('DROP TABLE settings; DROP TABLE contexts; PRAGMA user_version=1;');store.close();
- const migrated=new Store(path);assert.equal((migrated.db.prepare('PRAGMA user_version').get() as any).user_version,6);migrated.close();
+ const migrated=new Store(path);assert.equal((migrated.db.prepare('PRAGMA user_version').get() as any).user_version,7);migrated.close();
  const backup=join(root,readdirSync(root).find(name=>name.startsWith('room.sqlite.v1.')&&name.endsWith('.bak'))!);assert.ok(backup);
  const original=new DatabaseSync(backup,{readOnly:true});assert.equal((original.prepare('PRAGMA user_version').get() as any).user_version,1);assert.equal(original.prepare("SELECT name FROM sqlite_master WHERE name='settings'").get(),undefined);original.close();
 });
@@ -109,7 +109,7 @@ test('external completion summaries bind their task version and become stale wit
  const taskId=command('task.create',{title:'external fixture',agentId}).result.taskId as string;
  const actor={id:agentId,kind:'agent'} as const;
  const claim=service.execute({version:'0.1',commandId:uid(),roomId,type:'task.claim',payload:{taskId,managed:false}},actor);
- service.execute({version:'0.1',commandId:uid(),roomId,type:'task.complete',payload:{taskId,taskVersion:claim.result.version,summary:'external versioned result'}},actor);
+ service.execute({version:'0.1',commandId:uid(),roomId,type:'task.complete',payload:{taskId,taskVersion:claim.result.version,contextToken:claim.result.contextToken,summary:'external versioned result'}},actor);
  const message=store.list<Message>('messages',roomId).find(message=>message.text==='external versioned result')!,previousSeq=store.room(roomId)!.seq;
  assert.equal(message.taskId,taskId);assert.equal(message.taskVersion,claim.result.version);assert.equal(message.runId,undefined);assert.equal(store.list('runs').length,0);
  command('task.revise',{taskId,title:'external revised goal'});

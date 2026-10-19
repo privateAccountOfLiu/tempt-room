@@ -60,7 +60,7 @@ JSON Schema 是命令形状的权威来源：`packages/protocol/schema/*.schema.
 
 `POST /api/agent/tool` 要求协议版本头及 `Authorization: Bearer <room-agent-token>`，严格封套为 `{commandId,roomId,name,arguments}`。令牌绑定成员与房间（v1 格式）；旧的仅绑定 Agent 的令牌拒绝。启动密钥持久化在状态目录后，正常重启不改变令牌；轮换启动密钥后必须重新签发。作者由服务端确定，未知字段拒绝；禁用成员或移出房间会撤销访问。
 
-工具为 `room_read`、`room_post`、`task_propose`、`task_claim`、`task_complete`、`task_heartbeat`、`artifact_publish`、`room_status`、`room_wait`。写入以 commandId 去重并绑定内容；超时后复用原命令。HTTP 包装为 `{result: 工具结果}`，其中任务和消息工具结果是 Receipt，认领版本位于 `body.result.result.version`。SDK 返回工具结果（Receipt），不会自动拆开业务 result。
+工具为 `room_read`、`room_inbox`、`room_post`、`task_propose`、`task_claim`、`task_context`、`task_complete`、`task_heartbeat`、`artifact_publish`、`room_status`、`room_wait`。写入以 commandId 去重并绑定内容；超时后复用原命令。HTTP 包装为 `{result: 工具结果}`，其中任务和消息工具结果是 Receipt，认领版本位于 `body.result.result.version`。SDK 返回工具结果（Receipt），不会自动拆开业务 result。
 
 `room_wait` 逐页扫描事件，每次最多返回 20 条消息，`throughSeq` 为实际扫描到的游标；客户端以此续取，不跳到房间最新序号。等待期间成员身份持续检查。
 
@@ -142,7 +142,7 @@ Run.limits 保存入队时的内存、进程、超时与单次运行 Token/费�
 - `GET /api/rooms/:id/audit/export`：Owner 认证，按事件原样返回 `application/x-ndjson` 附件（每行一个事件，含 eventId/seq/type/actor/payload）；Agent 令牌不可访问。房间头部提供下载按钮。
 - WebSocket 与 SDK：持久序号出现缺口时通过 REST 补齐；同一房间连续提交、重复忽略、跨房间拒收。慢客户端可以丢瞬态；持久事件由游标恢复。客户端不会因为订阅建立就把缺失事件算作已处理。
 
-数据库 v3 为旧数据追加 migration checkpoint，而不重写旧事件；v4 新增 operations 投影及索引；v5 支持持久草稿和 superseded 终态；当前开发版 v6 增加 baseSeq 上下文对账与上下文预算。`historyFloor` 是可证明完整快照的最早水位。运行/工具的 generation fencing 与 baseSeq 提交前对账已接入；自动崩溃重试、WFQ/EWMA、quorum 与预算仍在 [实施记录](AGENT-PARALLEL-PROGRESS.md) 中跟踪。
+数据库 v3 为旧数据追加 migration checkpoint，而不重写旧事件；v4 新增 operations 投影及索引；v5 支持持久草稿和 superseded 终态；v6 增加 baseSeq 上下文对账与上下文预算；当前开发版 v7 强制外部任务输入回执并冻结执行副作用范围。`historyFloor` 是可证明完整快照的最早水位。运行/工具的 generation fencing 与 baseSeq 提交前对账已接入；纯讨论恢复、WFQ/EWMA、quorum 与预算已有实现，原生副作用恢复、每轮配额和完整验收仍在 [实施记录](AGENT-PARALLEL-PROGRESS.md) 中跟踪。
 
 
 ## 执行 generation 与工具操作（开发版 v4）
@@ -170,4 +170,24 @@ Message.final=true 时，supersedes 必须指向当前 partial.id（没有草稿
 
 任务改版/交接和新的明确点名聊天请求可使旧运行进入 stopReason=superseded。排队且尚未提交原生请求的运行立即 superseded；已启动的运行先 cancel_requested，确认结束后 superseded。unknown/interrupted 仍保留不确定性，不能因逻辑目标变更就宣称进程已停止。用户的明确停止使用 stopReason=user_cancel，并在确认结束后 canceled；普通历史消息不会中止当前任务。
 
-草稿以独立视图显示，取消或替代后保留。刷新和瞬态缺口回退到持久检查点；最后一次未提交的瞬态片段仍可能丢失。动态 EWMA 窗口、quorum/late 尚未完成；baseSeq 提交对账与上下文预算已实现，不能从持久 partial 的存在推断这些能力。
+草稿以独立视图显示，取消或替代后保留。刷新和瞬态缺口回退到持久检查点；最后一次未提交的瞬态片段仍可能丢失。EWMA 超时、quorum/absent 已有独立实现；它们的验收与 baseSeq 对账分别记录在实施记录中，不能从持久 partial 的存在推断全部调度门槛已经完成。
+
+## 外部任务上下文回执（开发版 v7）
+
+`task_claim` 在认领事务内保存上下文快照，并返回 `version / generation / leaseUntil / contextToken / baseSeq / throughSeq / context`。任务投影的 `externalContext` 保存本次租约的 token、水位、hasMore 与冻结的策略；token 标识服务端实际提供过的输入，不能由客户端指定读取水位或扩大权限。初始快照沿用可配置消息窗口，已接受决策保留。
+
+完成参数为 `{taskId, taskVersion, generation?, contextToken, ok?, summary?}`。服务端在同一事务核对有效租约、任务版本、最新 token 和增量；新增点名、接受决策、超出 maxLag 或尚有未取分页时返回 `context_outdated`，不会发布摘要或把任务标成完成/失败。成功摘要记录实际 throughSeq 与任务 generation。相同 commandId 在已提交后重试仍返回原回执，不因后来的变化重复执行。
+
+`task_context`（HTTP 命令 `task.context`）接收 `{taskId,taskVersion,generation?}`，仅限自己的有效外部租约。它签发新 token，返回 `{contextToken,baseSeq,throughSeq,headSeq,hasMore,delta}`，并持久化 `task.context.advanced`；首次接管旧租约时返回完整窗口 context。delta 提供连续事件区间中的完整相关事实，按冻结的 maxDeltaBytes 分页；单条超大事实或断号直接报错，不截断后声称已读。hasMore=true 时继续取下一页，最后对账并提交最新 token。后续读取替换旧 token，原 baseSeq 与策略保持不变；任务回收、过期、改版或交接撤销该租约的回执。
+
+读取不等于模型理解：回执证明输入曾提供，完成时回传 token 表示连接器基于该输入提交候选。`task_context` 不续租、不启动模型；room_read / room_inbox / task_heartbeat 不推进任务水位。外部进程的文件和网络副作用仍由它自身控制，发生变化后应修订候选，不能机械重复命令。旧客户端缺少 token 时返回 context_receipt_required，需升级连接器并为显式白名单启用 task_context。
+
+随附 runner 默认额外模型轮次为 0；仅在用户设置 `ROOM_CONTEXT_MAX_ROUNDS`（0–12）后自动进行有限对账。持续变化、分页超限或未知提交结果不会触发无限重跑；心跳覆盖整个执行和对账过程。
+
+## 自动恢复的证据边界
+
+新 Run 在入队时冻结 `effectScope`：当前演示/API 适配器为 conversation-only，原生 CLI 与 A2A 为 unrestricted。运行后的普通更新不能新增、改写或删除该字段；排队后修改 Agent 不能把纯讨论授权变成原生命令执行。缺少字段的历史运行不推断为安全。
+
+自动网络重试和重启恢复仍须用户开启，仅允许创建时和当前均为演示/API、沙箱模式、无任务/讨论、无 Room 写操作或交付物的纯讨论运行。恢复子运行、原运行标记与审计在同一事务提交；重复 supervisor 不会创建第二份子运行。原生进程可能执行过命令或访问网络，即使 Room 操作表为空也不会自动重跑。原生内部副作用的完整前置账本与安全续接仍为后续工作。
+
+历史 Run.limits 中缺少的 tokenBudget/costBudgetUsd 保持缺失，回放不得补入默认值。新运行在入队时显式冻结设置中的预算默认值，历史字段缺失并不表示已证明费用为零。

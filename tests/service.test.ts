@@ -30,7 +30,7 @@ test('external members receive wake events and claim assigned tasks without a ma
  assert.throws(()=>service.execute({version:'0.1',commandId:uid(),roomId,type:'task.claim',payload:{taskId,managed:true}},actor));
  const claimed=service.execute({version:'0.1',commandId:uid(),roomId,type:'task.claim',payload:{taskId,managed:false}},actor);
  assert.equal(store.get<Task>('tasks',taskId)?.status,'running');assert.equal(store.list('runs').length,0);
- service.execute({version:'0.1',commandId:uid(),roomId,type:'task.complete',payload:{taskId,taskVersion:claimed.result.version,summary:'done'}},actor);
+ service.execute({version:'0.1',commandId:uid(),roomId,type:'task.complete',payload:{taskId,taskVersion:claimed.result.version,contextToken:claimed.result.contextToken,summary:'done'}},actor);
  assert.equal(store.get<Task>('tasks',taskId)?.status,'completed');
 });
 
@@ -172,7 +172,7 @@ test('external claim starts no managed run and task.complete finishes it',t=>{
   assert.equal(store.get<Task>('tasks',taskId)!.status,'running');
   assert.equal(store.list<Run>('runs').length,0);
   assert.throws(()=>service.execute({version:'0.1',commandId:uid(),roomId,type:'task.complete',payload:{taskId,taskVersion:claim.result.version}},{id:'demo-reviewer',kind:'agent'}),/只能完成分配给自己的任务/);
-  const done=service.execute({version:'0.1',commandId:uid(),roomId,type:'task.complete',payload:{taskId,taskVersion:claim.result.version,summary:'外部完成摘要'}},{id:'demo-planner',kind:'agent'});
+  const done=service.execute({version:'0.1',commandId:uid(),roomId,type:'task.complete',payload:{taskId,taskVersion:claim.result.version,contextToken:claim.result.contextToken,summary:'外部完成摘要'}},{id:'demo-planner',kind:'agent'});
   assert.equal(done.result.status,'completed');
   assert.equal(store.get<Task>('tasks',taskId)!.status,'completed');
   assert.ok(store.list<Message>('messages').some(message=>message.text==='外部完成摘要'&&message.actor.id==='demo-planner'));
@@ -190,7 +190,7 @@ test('external claim carries a renewable lease cleared by completion',t=>{
   const heartbeat=service.execute({version:'0.1',commandId:uid(),roomId,type:'task.heartbeat',payload:{taskId,taskVersion:claim.result.version}},{id:'demo-planner',kind:'agent'});
   assert.ok(heartbeat.result.leaseUntil);
   assert.throws(()=>service.execute({version:'0.1',commandId:uid(),roomId,type:'task.heartbeat',payload:{taskId,taskVersion:claim.result.version}},{id:'demo-reviewer',kind:'agent'}),/只能续租分配给自己的任务/);
-  service.execute({version:'0.1',commandId:uid(),roomId,type:'task.complete',payload:{taskId,taskVersion:claim.result.version,summary:'done'}},{id:'demo-planner',kind:'agent'});
+  service.execute({version:'0.1',commandId:uid(),roomId,type:'task.complete',payload:{taskId,taskVersion:claim.result.version,contextToken:claim.result.contextToken,summary:'done'}},{id:'demo-planner',kind:'agent'});
   assert.equal(store.get<Task>('tasks',taskId)!.leaseUntil,undefined);
 });
 
@@ -229,7 +229,7 @@ test('a previous external claim cannot complete or renew a later claim by the sa
    assert.throws(()=>service.execute({version:'0.1',commandId:uid(),roomId,type,payload:{taskId,taskVersion:first.result.version}},actor),/任务版本已变化/);
  }
  assert.equal(store.get<Task>('tasks',taskId)!.status,'running');
- service.execute({version:'0.1',commandId:uid(),roomId,type:'task.complete',payload:{taskId,taskVersion:second.result.version}},actor);
+ service.execute({version:'0.1',commandId:uid(),roomId,type:'task.complete',payload:{taskId,taskVersion:second.result.version,contextToken:second.result.contextToken}},actor);
  assert.equal(store.get<Task>('tasks',taskId)!.status,'completed');
 });
 

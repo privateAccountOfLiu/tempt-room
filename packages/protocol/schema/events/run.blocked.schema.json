@@ -5,6 +5,13 @@
     "run": {
       "type": "object",
       "properties": {
+        "effectScope": {
+          "type": "string",
+          "enum": [
+            "conversation-only",
+            "unrestricted"
+          ]
+        },
         "usageByGeneration": {
           "type": "object",
           "propertyNames": {
@@ -229,13 +236,11 @@
               "maximum": 7200000
             },
             "tokenBudget": {
-              "default": 0,
               "type": "integer",
               "minimum": 0,
               "maximum": 100000000
             },
             "costBudgetUsd": {
-              "default": 0,
               "type": "number",
               "minimum": 0,
               "maximum": 1000000
@@ -244,9 +249,7 @@
           "required": [
             "memoryMb",
             "maxProcesses",
-            "timeoutMs",
-            "tokenBudget",
-            "costBudgetUsd"
+            "timeoutMs"
           ],
           "additionalProperties": false
         },

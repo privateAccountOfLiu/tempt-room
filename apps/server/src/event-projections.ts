@@ -47,6 +47,20 @@ export function projectEvent(sink:ProjectionSink,event:RoomEvent){
       put('messages',message);break;
     }
     case 'task':{
+      const previous=sink.get('tasks',payload.task.id),next=payload.task,receipt=next.externalContext;
+      if(event.schemaVersion!==0){
+        const sameLease=previous&&(previous.generation??1)===(next.generation??1)&&previous.version===next.version;
+        if(event.type==='task.context.advanced'||event.type==='task.claimed'&&receipt){
+          const context=receipt&&sink.get('contexts',receipt.token);
+          if(!context||context.throughSeq!==receipt.throughSeq||context.roomId!==event.roomId||receipt.baseSeq>receipt.throughSeq||receipt.throughSeq>=event.seq||!next.leaseUntil||next.status!=='running')throw new Error('Task context has no leased input snapshot');
+          if(event.type==='task.context.advanced'){
+            if(!previous||!sameLease||previous.agentId!==next.agentId)throw new Error('Task context cannot replace a lease');
+            const before=previous.externalContext;
+            if(before&&(receipt.token===before.token||receipt.baseSeq!==before.baseSeq||receipt.throughSeq<before.throughSeq||projectionJson(receipt.policy)!==projectionJson(before.policy)||payload.delta?.fromSeq!==before.throughSeq||payload.delta?.throughSeq!==receipt.throughSeq||payload.delta?.hasMore!==receipt.hasMore||payload.delta?.headSeq>=event.seq))throw new Error('Invalid external context advancement');
+          }
+        }else if(sameLease&&projectionJson([previous.externalContext])!==projectionJson([receipt]))throw new Error('Task context requires an input event');
+        if(event.type==='task.completed'&&previous?.externalContext&&payload.contextToken!==previous.externalContext.token)throw new Error('Task completion has no current input receipt');
+      }
       put('tasks',payload.task);
       // Task versions fence previously published summaries as well as runs.
       for(const message of sink.list('messages')){
@@ -60,6 +74,7 @@ export function projectEvent(sink:ProjectionSink,event:RoomEvent){
       if(event.schemaVersion!==0)validateRunTransition(previous,next,event.type);
       if(previous&&event.schemaVersion!==0){
         const generation=previous.generation??1;
+        if(projectionJson([next.effectScope])!==projectionJson([previous.effectScope]))throw new Error('Execution effect scope is immutable');
         if(previous.contextPolicy&&(next.basedOnSeq!==previous.basedOnSeq||next.contextId!==previous.contextId||projectionJson([next.contextPolicy])!==projectionJson([previous.contextPolicy])))throw new Error('Original context and policy are immutable');
         if(event.type==='run.context.advanced'){
           if(next.generation!==generation+1||!next.executionId||next.executionId===previous.executionId||next.status!=='running'||previous.finalMessageId||previous.stopReason)throw new Error('Invalid context continuation identity');

@@ -150,6 +150,16 @@
     ]
   },
   {
+    "type": "task.context.advanced",
+    "durability": "durable",
+    "aggregate": "task",
+    "projector": "task",
+    "schemaVersion": 1,
+    "kinds": [
+      "task.context"
+    ]
+  },
+  {
     "type": "task.lease_expired",
     "durability": "durable",
     "aggregate": "task",

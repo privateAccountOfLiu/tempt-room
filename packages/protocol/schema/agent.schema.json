@@ -63,6 +63,7 @@
         "room_post",
         "task_propose",
         "task_claim",
+        "task_context",
         "task_complete",
         "task_heartbeat",
         "artifact_publish"
@@ -78,6 +79,7 @@
           "room_post",
           "task_propose",
           "task_claim",
+          "task_context",
           "task_complete",
           "task_heartbeat",
           "artifact_publish"

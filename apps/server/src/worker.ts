@@ -140,7 +140,7 @@ export class Worker {
         const hasManagedRun = this.store.list<Run>('runs', task.roomId).some(run => run.taskId === task.id && !terminalStates.has(run.status));
         if (hasManagedRun) continue;
         const previousAgentId = task.agentId;
-        task.status = 'proposed'; task.agentId = 'unassigned'; task.open = true; task.version += 1; task.generation=(task.generation??1)+1;delete task.leaseUntil;
+        task.status = 'proposed'; task.agentId = 'unassigned'; task.open = true; task.version += 1; task.generation=(task.generation??1)+1;delete task.leaseUntil;delete task.externalContext;
          this.store.event(task.roomId, 'task.lease_expired', SYSTEM, { task, previousAgentId });
       }
     });
@@ -254,6 +254,7 @@ export class Worker {
     const timeout = setTimeout(() => controller.abort(new Error('运行达到时间上限')), run.limits!.timeoutMs);
     try {
       if (!agent?.enabled || !this.store.room(run.roomId)?.members.includes(agent.id)) throw new Error('Agent 已停用或不在当前房间');
+      if(run.effectScope==='conversation-only'&&!['api','demo'].includes(agent.provider))throw new Error('Agent 执行能力已变化，请显式重试以重新确认执行范围');
       if(agent.connectionMode==='external')throw new Error('成员已改用外部会话，不启动旧的托管运行');
       const report = await diagnose(agent, this.host);
       if (!report.ready) throw new Error(report.checks.filter(c => !c.passed).map(c => c.detail).join('；'));
@@ -388,20 +389,21 @@ export class Worker {
     if(stored&&this.shouldAutoRetry(stored))queueMicrotask(()=>this.autoRetry(stored));
   }
   private consumeToolCall(run:Run){const max=this.store.settings().maxToolCallsPerRun,used=this.toolCalls.get(run.id)??0;if(used>=max)throw new ProtocolError('tool_budget_exceeded',`单次运行工具调用已达上限（${max}）`,429);this.toolCalls.set(run.id,used+1);}
-  /** Restart recovery only requeues sandbox chat runs that never recorded a Room tool operation or artifact. */
+  /** Absence of Room writes is insufficient: native and remote effects remain unobservable. */
   private recoverInterrupted(){
     if(!this.store.settings().recoverInterruptedChatRuns)return;
     for(const candidate of this.store.list<Run>('runs')){
-      if(candidate.status!=='interrupted'||candidate.taskId||candidate.discussionId||(candidate.recoveryCount??0)>=1)continue;
+      if(candidate.status!=='interrupted'||candidate.effectScope!=='conversation-only'||candidate.taskId||candidate.discussionId||(candidate.recoveryCount??0)>=1)continue;
       const agent=this.store.get<AgentDescriptor>('agents',candidate.agentId);
-      if(!agent?.enabled||agent.executionMode!=='sandbox'||agent.connectionMode==='external')continue;
+      if(!agent?.enabled||!['demo','api'].includes(agent.provider)||agent.executionMode!=='sandbox'||agent.connectionMode==='external')continue;
       if(this.store.list<ToolOperation>('operations',candidate.roomId).some(operation=>operation.runId===candidate.id))continue;
       if(this.store.list<Artifact>('artifacts',candidate.roomId).some(artifact=>artifact.runId===candidate.id))continue;
       const room=this.store.room(candidate.roomId);if(!room)continue;
       try{
-        const next=this.service.enqueue(candidate.roomId,candidate.agentId,candidate.prompt,room.seq,{autoRetryOf:candidate.id,recoveryCount:1});
         this.store.atomic(()=>{
           const run=this.store.get<Run>('runs',candidate.id);if(!run||run.status!=='interrupted')return;
+          if((run.recoveryCount??0)>=1||this.store.list<Run>('runs',run.roomId).some(item=>item.autoRetryOf===run.id))return;
+          const next=this.service.enqueue(candidate.roomId,candidate.agentId,candidate.prompt,room.seq,{autoRetryOf:candidate.id,recoveryCount:1});
           run.recoveryCount=1;run.updatedAt=now();
           this.store.event(run.roomId,'run.updated',SYSTEM,{run},null,run.id);
           this.store.event(run.roomId,'audit.recorded',SYSTEM,{action:'run.recovered:'+run.id+'->'+next.id},null,run.id);
@@ -413,10 +415,10 @@ export class Worker {
   private shouldAutoRetry(run:Run){
     const settings=this.store.settings();
     if(!settings.autoRetryChatRuns||settings.maxAutoRetries<=0)return false;
-    if(run.status!=='failed'||run.taskId||run.discussionId)return false;
+    if(run.status!=='failed'||run.effectScope!=='conversation-only'||run.taskId||run.discussionId)return false;
     if((run.autoRetryCount??0)>=settings.maxAutoRetries)return false;
     const agent=this.store.get<AgentDescriptor>('agents',run.agentId);
-    if(!agent?.enabled||agent.executionMode!=='sandbox'||agent.connectionMode==='external')return false;
+    if(!agent?.enabled||!['demo','api'].includes(agent.provider)||agent.executionMode!=='sandbox'||agent.connectionMode==='external')return false;
     const failure=classifyFailure(run.error,'failed');
     if(!['timeout','network','provider'].includes(failure.kind))return false;
     if(this.store.list<ToolOperation>('operations',run.roomId).some(operation=>operation.runId===run.id))return false;
@@ -425,9 +427,13 @@ export class Worker {
   }
   private autoRetry(run:Run){
     try{
+      this.store.atomic(()=>{
+      const current=this.store.get<Run>('runs',run.id);if(!current||!this.shouldAutoRetry(current))return;
+      if(this.store.list<Run>('runs',run.roomId).some(item=>item.autoRetryOf===run.id))return;
       if(this.store.list<Run>('runs',run.roomId).some(item=>item.id!==run.id&&item.agentId===run.agentId&&!terminalStates.has(item.status)))return;
       const next=this.service.enqueue(run.roomId,run.agentId,run.prompt,this.store.room(run.roomId)!.seq,{autoRetryOf:run.id,autoRetryCount:(run.autoRetryCount??0)+1});
       this.store.event(run.roomId,'audit.recorded',SYSTEM,{action:'auto.retry:'+run.id+'->'+next.id},null,run.id);
+      });
     }catch{/* Queue, rate, or budget limits still apply to automatic retries. */}
   }
   /** Explicit recovery does not submit or restart a model request. */
@@ -562,8 +568,12 @@ export class Worker {
       return this.service.execute({ version: VERSION, commandId, roomId, type: 'task.claim', payload: { ...input, managed: false } }, actor);
     }
     if (name === 'task_complete') {
-      const input = z.object({ taskId: z.string(), taskVersion: z.number().int().positive(), generation:z.number().int().positive().optional(), ok: z.boolean().default(true), summary: z.string().max(8000).default('') }).strict().parse(args);
+      const input = z.object({ taskId: z.string(), taskVersion: z.number().int().positive(), generation:z.number().int().positive().optional(), contextToken:z.string().optional(), ok: z.boolean().default(true), summary: z.string().max(8000).default('') }).strict().parse(args);
       return this.service.execute({ version: VERSION, commandId, roomId, type: 'task.complete', payload: input }, actor);
+    }
+    if (name === 'task_context') {
+      const input = z.object({taskId:z.string(),taskVersion:z.number().int().positive(),generation:z.number().int().positive().optional()}).strict().parse(args);
+      return this.service.execute({version:VERSION,commandId,roomId,type:'task.context',payload:input},actor);
     }
     if (name === 'task_heartbeat') {
       const input = z.object({ taskId: z.string(), taskVersion: z.number().int().positive(), generation:z.number().int().positive().optional() }).strict().parse(args);
