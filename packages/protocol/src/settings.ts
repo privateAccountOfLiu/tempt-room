@@ -16,6 +16,7 @@ export const executionSettingsSchema=z.object({
   maxQueuedRunsPerRoom:z.number().int().min(1).max(500).default(20),
   maxAgentRunsPerMinute:z.number().int().min(1).max(1000).default(30),
   maxToolResultBytes:z.number().int().min(65536).max(8388608).default(2097152),
+  maxToolCallsPerRun:z.number().int().min(1).max(10000).default(100),
   maxContextMessages:z.number().int().min(1).max(200).default(40),
   autoRetryChatRuns:z.boolean().default(false),
   maxAutoRetries:z.number().int().min(0).max(3).default(1),

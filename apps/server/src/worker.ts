@@ -94,6 +94,7 @@ export class Worker {
   private timer?: NodeJS.Timeout;
   private closed = false;
   private fairServed = new Map<string,number>();
+  private toolCalls = new Map<string,number>();
   readonly streamListeners = new Set<(delta: StreamDelta) => void>();
   constructor(public store: Store, public service: RoomService, public root: string,private options:{adapter?:typeof runAdapter}={}) {
     this.operations=new ToolOperations(store,()=>store.settings().maxToolResultBytes);
@@ -382,9 +383,11 @@ export class Worker {
       }
       this.service.settleDiscussion(run);
     });
+    this.toolCalls.delete(run.id);
     const stored=this.store.get<Run>('runs',run.id);
     if(stored&&this.shouldAutoRetry(stored))queueMicrotask(()=>this.autoRetry(stored));
   }
+  private consumeToolCall(run:Run){const max=this.store.settings().maxToolCallsPerRun,used=this.toolCalls.get(run.id)??0;if(used>=max)throw new ProtocolError('tool_budget_exceeded',`单次运行工具调用已达上限（${max}）`,429);this.toolCalls.set(run.id,used+1);}
   /** Automatic retry is intentionally narrower than the owner retry command: sandbox-only chat runs without recorded side effects. */
   private shouldAutoRetry(run:Run){
     const settings=this.store.settings();
@@ -461,7 +464,7 @@ export class Worker {
       if (!run || !this.active.has(run.id) || this.active.get(run.id)!.signal.aborted || !['running','waiting_input'].includes(run.status)) throw new ProtocolError('run_not_active','运行没有活动授权',409);
       if(fence)assertRunFence(this.store,fence);
       else if(run.executionId)throw new ProtocolError('execution_identity_required','工具通道缺少不可变的执行授权',409);
-      const args=request?.arguments??{},name=request?.name,actor={id:run.agentId,kind:'agent' as const};const toolAgent=this.store.get<AgentDescriptor>('agents',run.agentId);assertRoomToolAllowed(toolAgent?.roomToolPolicy,String(name),toolAgent?.allowedRoomTools);
+      const args=request?.arguments??{},name=request?.name,actor={id:run.agentId,kind:'agent' as const};const toolAgent=this.store.get<AgentDescriptor>('agents',run.agentId);assertRoomToolAllowed(toolAgent?.roomToolPolicy,String(name),toolAgent?.allowedRoomTools);this.consumeToolCall(run);
       const commandId=fence?'tool_'+digest([run.id,fence.generation,request?.operationId]).slice(0,64):uid('tool');
       const scope={runId:run.id,...(fence?{generation:fence.generation,executionId:fence.executionId}:{})};
       let action:()=>unknown;
@@ -574,6 +577,7 @@ export class Worker {
     throw new Error('不支持的房间工具');
   }
   async close() {
+    this.toolCalls.clear();
     this.closed = true; if (this.timer) clearInterval(this.timer);
     for (const controller of this.active.values()) controller.abort(new Error('服务关闭'));
     this.host.close();
