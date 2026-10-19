@@ -587,6 +587,19 @@ try {
     writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
     report.screenshots.push(screenshotPath);
     step('screenshot', {path: screenshotPath});
+    await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true},sessionId);
+    await sleep(350);
+    const mobileState = await evaluate("(()=>{const details=document.querySelector('.details-panel');const composer=document.querySelector('.composer textarea');return {detailsDisplay:details?getComputedStyle(details).display:'missing',composer:!!composer,overflow:document.documentElement.scrollWidth>window.innerWidth+1};})()") as any;
+    if (mobileState.detailsDisplay !== 'none') fail('移动端仍显示右侧详情面板');
+    if (!mobileState.composer) fail('移动端缺少消息输入框');
+    if (mobileState.overflow) fail('移动端出现水平溢出');
+    const mobileShot = await send('Page.captureScreenshot', {format: 'png'}, sessionId);
+    const mobileShotPath = join(runDir, 'ui-mobile.png');
+    writeFileSync(mobileShotPath, Buffer.from(mobileShot.data, 'base64'));
+    report.screenshots.push(mobileShotPath);
+    step('mobile-layout', {path: mobileShotPath, width: 390, height: 844});
+    await send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
+
     report.consoleErrors = consoleErrors;
     if (consoleErrors.length) fail(`页面出现 ${consoleErrors.length} 条控制台错误/异常：${consoleErrors.slice(0, 3).join(' | ')}`);
     report.ok = true;

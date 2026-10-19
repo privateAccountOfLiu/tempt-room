@@ -97,7 +97,7 @@
 ## 增量：审计导出与 UI 体验
 
 - 新增 owner-only `GET /api/rooms/:id/audit/export`：按事件原样输出 NDJSON（事件 id、seq、type、actor、payload 等），并设置 `application/x-ndjson` 与附件下载名；房间头部新增「导出审计日志」按钮。测试覆盖 owner 下载、未认证 401、NDJSON 可解析与事件字段；自动测试 202/202。
-- UI 体验：运行用量改为紧凑的两行（用量未返回时不再重复三个“未知”），任务卡操作下拉改为紧凑样式并补 aria-label，房间头部显示“N 进行中”，owner 页脚提高对比度；新增“当前房间 id 写入 URL 查询参数 + 浏览器标签标题显示房间名”的持久化，刷新后保持所选房间。浏览器 E2E 新增 `room-url-and-title-persistence`、`usage-tab`、`run-detail-modal` 与 `composer-keyboard-shortcut` 步骤，全量 39/39 通过。
+- UI 体验：运行用量改为紧凑的两行（用量未返回时不再重复三个“未知”），任务卡操作下拉改为紧凑样式并补 aria-label，房间头部显示“N 进行中”，owner 页脚提高对比度；新增“当前房间 id 写入 URL 查询参数 + 浏览器标签标题显示房间名”的持久化，刷新后保持所选房间。浏览器 E2E 新增 `room-url-and-title-persistence`、`usage-tab`、`run-detail-modal`、`composer-keyboard-shortcut` 与 `mobile-layout` 步骤，全量 41/41 通过。
 - 新增右侧「用量」标签：按房间汇总输入/输出 Token、费用估值、已上报/未知运行数，并按 Agent 列出用量；未知提供方不会被当作 0。该面板不强制预算，只提供可解释的成本可见性。
 - 新增「运行详情」弹窗：从进行中运行、错误卡片或用量历史打开，展示时间、任务/版本、上下文水位、提示词、错误原文、限额/预算与 Room 工具操作记录；支持停止和显式重试。
 - 仓库与 CI：`git init -b main` 首个提交 `ced6da3` 纳入全部基线；新增 `.github/workflows/ci.yml`（typecheck、密钥扫描、单元测试、replay 契约、production build，Windows runner）；本地未实际触发 GitHub Actions。
@@ -121,7 +121,7 @@
 - `discussion.start` 新增可选 `quorum`（默认等于参与者数）；拒绝 quorum 超过参与人数、或 maxResponses 小于 quorum 的不可达配置。
 - 每轮成功响应达到 quorum 即推进下一轮：未完成成员记入 `Discussion.absent` 并以 `superseded` 取消，避免慢成员阻塞本轮；若所有运行终止仍未达 quorum 则停止讨论。默认 quorum 为全员，保留原语义。
 - 讨论横幅显示 Quorum 与缺席成员；创建讨论表单增加 quorum 字段（0=全部）。
-- 测试：`tests/discussion-quorum.test.ts` 覆盖提前推进、缺席记录、迟到取消、quorum 不可达拒绝；`npm test` **214/214**。
+- 测试：`tests/discussion-quorum.test.ts` 覆盖提前推进、缺席记录、迟到取消、quorum 不可达拒绝；`npm test` **215/215**。
 
 ## 增量：房间 / 成员待处理运行上限
 
@@ -177,18 +177,23 @@
 - 新增注入相关测试：外部/远程消息中的指令原样作为数据进入上下文，不会被解析为工具授权；超长文本带明确截断标记。`tests/context-format.test.ts` 2 项，`npm test` **214/214**。
 - 右侧新增「讨论记录」：显示最近 3 场讨论的状态、轮次、quorum 与缺席成员；点击打开只读「讨论详情」，含关联运行与发言记录。浏览器 E2E 新增 `discussion-history`，全量 **40/40**。
 
+## 增量：公平性压力测试与移动端布局
+
+- 新增 20 Agent × 5 运行的无模型公平性压力测试：使用公平排序连续调度 100 次，所有 Agent 均被服务 5 次，无饥饿；`npm test` **215/215**。
+- 浏览器 E2E 新增 390×844 移动端步骤：右侧详情面板隐藏、消息输入框可见、无水平溢出；移动端截图 `docs/screenshots/ui-mobile-20261019.png`，全量 **41/41**。
+
 ## 原计划逐项剩余工作
 
 P0 尚未完成：
 
 1. 把可恢复副作用的操作记录扩展到适配器内部的命令执行，区分可证明幂等与结果未知的原生工作；Room 工具 fencing 与账本已完成，不能替代内部 Shell/网络副作用的验收。
 2. 带 generation/租约的崩溃恢复与安全自动重入队。中断标记、generation 撤销与显式重入队事件已具备；必须先解决外部命令副作用不受 SQLite 回滚保护的问题，当前仍不盲目重试状态不明的写运行。
-3. 更多 seq 边界的随机故障注入与并发冲突门禁，并把完整故障与 UI 不变量纳入 CI；本地 CI 配置已添加（`.github/workflows/ci.yml`：typecheck、密钥扫描、214 项测试、replay 契约、构建），尚未在远端实际执行。
+3. 更多 seq 边界的随机故障注入与并发冲突门禁，并把完整故障与 UI 不变量纳入 CI；本地 CI 配置已添加（`.github/workflows/ci.yml`：typecheck、密钥扫描、215 项测试、replay 契约、构建），尚未在远端实际执行。
 
 P1 尚未完成：
 
 1. 单一 Worker 调度器、房间并发闸门与最近服务公平排序/aging 已实现；加权 WFQ、链深上限、每 Agent 每轮配额与公平性压测仍待实现。
-2. quorum/absent/late、分桶 EWMA 自适应超时与超时草稿降级测试已实现（第六/八/十二批）；按轮公平性压测与加权 WFQ 仍待实现。
+2. quorum/absent/late、分桶 EWMA 自适应超时、超时草稿降级与 20 Agent 公平性压力测试已实现；加权 WFQ、链深/每轮配额仍待实现。
 3. 每 Agent/房间待处理运行上限已实现（`maxQueuedRunsPerAgent`/`maxQueuedRunsPerRoom`，入队前 429 原子失败）；工具输出上限、每 Agent 增量 inbox 与大规模上下文分段/引用仍待实现。
 4. 单次运行 Token/费用硬预算、房间累计用量上限与入队前熔断、房间成本看板均已实现（未知用量不按 0 计）；时长上限由 timeout 控制。
 5. 消息 trust 来源级、上下文内不可信标注与序列化注入测试、JSONL 审计导出、显式 `run.retry`、失败分类建议已实现；工具前策略校验与自动重试策略仍待实现。
