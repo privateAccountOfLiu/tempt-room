@@ -46,7 +46,7 @@ JSON Schema 是命令形状的权威来源：`packages/protocol/schema/*.schema.
 - `task.revise`：taskId、title；递增任务及其传递依赖的版本、取消旧运行并标记旧发言；完成整棵依赖树的失效处理后，共用新快照重新排队。尚未接受的提案保持 proposed，修改文字不自动启动执行。
 - `task.accept`：taskId、可选 projectPath，仅人类确认 proposed 任务；确认不额外递增版本。
 - `task.handoff`：taskId、agentId、可选 note，仅人类；把任务转交给同房间另一个已启用 Agent，递增该任务及全部下游版本、取消旧运行并标记旧发言，再重新排队已接受任务；未接受提案不自动执行。Agent 侧可用 `task_propose` 携带 `dependencies` 提议后继任务（仍需人类确认）。
-- `settings.update`：完整运行设置 concurrency、memoryMb、maxProcesses、taskTimeoutMs、chatTimeoutMs、taskLeaseMs。仅人类可修改；缺省值由 Schema 给定，属于替换语义。`taskLeaseMs` 控制外部任务认领的租约时长（默认 600000ms），过期且无托管运行的任务会被回收为开放任务。
+- `settings.update`：完整运行设置 concurrency、memoryMb、maxProcesses、taskTimeoutMs、chatTimeoutMs、taskLeaseMs、tokenBudget、costBudgetUsd。仅人类可修改；缺省值由 Schema 给定，属于替换语义。`taskLeaseMs` 控制外部任务认领的租约时长（默认 600000ms），过期且无托管运行的任务会被回收为开放任务。`tokenBudget`/`costBudgetUsd` 为单次运行的硬预算，0 表示不限，创建运行时冻结到 Run.limits。
 - `run.cancel`：runId；`run.input`：runId、text，只用于 waiting_input 状态。
 - `decision.propose`：text；`decision.accept`：decisionId，人类确认后才进入后续授权上下文。
 - `agent.save`：完整 AgentDescriptor，不含密钥值。`connectionMode` 默认为 `managed`；设为 `external` 后，提及只记录 `agent.wake.requested`，分派任务等待外部成员主动认领，不创建托管 Run。外部成员只能 managed=false 认领同房间开放任务，或明确分给自己的 queued 任务；依赖必须已完成。当前自动讨论不支持外部成员。
@@ -115,7 +115,7 @@ Run：queued → running → completed/failed；可进入 waiting_input，再由
 
 每轮上下文在入队事务内固定为 contextId，记录 fromSeq/throughSeq；所有参与者引用同一快照。使用最多最近 40 条消息，提示文本每条展示最多 6000 字符并标明截取；保留全部已接受决策。原始事件不被摘要替代。依赖完成后保存 dependencyVersions 和 inputArtifacts，只纳入同房间、当前已完成版本的交付物。文本附件每份最多展示 16,000 字符，总展示预算 64,000 字符，完整副本供本地 Agent 读取。二进制对 API 只提供描述。原生 room_read 返回该运行绑定的快照，不能读到后续轮次的消息或扩大权限。
 
-Run.limits 保存入队时的内存、进程与超时设置。系统宿主的 sandbox.started 报告实际绑定限制后，才形成 sandbox.verified；改变全局设置不会改写既有运行。usage.scope 为 run、last-request 或 session-total；缺失数值表示未知，不能按零计算。
+Run.limits 保存入队时的内存、进程、超时与单次运行 Token/费用预算。系统宿主的 sandbox.started 报告实际绑定限制后，才形成 sandbox.verified；改变全局设置不会改写既有运行。usage.scope 为 run、last-request 或 session-total；缺失数值表示未知，不能按零计算。已上报用量超过冻结预算时运行以 `failed` 结束并保留错误原文，未上报的提供方不会被当成超预算或未超预算。
 
 自建 API 的 responseFormat 为 text 或 room-json。后者只接受完整的 `{message, artifacts:[{name,text,mediaType}]}` 对象，最多 10 个文本交付物；不开放调用工具，也不将报告当成可应用补丁。
 

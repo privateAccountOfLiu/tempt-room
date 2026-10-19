@@ -53,3 +53,4 @@
 .usage-row strong{font-size:11px;font-weight:500;color:#c7d5bc}
 .usage-row strong small{display:block;margin-top:3px;font-size:9px;font-weight:400;color:#738364}
 .usage-row>span{display:block;margin-top:6px;font-size:9px;line-height:1.8;color:#91a385}
+.usage-budget{font-size:9px;color:#9db08d;border:1px solid #2f3d28;background:#151b13;border-radius:4px;padding:6px 8px;margin:0 0 13px;line-height:1.7}

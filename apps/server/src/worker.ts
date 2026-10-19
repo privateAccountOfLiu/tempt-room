@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync } from 'no
 import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
-import { defaultSandbox, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError, type AgentDescriptor, type Artifact, type Discussion, type Message, type Run, type Task, type StreamDelta } from '../../../packages/protocol/src/index.ts';
+import { defaultSandbox, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError, type AgentDescriptor, type Artifact, type Discussion, type Message, type Run, type Task, type StreamDelta } from '../../../packages/protocol/src/index.ts';
 import { diagnose, ExecutionUnknown, RemoteCanceled, runAdapter } from './adapters.ts';
 import { SandboxHost } from './sandbox.ts';
 import { digest, now, Store, SYSTEM, uid } from './store.ts';
@@ -18,6 +18,10 @@ import { codexThreadKey, reconcileAttachedRun } from './codex-attach.ts';
 import { assertRunFence,assertRunIdentity,executionFence } from './execution.ts';
 import { ToolOperations } from './tool-operations.ts';
 import type { RunFence,AgentOutput }  from '../../../packages/protocol/src/index.ts';
+
+/** A hard budget stop is a failed run, not a user cancellation. */
+class BudgetExceeded extends Error {}
+
 import type { CodexRunState } from '../../../packages/protocol/src/index.ts';
 
 /**
@@ -158,7 +162,7 @@ export class Worker {
       // Legacy queued work keeps its original authorization: no implicit extra
       // model turns on upgrade, but old-context success is still rejected.
       run.contextPolicy??={...settings.contextPolicy,maxRounds:0};run.lifecycleVersion??=1;
-      run.limits??={memoryMb:settings.memoryMb,maxProcesses:settings.maxProcesses,timeoutMs:run.taskId?settings.taskTimeoutMs:settings.chatTimeoutMs};
+      run.limits??={memoryMb:settings.memoryMb,maxProcesses:settings.maxProcesses,timeoutMs:run.taskId?settings.taskTimeoutMs:settings.chatTimeoutMs,tokenBudget:settings.tokenBudget,costBudgetUsd:settings.costBudgetUsd};
       run.generation??=1;run.executionId=uid('execution');run.leaseUntil=new Date(Date.now()+settings.taskLeaseMs).toISOString();
       const fence=executionFence(run);this.executions.set(fence.executionId,fence);
       run.status = 'running'; run.updatedAt = now();
@@ -228,7 +232,7 @@ export class Worker {
           const current=this.store.get<Run>('runs',run.id)!;current.nativeSessionId=output.id;this.store.atomic(()=>{this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);});
         } else if(output.type==='remote-task'){
           run.remoteTaskId=output.id;const current=this.store.get<Run>('runs',run.id)!;current.remoteTaskId=output.id;this.store.atomic(()=>{this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);});
-        } else if (output.type === 'usage') {run.usage=output.usage;const current=this.store.get<Run>('runs',run.id)!;current.usage=output.usage;current.usageByGeneration={...current.usageByGeneration,[String(run.generation??1)]:output.usage};this.store.atomic(()=>{this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);});}
+        } else if (output.type === 'usage') {run.usage=output.usage;const current=this.store.get<Run>('runs',run.id)!;current.usage=output.usage;current.usageByGeneration={...current.usageByGeneration,[String(run.generation??1)]:output.usage};this.store.atomic(()=>{this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);});const budget=budgetError(run.limits,current.usageByGeneration);if(budget)throw new BudgetExceeded(budget);}
         else if (output.type === 'input') { this.publishMessage(run, output.question, uid('msg')); }
         else if (output.type === 'artifact'){if(artifacts.length>=10||Buffer.byteLength(output.text)>2**20)throw new Error('候选交付物超过 10 份或单份 1 MiB 上限');artifacts.push(output);}
       }
@@ -317,7 +321,7 @@ export class Worker {
       if(error instanceof ProtocolError&&error.code==='lease_expired'){this.finish(run,'interrupted','执行租约已过期，未提交迟到输出');return;}
       const message = redactDiagnostic(error,[agent?.credentialEnv?process.env[agent.credentialEnv]:undefined,agent?.codexBinding?.credentialEnv?process.env[agent.codexBinding.credentialEnv]:undefined]);
       const contextFailure=error instanceof ProtocolError&&error.code.startsWith('context_');
-      const status = contextFailure?'failed':run.codex?.nativeStatus==='completed'?'completed':run.codex?.nativeStatus==='failed'?'failed':error instanceof ExecutionUnknown?'unknown':error instanceof RemoteCanceled?'canceled':controller.signal.aborted ? ['api','a2a'].includes(agent.provider) ? 'interrupted' : 'canceled' : 'failed';
+      const status = error instanceof BudgetExceeded?'failed':contextFailure?'failed':run.codex?.nativeStatus==='completed'?'completed':run.codex?.nativeStatus==='failed'?'failed':error instanceof ExecutionUnknown?'unknown':error instanceof RemoteCanceled?'canceled':controller.signal.aborted ? ['api','a2a'].includes(agent.provider) ? 'interrupted' : 'canceled' : 'failed';
       this.finish(run, status, status==='completed'?undefined:status==='interrupted' && ['api','a2a'].includes(agent.provider) ? '已停止接收；远程计算是否停止未知。' : message);
     } finally { clearTimeout(timeout);for(const id of ownedExecutions)this.executions.delete(id); }
   }

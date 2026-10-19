@@ -3,7 +3,7 @@ import { executionSettingsSchema,type RunLimits } from './settings.ts';
 import { codexBindingSchema, type CodexRunState } from './codex.ts';
 export { eventRegistry, eventRegistryManifest, eventDefinition, eventMetadata, EventContractError, projectionTableNames, type ProjectionTable } from './events.ts';
 export { codexBindingSchema, codexRunStateSchema, type CodexBinding, type CodexRunState } from './codex.ts';
-export { executionSettingsSchema,runLimitsSchema,defaultExecutionSettings,type ExecutionSettings,type RunLimits } from './settings.ts';
+export { executionSettingsSchema,runLimitsSchema,defaultExecutionSettings,budgetError,type ExecutionSettings,type RunLimits,type BudgetUsage } from './settings.ts';
 export { actorSchema,sandboxProfileSchema,messageSchema,taskSchema,runSchema,artifactSchema } from './models.ts';
 export { runFenceSchema,toolOperationSchema,sameRunFence,type RunFence,type ToolOperation } from './execution.ts';
 export {contextPolicySchema,contextDeltaSchema,contextSeqOf,type ContextPolicy,type ContextDelta} from './reconciliation.ts';

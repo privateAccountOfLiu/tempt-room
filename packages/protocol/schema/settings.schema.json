@@ -71,6 +71,18 @@
       "type": "integer",
       "minimum": 5000,
       "maximum": 86400000
+    },
+    "tokenBudget": {
+      "default": 0,
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100000000
+    },
+    "costBudgetUsd": {
+      "default": 0,
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000000
     }
   },
   "required": [
@@ -80,7 +92,9 @@
     "maxProcesses",
     "taskTimeoutMs",
     "chatTimeoutMs",
-    "taskLeaseMs"
+    "taskLeaseMs",
+    "tokenBudget",
+    "costBudgetUsd"
   ],
   "additionalProperties": false
 }

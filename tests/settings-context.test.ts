@@ -19,9 +19,9 @@ function fixture(t:TestContext){
 test('execution settings persist and new runs keep their creation-time resource limits',t=>{
  const {store,command,root}=fixture(t);assert.deepEqual(store.settings(),defaultExecutionSettings);
  command('message.send',{text:'first',mentions:['demo-planner']});const first=store.list<Run>('runs')[0];
- const settings={...defaultExecutionSettings,concurrency:1,memoryMb:2048,maxProcesses:16,taskTimeoutMs:120000,chatTimeoutMs:60000,taskLeaseMs:600000};command('settings.update',settings);
+ const settings={...defaultExecutionSettings,concurrency:1,memoryMb:2048,maxProcesses:16,taskTimeoutMs:120000,chatTimeoutMs:60000,taskLeaseMs:600000,tokenBudget:5000,costBudgetUsd:0.25};command('settings.update',settings);
  command('task.create',{title:'second',agentId:'demo-reviewer'});const second=store.list<Run>('runs')[1];
- assert.deepEqual(first.limits,{memoryMb:4096,maxProcesses:64,timeoutMs:300000});assert.deepEqual(second.limits,{memoryMb:2048,maxProcesses:16,timeoutMs:120000});
+ assert.deepEqual(first.limits,{memoryMb:4096,maxProcesses:64,timeoutMs:300000,tokenBudget:0,costBudgetUsd:0});assert.deepEqual(second.limits,{memoryMb:2048,maxProcesses:16,timeoutMs:120000,tokenBudget:5000,costBudgetUsd:0.25});
  assert.throws(()=>command('settings.update',{...settings,network:'private'}));
  store.close();const reopened=new Store(join(root,'room.sqlite'));assert.deepEqual(reopened.settings(),settings);assert.deepEqual(reopened.get<Run>('runs',first.id)?.limits,first.limits);reopened.close();
 });
