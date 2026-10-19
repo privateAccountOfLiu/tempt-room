@@ -6,7 +6,7 @@
 
 | 能力 | 结果 | 验证方式 | 证据 |
 | --- | --- | --- | --- |
-| 类型检查 / 单元测试 | PASS（228/228） | `npx tsc --noEmit`、`npm test` | 测试输出；含 replay/context/audit/budget/UI 测试 |
+| 类型检查 / 单元测试 | PASS（230/230） | `npx tsc --noEmit`、`npm test` | 测试输出；含 replay/context/audit/budget/UI 测试 |
 | 运行级 Token / 费用硬预算 | PASS | `npm test`（`tests/budget.test.ts`、`tests/budget-worker.test.ts`）；设置对话框浏览器 E2E | 测试输出 |
 | 显式失败重试 `run.retry` | PASS | `npm test`（`tests/run-retry.test.ts`） | 测试输出 |
 | 讨论 quorum / 缺席 / 迟到推进 | PASS | `npm test`（`tests/discussion-quorum.test.ts`） | 测试输出 |
@@ -31,6 +31,7 @@
 | 外部 Agent 增量 inbox | PASS | `npm test`（`tests/agent-inbox.test.ts`） | 测试输出 |
 | 单次运行工具调用上限 | PASS | `npm test`（`tests/tool-budget.test.ts`） | 测试输出 |
 | 按 Agent 发言长度上限 | PASS | `npm test`（`tests/tool-policy.test.ts`） | 测试输出 |
+| Agent 提及唤醒链深 | PASS | `npm test`（`tests/wake-chain.test.ts`） | 测试输出 |
 | 移动端布局（390×844） | PASS | 浏览器 E2E `mobile-layout` | `.state/browser-e2e/`、`docs/screenshots/ui-mobile-20261019.png` |
 | 快捷键帮助面板 | PASS | 浏览器 E2E `shortcut-help` | 上述浏览器报告 |
 | 侧边栏房间搜索 | PASS | 浏览器 E2E `room-search` | 上述浏览器报告 |
@@ -42,10 +43,10 @@
 | 事件回放 / fencing / partial / 上下文契约 | PASS（63/63） | `npm run test:replay` | 测试输出 |
 | 房间事件审计导出（NDJSON） | PASS | `npm test`（`tests/audit-export.test.ts`） | 测试输出 |
 | 仓库密钥扫描 | PASS（0 finding） | `npm run check:secrets` | `.state/secret-scan/latest.json` |
-| 预发布全链路 | PASS（9/9） | `npm run test:preflight -- --with-native` | `.state/preflight/run-2Iy4Wm/report.json` |
-| 浏览器端到端 / URL 与标题恢复 / 草稿与对账 UI / 用量看板 | PASS（45/45） | `npm run test:browser` | `.state/browser-e2e/run-xo6aSF/report.json`、`docs/screenshots/ui-polish-20261019.png` |
+| 预发布全链路 | PASS（9/9） | `npm run test:preflight -- --with-native` | `.state/preflight/run-ZPZvAs/report.json` |
+| 浏览器端到端 / URL 与标题恢复 / 草稿与对账 UI / 用量看板 | PASS（45/45） | `npm run test:browser` | `.state/browser-e2e/run-T7sLJU/report.json`、`docs/screenshots/ui-polish-20261019.png` |
 | 房间用量看板（Token / 费用估值 / 未知用量） | PASS | 浏览器 E2E `usage-tab` 步骤 | 上述报告 |
-| 生产构建 + 重启恢复 + Cookie 保持 | PASS（10/10） | `npm run test:production` | `.state/production-smoke/run-wbBcb2/report.json` |
+| 生产构建 + 重启恢复 + Cookie 保持 | PASS（10/10） | `npm run test:production` | `.state/production-smoke/run-fs6SnE/report.json` |
 | Windows 原生沙箱探测 | PASS（23/23） | `npm run test:sandbox` | `.state/diagnostics/sandbox.json` |
 | 连接器进程树 | PASS（9/9） | `npm run test:connectors` | `.state/connector-probes/` |
 | 原生 Agent 协议预检 | PASS（codex/claude/deepseek） | `npm run test:agent-protocols -- --check` | `.state/native-pipecompat-20261017/diagnostics/agent-protocols.json` |
@@ -95,7 +96,7 @@
 npm run dev                         # 启动（已运行会提示当前地址）
 npm run open                        # 在浏览器打开当前运行实例
 npm run typecheck
-npm test                            # 228 项单元/契约测试
+npm test                            # 230 项单元/契约测试
 npm run test:replay                 # 事件/回放/fencing/partial/上下文契约
 npm run test:browser                # 无模型浏览器 E2E（36 步）
 npm run test:preflight -- --with-native

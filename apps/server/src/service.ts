@@ -80,7 +80,13 @@ export class RoomService {
         const message: Message = { id: uid('msg'), roomId, actor, ...input, createdAt: now(), trust: trustForActor(this.store,actor) };
         if(scope){const run=this.store.get<Run>('runs',scope.runId)!;message.runId=run.id;if(run.taskId){message.taskId=run.taskId;message.taskVersion=run.taskVersion;}message.basedOnSeq=contextSeqOf(run);message.generation=run.generation;message.executionId=run.executionId;message.stale=Boolean(run.taskId&&this.store.get<Task>('tasks',run.taskId)?.version!==run.taskVersion);}
          const event = this.store.event(roomId, 'chat.message.created', actor, { message }, command.commandId,scope?.runId??null);
-        if (actor.kind === 'human'&&input.mentions.length){const contextId=this.saveContext(roomId,event.seq);for (const agentId of new Set(input.mentions)){const agent=this.checkAgent(roomId,agentId);if(agent.connectionMode==='external')this.store.event(roomId,'agent.wake.requested',actor,{agentId,messageId:message.id,connectionMode:'external'},command.commandId);else {for(const old of this.store.list<Run>('runs',roomId))if(old.agentId===agentId&&!old.taskId&&!old.discussionId&&!terminalStates.has(old.status))this.cancel(old,'superseded');this.enqueue(roomId, agentId, input.text, event.seq, { causationId: event.eventId,contextId });}}}
+        const wakeSettings=this.store.settings();
+        const agentWake=actor.kind==='agent'&&wakeSettings.allowAgentMentionsToWake&&Boolean(scope);
+        if ((actor.kind === 'human'||agentWake)&&input.mentions.length){
+          let chainDepth=0;
+          if(agentWake&&scope){const parent=this.store.get<Run>('runs',scope.runId);chainDepth=(parent?.wakeChainDepth??0)+1;if(chainDepth>wakeSettings.maxWakeChainDepth){this.store.event(roomId,'audit.recorded',SYSTEM,{action:'wake.chain.limit:'+scope.runId},command.commandId);chainDepth=-1;}}
+          if(chainDepth>=0){const contextId=this.saveContext(roomId,event.seq);for (const agentId of new Set(input.mentions)){const agent=this.checkAgent(roomId,agentId);if(agent.connectionMode==='external')this.store.event(roomId,'agent.wake.requested',actor,{agentId,messageId:message.id,connectionMode:'external'},command.commandId);else {for(const old of this.store.list<Run>('runs',roomId))if(old.agentId===agentId&&!old.taskId&&!old.discussionId&&!terminalStates.has(old.status))this.cancel(old,'superseded');this.enqueue(roomId, agentId, input.text, event.seq, { causationId: event.eventId,contextId,wakeChainDepth:chainDepth });}}}
+        }
         return { messageId: message.id };
       }
       case 'discussion.start': {

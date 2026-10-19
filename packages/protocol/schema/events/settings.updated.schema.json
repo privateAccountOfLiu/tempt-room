@@ -105,6 +105,16 @@
           "minimum": 1,
           "maximum": 1000
         },
+        "allowAgentMentionsToWake": {
+          "default": false,
+          "type": "boolean"
+        },
+        "maxWakeChainDepth": {
+          "default": 2,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
         "maxToolResultBytes": {
           "default": 2097152,
           "type": "integer",
@@ -163,6 +173,8 @@
         "maxQueuedRunsPerAgent",
         "maxQueuedRunsPerRoom",
         "maxAgentRunsPerMinute",
+        "allowAgentMentionsToWake",
+        "maxWakeChainDepth",
         "maxToolResultBytes",
         "maxToolCallsPerRun",
         "maxContextMessages",
