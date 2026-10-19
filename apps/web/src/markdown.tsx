@@ -1,3 +1,4 @@
+import {isValidElement,useEffect,useRef,useState,type ReactNode} from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -20,6 +21,20 @@ function normalizeMath(text: string): string {
   }).join('');
 }
 
+function CodeBlock({children}:{children:ReactNode}){
+  const pre=useRef<HTMLPreElement>(null),timer=useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [status,setStatus]=useState<'idle'|'copied'|'failed'>('idle');
+  useEffect(()=>()=>clearTimeout(timer.current),[]);
+  const language=isValidElement<{className?:string}>(children)?children.props.className?.replace(/^language-/,'').slice(0,40)||'text':'text';
+  async function copy(){
+    clearTimeout(timer.current);
+    try{await navigator.clipboard.writeText(pre.current?.textContent??'');setStatus('copied');}
+    catch{setStatus('failed');}
+    timer.current=setTimeout(()=>setStatus('idle'),2000);
+  }
+  return <div className="code-frame"><div className="code-toolbar"><span>{language}</span><button type="button" aria-label="复制代码" onClick={()=>void copy()}>{status==='copied'?'已复制':status==='failed'?'复制失败，可手动选择':'复制'}</button></div><pre ref={pre}>{children}</pre><span className="sr-only" role="status">{status==='copied'?'代码已复制':status==='failed'?'复制失败，请手动选择代码':''}</span></div>;
+}
+
 /**
  * Chat message renderer: GitHub-flavored Markdown plus KaTeX math. Raw HTML is
  * not enabled, so agent output cannot inject markup into the room.
@@ -29,7 +44,7 @@ export function Markdown({ text }: { text: string }) {
     <ReactMarkdown
       remarkPlugins={[remarkGfm, remarkMath]}
       rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false, trust: false }]]}
-      components={{ a: ({ ...props }) => <a {...props} target="_blank" rel="noreferrer noopener"/> }}
+      components={{ a: ({node:_,...props}) => <a {...props} target="_blank" rel="noreferrer noopener"/>,pre:({children})=><CodeBlock>{children}</CodeBlock> }}
     >{normalizeMath(text)}</ReactMarkdown>
   </div>;
 }

@@ -257,6 +257,21 @@ try {
     const headerRoomName = () => evaluate(`document.querySelector('.room-title h1')?.textContent?.trim() ?? ''`) as Promise<string>;
     const taskCardText = (title: string) => evaluate(`(() => { const card = [...document.querySelectorAll('.task-card')].find(item => (item.textContent ?? '').includes(${JSON.stringify(title)})); return card ? card.innerText : ''; })()`) as Promise<string>;
 
+    const originalPanelWidth=await evaluate("document.querySelector('.room-main').getBoundingClientRect().width");
+    await evaluate("document.querySelector('.room-header button[aria-label=收起协作面板]')?.click()");
+    await waitFor('协作面板收起',async()=>await evaluate("document.querySelector('.details-panel').hidden&&document.querySelector('.room-main').getBoundingClientRect().width")>originalPanelWidth+250);
+    const reloadCollapsed=waitEvent('Page.loadEventFired');await send('Page.reload',{},sessionId);await reloadCollapsed;
+    await waitFor('刷新后保持收起',async()=>await evaluate("document.querySelector('.details-panel')?.hidden")===true);
+    await evaluate("document.querySelector('.room-header button[aria-label=展开协作面板]')?.click()");
+    await waitFor('面板重新展开',async()=>await evaluate("document.querySelector('.details-panel')?.hidden")===false);
+    step('panel-collapse-persistence');
+    await evaluate("document.querySelector('button[aria-label=查看房间成员]')?.click()");
+    await waitFor('仅成员面板可见',async()=>await evaluate("!!document.querySelector('#panel-content .members-section')&&!document.querySelector('#panel-content .task-card')&&!document.querySelector('#panel-content .discussion-history')"));
+    await evaluate("(()=>{const tab=document.querySelector('#panel-tab-members');tab.focus();tab.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));})()");
+    await waitFor('页签键盘导航',async()=>await evaluate("document.activeElement?.id==='panel-tab-usage'&&document.querySelector('#panel-tab-usage').getAttribute('aria-selected')==='true'&&new URLSearchParams(location.search).get('panel')==='usage'"));
+    await evaluate("document.querySelector('#panel-tab-tasks')?.click()");
+    step('exclusive-panel-keyboard-navigation');
+
     const taskTitle = `浏览器任务 ${Date.now()}`;
     if (await clickByText('button', '创建任务') !== 'ok') fail('找不到工具栏「创建任务」');
     await waitFor('任务表单', async () => (await bodyText()).includes('任务与验收要求'), 10000);
@@ -287,9 +302,10 @@ try {
 
     const goal = `浏览器讨论 ${Date.now()}`;
     if (await clickByText('button', '开启讨论') !== 'ok') fail('找不到「开启讨论」入口');
-    await waitFor('讨论表单', async () => { const text = await bodyText(); return text.includes('这场讨论要解决什么') && text.includes('推进所需成功响应'); }, 10000);
+    await waitFor('讨论表单', async () => { const text = await bodyText(); return text.includes('这场讨论要解决什么') && text.includes('讨论边界'); }, 10000);
     if (await setTextareaValue('dialog.modal textarea', goal) !== 'ok') fail('无法填写讨论目标');
     const setNumberInput = async (label: string, value: number) => evaluate(`(() => { const input = [...document.querySelectorAll('dialog.modal input[type="number"]')].find(item => (item.closest('label')?.textContent ?? '').includes(${JSON.stringify(label)})); if (!input) return 'missing'; const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; setter.call(input, ${JSON.stringify(String(value))}); input.dispatchEvent(new Event('input', {bubbles: true})); return 'ok'; })()`);
+    await evaluate("document.querySelector('dialog.modal .form-advanced')?.setAttribute('open','')");
     if (await setNumberInput('讨论轮次', 1) !== 'ok' || await setNumberInput('最多响应次数', 2) !== 'ok') fail('无法设置讨论轮次/响应上限');
     if (await clickByText('dialog.modal button', '开始讨论') !== 'ok') fail('无法提交讨论');
     // The handoff already produced one reviewer reply; the discussion must add another.
@@ -315,11 +331,13 @@ try {
     const summaryDefault=await evaluate("(()=>{const select=[...document.querySelectorAll('dialog.modal select')].find(x=>x.closest('label')?.textContent?.includes('总结人'));return select?.value;})()");
     if(summaryDefault!=='')fail('总结人必须缺省为空');
     if(await setTextareaValue('dialog.modal textarea',convergenceGoal)!=='ok')fail('无法填写收敛目标');
+    await evaluate("document.querySelector('dialog.modal .form-advanced')?.setAttribute('open','')");
     if(await setNumberInput('讨论轮次',1)!=='ok'||await setNumberInput('最多响应次数',6)!=='ok')fail('无法填写收敛上限');
     if(await setSelectByLabel('总结人','demo-reviewer')!=='ok')fail('无法指定总结人');
     const convergenceToggle=await evaluate("(()=>{const input=[...document.querySelectorAll('dialog.modal input[type=checkbox]')].find(x=>x.closest('label')?.textContent?.includes('收敛后自动结束'));if(!input)return false;input.click();return true;})()");
     if(!convergenceToggle)fail('找不到收敛复选框');
     await waitFor('收敛模式禁用轮次',async()=>await evaluate("[...document.querySelectorAll('dialog.modal input[type=number]')].find(x=>x.closest('label')?.textContent?.includes('讨论轮次'))?.disabled")===true);
+    await sleep(250);
     const formShot=await send('Page.captureScreenshot',{format:'png'},sessionId),formShotPath=join(runDir,'discussion-options.png');writeFileSync(formShotPath,Buffer.from(formShot.data,'base64'));report.screenshots.push(formShotPath);
     step('discussion-options',{screenshot:formShotPath});
     if(await clickByText('dialog.modal button','开始讨论')!=='ok')fail('无法提交收敛讨论');
@@ -408,9 +426,49 @@ try {
     step('ui-room-settings', {renamedRoom});
 
     // Return to the original room so the screenshot keeps the rich collaboration state.
-    const switchedBack = await evaluate(`(() => { const button = [...document.querySelectorAll('button')].find(item => (item.textContent ?? '').includes('浏览器端到端') && !(item.textContent ?? '').includes('新房间')); if (!button) return 'missing'; button.click(); return 'ok'; })()`);
+    const switchedBack = await evaluate(`(() => { const button = [...document.querySelectorAll('.room-link')].find(item => (item.textContent ?? '').includes('浏览器端到端') && !(item.textContent ?? '').includes('新房间')); if (!button) return 'missing'; button.click(); return 'ok'; })()`);
     if (switchedBack !== 'ok') fail('无法切回原房间');
     await waitFor('切回原房间', async () => (await headerRoomName()) === '浏览器端到端', 15000);
+
+    const savedDraft='房间 A 中还没发送的草稿';
+    await setTextareaValue('textarea[aria-label="消息内容"]',savedDraft);
+    await evaluate(`(()=>{const link=[...document.querySelectorAll('.room-link')].find(x=>x.textContent.includes(${JSON.stringify(renamedRoom)}));link?.click();})()`);
+    await waitFor('切到 B 且草稿为空',async()=>await headerRoomName()===renamedRoom&&await evaluate("document.querySelector('textarea[aria-label=消息内容]').value")==='');
+    await setTextareaValue('textarea[aria-label="消息内容"]','房间 B 的草稿');
+    await evaluate("[...document.querySelectorAll('.room-link')].find(x=>x.textContent.includes('浏览器端到端'))?.click()");
+    await waitFor('恢复 A 的独立草稿',async()=>await headerRoomName()==='浏览器端到端'&&await evaluate("document.querySelector('textarea[aria-label=消息内容]').value")===savedDraft);
+    await setTextareaValue('textarea[aria-label="消息内容"]','');
+    step('room-scoped-composer-drafts');
+    const attachmentFixture=join(runDir,'room-a-note.txt');writeFileSync(attachmentFixture,'Scoped upload fixture');
+    await evaluate("(()=>{window.__normalFetch=window.fetch;window.fetch=async(...args)=>{const response=await window.__normalFetch(...args);if(String(args[0]).includes('/attachments'))return new Promise(resolve=>{window.__releaseUpload=()=>resolve(response);});return response;};})()");
+    const fileDocument=await send('DOM.getDocument',{},sessionId),fileNode=await send('DOM.querySelector',{nodeId:fileDocument.root.nodeId,selector:'input[type=file]'},sessionId);
+    await send('DOM.setFileInputFiles',{nodeId:fileNode.nodeId,files:[attachmentFixture]},sessionId);
+    await waitFor('附件已上传但响应延迟',async()=>await evaluate("typeof window.__releaseUpload==='function'"));
+    await evaluate(`(()=>{const link=[...document.querySelectorAll('.room-link')].find(x=>x.textContent.includes(${JSON.stringify(renamedRoom)}));link?.click();})()`);
+    await waitFor('上传期间切换房间',async()=>await headerRoomName()===renamedRoom);
+    await evaluate("window.__releaseUpload()");await sleep(150);
+    if(await evaluate("document.querySelector('.composer-chips')?.textContent?.includes('room-a-note.txt')??false"))fail('旧房间附件进入了新房间草稿');
+    await evaluate("[...document.querySelectorAll('.room-link')].find(x=>x.textContent.includes('浏览器端到端'))?.click()");
+    await waitFor('附件回到所属房间',async()=>await evaluate("document.querySelector('.composer-chips')?.textContent?.includes('room-a-note.txt')??false"));
+    await evaluate(`document.querySelector('button[aria-label="移除附件 room-a-note.txt"]')?.click();window.fetch=window.__normalFetch;`);
+    step('upload-response-stays-in-source-room');
+
+    const uncertainMessage='RECEIPT_LOST_ROOM_A';
+    await evaluate(`(()=>{window.__normalFetch=window.fetch;window.__dropReply=true;window.fetch=async(...args)=>{const response=await window.__normalFetch(...args);let command;try{command=JSON.parse(args[1]?.body??'{}');}catch{}if(window.__dropReply&&command?.type==='message.send'&&command.payload?.text===${JSON.stringify(uncertainMessage)}){window.__dropReply=false;throw new TypeError('UI_FIXTURE_REPLY_LOST');}return response;};})()`);
+    await setTextareaValue('textarea[aria-label="消息内容"]',uncertainMessage);await evaluate("document.querySelector('button[aria-label=发送消息]').click()");
+    await waitFor('提交成功但响应丢失',async()=>(await bodyText()).includes('UI_FIXTURE_REPLY_LOST'));
+    await evaluate(`(()=>{const link=[...document.querySelectorAll('.room-link')].find(x=>x.textContent.includes(${JSON.stringify(renamedRoom)}));link?.click();})()`);
+    await waitFor('切到 B 继续发言',async()=>await headerRoomName()===renamedRoom);
+    await setTextareaValue('textarea[aria-label="消息内容"]','Room B independent command');await evaluate("document.querySelector('button[aria-label=发送消息]').click()");
+    await waitFor('B 发言结束',async()=>await evaluate("document.querySelector('textarea[aria-label=消息内容]').value")==='');
+    await evaluate("[...document.querySelectorAll('.room-link')].find(x=>x.textContent.includes('浏览器端到端'))?.click()");
+    await waitFor('A 待核对草稿恢复',async()=>await headerRoomName()==='浏览器端到端'&&await evaluate("document.querySelector('textarea[aria-label=消息内容]').value")===uncertainMessage);
+    await evaluate("document.querySelector('button[aria-label=发送消息]').click()");
+    await waitFor('A 使用原命令收据重试',async()=>await evaluate("document.querySelector('textarea[aria-label=消息内容]').value")==='');
+    if(store.list<any>('messages',roomId).filter(m=>m.text===uncertainMessage).length!==1)fail('切房间后重试重复发布消息');
+    await evaluate("window.fetch=window.__normalFetch;document.querySelector('.toast button')?.click()");
+    step('room-scoped-pending-command-receipts');
+
 
     const agentName = `浏览器自建助手 ${Date.now() % 1000000}`;
     if (await clickByText('button', 'Agent 连接') !== 'ok') fail('找不到 Agent 连接入口');
@@ -657,6 +715,61 @@ try {
     await waitFor('恢复后房间快照标题', async () => { const title = await evaluate("document.querySelector('.room-title h1')?.textContent?.trim() ?? ''"); return title && title !== '正在打开房间'; }, 15000);
     step('recovery-live-and-room-ready');
 
+    const showcase=(await command(roomId,'room.create',{name:'产品与工程',description:'本地协作工作台 · 界面验收示例，不调用模型',members:['demo-planner','demo-reviewer']} ) as any).result.roomId;
+    await command(showcase,'message.send',{text:'讨论一下新功能的交付方案。先明确边界，再分别处理实现与审查，最后把结论留在这里。'});
+    const showcaseStore=appHandle.store,showcaseWorker=appHandle.worker;
+    const showcaseReply=(agentId:string,text:string)=>{const run=appHandle!.service.enqueue(showcase,agentId,'Deterministic visual fixture',showcaseStore.room(showcase)!.seq);run.status='running';run.executionId=randomUUID();showcaseStore.event(showcase,'run.started',{id:'system',kind:'system'},{run});showcaseWorker.publishFinalMessage(run,text);showcaseWorker.finish(run,'completed');};
+    showcaseReply('demo-planner','建议把这次交付拆成两个并行步骤：\n\n1. **实现**：完成独立工作区中的修改，并记录验证结果。\n2. **审查**：检查边界、异常情况和版本一致性。\n\n完成后在同一份总结里保留已确认结论与未决事项。');
+    showcaseReply('demo-reviewer','我来审查验收条件，重点确认：\n\n- 用户在执行期间补充要求后，结果是否仍对应正确版本；\n- 交付物能否清楚说明改动与测试；\n- 存在分歧时，把问题留在讨论里继续确认。\n\n范围已经明确，可以开始小规模验证。');
+    const openTask=(await command(showcase,'task.create',{title:'实现讨论收敛与总结交付流程',open:true}) as any).result.taskId;
+    const reviewTask=(await command(showcase,'task.create',{title:'审查异常与取消路径，补充验收条件',open:true}) as any).result.taskId;
+    const showcaseLoaded=waitEvent('Page.loadEventFired');await send('Page.navigate',{url:base+'/?room='+showcase+'&panel=tasks'},sessionId);await showcaseLoaded;
+    await waitFor('工作台视觉场景',async()=>(await headerRoomName())==='产品与工程'&&(await bodyText()).includes('补充验收条件'));
+    await clickByText('button','开启讨论');
+    await waitFor('讨论主输入自动聚焦',async()=>await evaluate("document.activeElement===document.querySelector('dialog.modal textarea')"));
+    if(await evaluate("document.querySelector('dialog.modal .form-advanced')?.open"))fail('低频参数默认应收起');
+    await clickByText('dialog.modal button','取消');
+    step('dialog-primary-focus-and-progressive-options');
+    // Reading history stays in place; new activity is a deliberate jump.
+    for(let i=0;i<20;i++)await command(showcase,'message.send',{text:`历史记录 ${i+1} · `+'明确目标、记录决策，确保每一步都可回溯。'.repeat(6)});
+    await waitFor('历史已同步',async()=>(await bodyText()).includes('历史记录 20'));
+    await evaluate("(()=>{const list=document.querySelector('.message-list');list.dispatchEvent(new WheelEvent('wheel',{deltaY:-1000,bubbles:true}));list.scrollTop=0;list.dispatchEvent(new Event('scroll'));})()");
+    await command(showcase,'message.send',{text:'NEW_MESSAGE_WHILE_READING'});
+    await waitFor('历史阅读不被打断',async()=>await evaluate("document.querySelector('.message-list').scrollTop<10&&!!document.querySelector('.jump-latest')&&document.querySelector('.jump-latest').textContent.includes('新消息')"));
+    await evaluate("document.querySelector('.jump-latest')?.click()");
+    await waitFor('主动回到最新消息',async()=>await evaluate("(()=>{const l=document.querySelector('.message-list');return l.scrollHeight-l.scrollTop-l.clientHeight<5;})()"));
+    step('reading-position-and-new-message-jump');
+    // Return to the concise visual sample after proving scroll behavior in a separate view.
+    const visualRoom=(await command(roomId,'room.create',{name:'工作台设计',description:'界面示例 · 清楚讨论，并行推进，集中交付',members:['demo-planner','demo-reviewer']} ) as any).result.roomId;
+    for(const m of showcaseStore.list<any>('messages',showcase).slice(0,3))appHandle.service.execute({version:'0.1',commandId:randomUUID(),roomId:visualRoom,type:'message.send',payload:{text:m.text}},m.actor);
+    const codeExample='const room = await client.snapshot(roomId);\nconsole.log(room.discussions);';
+    appHandle.service.execute({version:'0.1',commandId:randomUUID(),roomId:visualRoom,type:'message.send',payload:{text:'可以从当前房间读取讨论状态：\n\n```ts\n'+codeExample+'\n```'}},{id:'demo-planner',kind:'agent'});
+    await command(visualRoom,'task.create',{title:'完成协作界面与交互验证',open:true});
+    await command(visualRoom,'task.create',{title:'审查窄屏布局与键盘操作',open:true});
+    const visualLoaded=waitEvent('Page.loadEventFired');await send('Page.navigate',{url:base+'/?room='+visualRoom+'&panel=tasks'},sessionId);await visualLoaded;
+    await waitFor('精简视觉场景',async()=>(await headerRoomName())==='工作台设计'&&(await bodyText()).includes('审查窄屏布局'));
+    await sleep(300);
+    // Stub only the clipboard capability in this isolated page; never overwrite the user's OS clipboard.
+    await evaluate("(()=>{window.__clipboardDescriptor=Object.getOwnPropertyDescriptor(navigator,'clipboard');Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.__copiedCode=text;}}});document.querySelector('button[aria-label=复制代码]')?.click();})()");
+    await waitFor('代码复制请求与反馈',async()=>await evaluate("window.__copiedCode")===(codeExample+'\n')&&(await bodyText()).includes('已复制'));
+    await evaluate("(()=>{if(window.__clipboardDescriptor)Object.defineProperty(navigator,'clipboard',window.__clipboardDescriptor);else delete navigator.clipboard;})()");
+    step('code-block-copy-feedback');
+    const animation=await evaluate("getComputedStyle(document.querySelector('.panel-page')).animationName");if(animation!=='panel-reveal')fail('缺少页签动效');
+    await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]},sessionId);
+    if(await evaluate("getComputedStyle(document.querySelector('.panel-page')).animationName")!=='none')fail('未遵守减少动态效果');
+    await send('Emulation.setEmulatedMedia',{features:[]},sessionId);
+    step('motion-and-reduced-motion');
+    const responsive=[];
+    for(const width of [320,390,768,1024,1440,1920]){
+      await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<741},sessionId);await sleep(100);
+      const geometry=await evaluate("(()=>{const c=document.querySelector('.composer textarea').getBoundingClientRect();return {overflow:document.documentElement.scrollWidth>innerWidth+1,composerInView:c.left>=0&&c.right<=innerWidth&&c.bottom<=innerHeight,sidebar:getComputedStyle(document.querySelector('.sidebar')).display};})()");
+      if(geometry.overflow||!geometry.composerInView)fail('响应式布局溢出 '+width);responsive.push({width,...geometry});
+    }
+    await send('Emulation.clearDeviceMetricsOverride',{},sessionId);await sleep(250);
+    if(await evaluate("!!document.querySelector('.jump-latest')"))fail('跟随最新消息时，缩放不应切换为历史阅读状态');
+    step('responsive-workbench-widths',{viewports:responsive});
+
+    await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false},sessionId);await sleep(250);
     const screenshot = await send('Page.captureScreenshot', {format: 'png'}, sessionId);
     const screenshotPath = join(runDir, 'ui.png');
     writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
@@ -668,9 +781,14 @@ try {
     if (mobileState.detailsDisplay !== 'none') fail('移动端仍显示右侧详情面板');
     if (!mobileState.composer) fail('移动端缺少消息输入框');
     if (mobileState.overflow) fail('移动端出现水平溢出');
+    const mobileRooms=await evaluate("(()=>{const button=document.querySelector('button[aria-label=打开房间列表]');button?.click();return !!button;})()");if(!mobileRooms)fail('缺少移动房间切换入口');
+    await waitFor('完整房间列表',async()=>(await bodyText()).includes('切换房间')&&(await bodyText()).includes('运行设置'));
+    const roomShot=await send('Page.captureScreenshot',{format:'png'},sessionId),roomShotPath=join(runDir,'ui-mobile-rooms.png');writeFileSync(roomShotPath,Buffer.from(roomShot.data,'base64'));report.screenshots.push(roomShotPath);
+    await clickByText('dialog.modal button','关闭');await sleep(150);step('mobile-room-switcher-and-settings');
     const mobilePanelOpened = await evaluate("(()=>{const button=document.querySelector('button[aria-label=\"打开协作面板\"]');if(!button)return false;button.click();return true;})()");
     if (!mobilePanelOpened) fail('找不到移动端协作面板入口');
-    await waitFor('移动端协作面板', async () => { const text = await bodyText(); return text.includes('协作面板') && text.includes('交付物'); }, 10000);
+    await waitFor('移动端协作面板', async () => { const text = await bodyText(); return text.includes('协作面板') && text.includes('交付物') && text.includes('修改目标'); }, 10000);
+    await sleep(250);
     const mobilePanelShot = await send('Page.captureScreenshot', {format: 'png'}, sessionId);
     const mobilePanelShotPath = join(runDir, 'ui-mobile-panel.png');
     writeFileSync(mobilePanelShotPath, Buffer.from(mobilePanelShot.data, 'base64'));
