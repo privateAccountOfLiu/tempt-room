@@ -625,6 +625,15 @@
               },
               "stale": {
                 "type": "boolean"
+              },
+              "trust": {
+                "type": "string",
+                "enum": [
+                  "owner",
+                  "managed",
+                  "external",
+                  "remote"
+                ]
               }
             },
             "required": [

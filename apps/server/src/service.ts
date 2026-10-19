@@ -5,6 +5,7 @@ import {assertContextCurrent} from './context-reconciliation.ts';
 import { assertRunFence } from './execution.ts';
 import { captureContext } from './context.ts';
 import { adaptiveTimeoutMs } from './adaptive.ts';
+import { trustForActor } from './trust.ts';
 
 /** External (non-managed) claims must heartbeat within this window or the worker recycles the task. */
 const externalTaskLeaseMs = (store: Store) => store.settings().taskLeaseMs;
@@ -76,7 +77,7 @@ export class RoomService {
         for (const id of input.attachments) if (this.store.get<Artifact>('artifacts', id)?.roomId !== roomId) throw new ProtocolError('invalid_attachment', '附件不属于此房间');
         const room = this.store.room(roomId)!;
         for (const id of input.mentions) if (!room.members.includes(id)) throw new ProtocolError('invalid_mention', '提及的成员不在房间内');
-        const message: Message = { id: uid('msg'), roomId, actor, ...input, createdAt: now() };
+        const message: Message = { id: uid('msg'), roomId, actor, ...input, createdAt: now(), trust: trustForActor(this.store,actor) };
         if(scope){const run=this.store.get<Run>('runs',scope.runId)!;message.runId=run.id;if(run.taskId){message.taskId=run.taskId;message.taskVersion=run.taskVersion;}message.basedOnSeq=contextSeqOf(run);message.generation=run.generation;message.executionId=run.executionId;message.stale=Boolean(run.taskId&&this.store.get<Task>('tasks',run.taskId)?.version!==run.taskVersion);}
          const event = this.store.event(roomId, 'chat.message.created', actor, { message }, command.commandId,scope?.runId??null);
         if (actor.kind === 'human'&&input.mentions.length){const contextId=this.saveContext(roomId,event.seq);for (const agentId of new Set(input.mentions)){const agent=this.checkAgent(roomId,agentId);if(agent.connectionMode==='external')this.store.event(roomId,'agent.wake.requested',actor,{agentId,messageId:message.id,connectionMode:'external'},command.commandId);else {for(const old of this.store.list<Run>('runs',roomId))if(old.agentId===agentId&&!old.taskId&&!old.discussionId&&!terminalStates.has(old.status))this.cancel(old,'superseded');this.enqueue(roomId, agentId, input.text, event.seq, { causationId: event.eventId,contextId });}}}
@@ -145,7 +146,7 @@ export class RoomService {
         task.status = input.ok ? 'completed' : 'failed'; delete task.leaseUntil;
          this.store.event(roomId, 'task.completed', actor, { task, ok: input.ok, summary: input.summary }, command.commandId);
         if (input.summary.trim()) {
-          const message: Message = { id: uid('msg'), roomId, actor, text: input.summary.trim(), mentions: [], attachments: [], createdAt: now(),taskId:task.id,taskVersion:task.version };
+          const message: Message = { id: uid('msg'), roomId, actor, text: input.summary.trim(), mentions: [], attachments: [], createdAt: now(),taskId:task.id,taskVersion:task.version,trust:trustForActor(this.store,actor) };
            this.store.event(roomId, 'chat.message.created', actor, { message }, command.commandId);
         }
         return { taskId: task.id, status: task.status,generation:task.generation };
@@ -224,7 +225,7 @@ export class RoomService {
         const run = this.store.get<Run>('runs', input.runId); if (!run || run.roomId !== roomId || run.status !== 'waiting_input') throw new ProtocolError('not_waiting', '运行未等待输入', 409);
         // Only the trusted human command can supply requested input.
         this.onInput(run.id, input.text);
-        const message:Message={id:uid('msg'),roomId,actor,text:input.text,mentions:[],attachments:[],runId:run.id,createdAt:now()};this.store.event(roomId,'chat.message.created',actor,{message},command.commandId,run.id);
+        const message:Message={id:uid('msg'),roomId,actor,text:input.text,mentions:[],attachments:[],runId:run.id,createdAt:now(),trust:trustForActor(this.store,actor)};this.store.event(roomId,'chat.message.created',actor,{message},command.commandId,run.id);
         return { runId: run.id };
       }
       case 'decision.propose': {

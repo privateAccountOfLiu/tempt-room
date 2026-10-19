@@ -71,3 +71,6 @@
 .run-detail .run-summary{margin:0;padding:9px 10px;border:1px solid #2c3826;border-radius:5px;background:#151a14}
 /* Discussion quorum / absent marker in the active discussion banner. */
 .discussion-quorum{margin-left:8px;padding:2px 6px;border:1px solid #4b5637;border-radius:3px;color:#b7c99a;font-size:8px;font-weight:400;letter-spacing:.2px}
+/* Source trust marker: external/remote text is data, never tool authorization. */
+.trust-badge{font-family:'IBM Plex Mono',Consolas,monospace;font-size:7px;border:1px solid #5d4b2f;color:#c6a875;background:#241d12;border-radius:3px;padding:2px 4px;letter-spacing:.2px}
+.trust-badge.remote{border-color:#4a4058;color:#b2a3c8;background:#1e1924}
