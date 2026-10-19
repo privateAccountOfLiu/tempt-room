@@ -46,7 +46,7 @@ JSON Schema 是命令形状的权威来源：`packages/protocol/schema/*.schema.
 - `task.revise`：taskId、title；递增任务及其传递依赖的版本、取消旧运行并标记旧发言；完成整棵依赖树的失效处理后，共用新快照重新排队。尚未接受的提案保持 proposed，修改文字不自动启动执行。
 - `task.accept`：taskId、可选 projectPath，仅人类确认 proposed 任务；确认不额外递增版本。
 - `task.handoff`：taskId、agentId、可选 note，仅人类；把任务转交给同房间另一个已启用 Agent，递增该任务及全部下游版本、取消旧运行并标记旧发言，再重新排队已接受任务；未接受提案不自动执行。Agent 侧可用 `task_propose` 携带 `dependencies` 提议后继任务（仍需人类确认）。
-- `settings.update`：完整运行设置 concurrency、memoryMb、maxProcesses、taskTimeoutMs、chatTimeoutMs、taskLeaseMs、tokenBudget、costBudgetUsd。仅人类可修改；缺省值由 Schema 给定，属于替换语义。`taskLeaseMs` 控制外部任务认领的租约时长（默认 600000ms），过期且无托管运行的任务会被回收为开放任务。`tokenBudget`/`costBudgetUsd` 为单次运行的硬预算，0 表示不限，创建运行时冻结到 Run.limits。
+- `settings.update`：完整运行设置 concurrency、memoryMb、maxProcesses、taskTimeoutMs、chatTimeoutMs、taskLeaseMs、tokenBudget、costBudgetUsd。仅人类可修改；缺省值由 Schema 给定，属于替换语义。`taskLeaseMs` 控制外部任务认领的租约时长（默认 600000ms），过期且无托管运行的任务会被回收为开放任务。`tokenBudget`/`costBudgetUsd` 为单次运行的硬预算，0 表示不限，创建运行时冻结到 Run.limits。`maxQueuedRunsPerAgent`/`maxQueuedRunsPerRoom` 限制每个成员/房间未终止运行数量（默认 5/20）；超限时入队命令原子失败并返回 429，不留下半个运行。
 - `run.cancel`：runId；`run.input`：runId、text，只用于 waiting_input 状态；`run.retry`：runId，只允许 owner 对 failed/canceled/interrupted/unknown 运行显式创建新运行，任务必须仍为同一版本且处于 failed/queued/canceled/interrupted/unknown，且该成员没有其他活动运行。重试不会撤销原运行已产生的外部副作用。
 - `decision.propose`：text；`decision.accept`：decisionId，人类确认后才进入后续授权上下文。
 - `agent.save`：完整 AgentDescriptor，不含密钥值。`connectionMode` 默认为 `managed`；设为 `external` 后，提及只记录 `agent.wake.requested`，分派任务等待外部成员主动认领，不创建托管 Run。外部成员只能 managed=false 认领同房间开放任务，或明确分给自己的 queued 任务；依赖必须已完成。当前自动讨论不支持外部成员。

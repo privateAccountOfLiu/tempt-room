@@ -279,6 +279,9 @@ export class RoomService {
     if(this.checkAgent(roomId,agentId).connectionMode==='external')throw new ProtocolError('external_agent','外部会话不创建托管运行',409);
     const { causationId, ...fields } = extra;
     const settings=this.store.settings();
+    const backlog=this.store.list<Run>('runs',roomId).filter(run=>!terminalStates.has(run.status));
+    if(backlog.length>=settings.maxQueuedRunsPerRoom)throw new ProtocolError('room_queue_full',`房间待处理运行已达上限（${settings.maxQueuedRunsPerRoom}）`,429);
+    if(backlog.filter(run=>run.agentId===agentId).length>=settings.maxQueuedRunsPerAgent)throw new ProtocolError('agent_queue_full',`该成员的待处理运行已达上限（${settings.maxQueuedRunsPerAgent}）`,429);
     const run: Run = { id: uid('run'), roomId, agentId, prompt, basedOnSeq, status: 'queued',lifecycleVersion:1,generation:1,contextPolicy:structuredClone(settings.contextPolicy), createdAt: now(), updatedAt: now(),contextId:fields.contextId??this.saveContext(roomId,basedOnSeq),limits:{memoryMb:settings.memoryMb,maxProcesses:settings.maxProcesses,timeoutMs:fields.taskId?settings.taskTimeoutMs:settings.chatTimeoutMs,tokenBudget:settings.tokenBudget,costBudgetUsd:settings.costBudgetUsd}, ...fields };
      this.store.event(roomId, 'run.created', SYSTEM, { run }, causationId ?? null, run.id); return run;
   }

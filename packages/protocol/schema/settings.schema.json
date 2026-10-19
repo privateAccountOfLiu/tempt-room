@@ -83,6 +83,18 @@
       "type": "number",
       "minimum": 0,
       "maximum": 1000000
+    },
+    "maxQueuedRunsPerAgent": {
+      "default": 5,
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+    },
+    "maxQueuedRunsPerRoom": {
+      "default": 20,
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 500
     }
   },
   "required": [
@@ -94,7 +106,9 @@
     "chatTimeoutMs",
     "taskLeaseMs",
     "tokenBudget",
-    "costBudgetUsd"
+    "costBudgetUsd",
+    "maxQueuedRunsPerAgent",
+    "maxQueuedRunsPerRoom"
   ],
   "additionalProperties": false
 }
