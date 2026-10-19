@@ -8,6 +8,7 @@ import { captureContext } from './context.ts';
 import { adaptiveTimeoutMs } from './adaptive.ts';
 import { trustForActor } from './trust.ts';
 import {provideTaskContext,assertExternalContextCurrent} from './external-context.ts';
+import {capabilityEvidenceId} from './adapter-capabilities.ts';
 
 /** External (non-managed) claims must heartbeat within this window or the worker recycles the task. */
 const externalTaskLeaseMs = (store: Store) => store.settings().taskLeaseMs;
@@ -90,6 +91,16 @@ export class RoomService {
           if(chainDepth>=0){const contextId=this.saveContext(roomId,event.seq);for (const agentId of new Set(input.mentions)){const agent=this.checkAgent(roomId,agentId);if(agent.connectionMode==='external')this.store.event(roomId,'agent.wake.requested',actor,{agentId,messageId:message.id,connectionMode:'external'},command.commandId);else {for(const old of this.store.list<Run>('runs',roomId))if(old.agentId===agentId&&!old.taskId&&!old.discussionId&&!terminalStates.has(old.status))this.cancel(old,'superseded');this.enqueue(roomId, agentId, input.text, event.seq, { causationId: event.eventId,contextId,wakeChainDepth:chainDepth });}}}
         }
         return { messageId: message.id };
+      }
+      case 'capability.verify': {
+        const roomId = this.requireRoom(command);
+        const input = payloadSchemas['capability.verify'].parse(p);
+        const recorded = input.evidence.map(item => {
+          if (item.fingerprint !== input.fingerprint) throw new ProtocolError('fingerprint_mismatch', '能力证据指纹与命令不一致', 400);
+          return {...item, id: capabilityEvidenceId(item.fingerprint, item.capability)};
+        });
+        for (const capabilityEvidence of recorded) this.store.event(roomId, 'capability.verified', actor, {capabilityEvidence});
+        return {fingerprint: input.fingerprint, recorded: recorded.length};
       }
       case 'discussion.start': {
         const roomId = this.requireRoom(command);

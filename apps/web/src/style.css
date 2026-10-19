@@ -144,3 +144,18 @@
 .failure-chips{display:flex;flex-wrap:wrap;gap:5px}
 .failure-chips>span{display:inline-flex;align-items:center;gap:5px;border:1px solid #3b3429;border-radius:999px;padding:2px 8px;font-size:9px;color:#c9b58e;background:#1b1712}
 .failure-chips em{font-style:normal;color:#a99570}
+/* Capability evidence panel in Agent settings. */
+.capability-panel{border:1px solid #2c3728;border-radius:6px;padding:9px 11px;margin:2px 0 12px;background:#141a12}
+.capability-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.capability-head strong{font-size:11px;color:#c6d5bb}
+.capability-head small{font-size:9px;color:#819175;flex:1}
+.capability-head .button{font-size:9px;padding:4px 8px}
+.capability-panel details{margin-top:8px}
+.capability-panel summary{cursor:pointer;font-size:9px;color:#9ead92}
+.capability-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:4px 10px;margin-top:7px}
+.capability-list>div{display:flex;align-items:center;gap:6px;font-size:9px;color:#a8b79c}
+.capability-list em{font-style:normal;border-radius:999px;padding:1px 6px;border:1px solid #3a4433}
+.capability-list em.verified_supported{color:#a8d28a;border-color:#4b6b37}
+.capability-list em.verified_unsupported{color:#d9a58a;border-color:#6b4a37}
+.capability-list em.unverified{color:#9b9b8c;border-color:#4c4c40}
+.capability-list small{margin-left:auto;color:#66745d;font-size:8px}

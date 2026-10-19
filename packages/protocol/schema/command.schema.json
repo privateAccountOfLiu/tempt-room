@@ -674,6 +674,135 @@
         },
         "type": {
           "type": "string",
+          "const": "capability.verify"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "fingerprint": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "evidence": {
+              "minItems": 1,
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[a-zA-Z0-9_-]+$"
+                  },
+                  "fingerprint": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "capability": {
+                    "type": "string",
+                    "enum": [
+                      "streamOutput",
+                      "nextTurnInput",
+                      "toolBoundaryInput",
+                      "steerDuringRun",
+                      "cancelOwnedTree",
+                      "cancelRemoteTask",
+                      "resumeSession",
+                      "queryOutcome",
+                      "usageScope",
+                      "preToolGate"
+                    ]
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "verified_supported",
+                      "verified_unsupported",
+                      "unverified"
+                    ]
+                  },
+                  "mode": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "testedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  "suiteVersion": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "evidenceHash": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "evidenceLocation": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "fingerprint",
+                  "capability",
+                  "state",
+                  "mode",
+                  "testedAt",
+                  "suiteVersion",
+                  "evidenceHash"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "fingerprint",
+            "evidence"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "commandId",
+        "type",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "const": "0.1"
+        },
+        "commandId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "roomId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "type": {
+          "type": "string",
           "const": "task.create"
         },
         "payload": {

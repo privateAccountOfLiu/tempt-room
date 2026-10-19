@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: ce2f39ca9f17cec6b6ea4426220f82cd68600213 (dirty)
+source HEAD: cb24a3800fa8ad42e510ced8a227c92a4f8a278e (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-19T16-21-46-269Z-9dbc1aa6/report.json
+report: .state/collaboration-baseline/run-2026-10-19T16-35-04-846Z-e7523498/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -54,6 +54,17 @@ report: .state/collaboration-baseline/run-2026-10-19T16-21-46-269Z-9dbc1aa6/repo
 - host 任务仍使用真实项目目录（D01a 尚未接入），报告只做内容变化清单，不改写用户工作树
 - 新增 `tests/host-workspace-isolation.test.ts` 3 项；`npm test` **295/295**
 
+### B05b — 能力证据持久化与 UI
+
+- 新增 agentCapabilityFingerprint：绑定 provider、adapter 版本、executable 版本、运行布局、connectionMode、executionMode、模型与行为配置摘要
+- 新增 capability.verify owner 命令：按 fingerprint+capability 确定性 ID 写入 capability.verified 事件，B02 唯一键保证同一能力只有一条当前证据
+- 新增 API：
+  - GET /api/rooms/:id/agents/:agentId/capabilities：当前指纹、证据、三态结果
+  - POST /api/agents/:id/capabilities/probe：确定性契约探测；demo 仅写入可验证项，其他真实 CLI 保持 unverified
+- Agent 设置表单新增「能力证据」面板：指纹、三态计数、验证时间、验证按钮
+- 版本/模型/配置变化产生新指纹，旧证据自动失效为 unverified
+- 新增 tests/capability-evidence.test.ts 2 项：探测持久化/指纹失效、命令指纹不匹配拒绝
+- 自动路由仍待接入：当前调度继续使用兼容能力提示，不会把未验证证据当成支持
 ### B04 — 订阅投递与幂等唤醒主体
 
 - 新增 apps/server/src/wake-policy.ts：纯触发策略；typing/partial/ACK/audit/状态/自身消息默认不唤醒，显式点名与 assigned-task 触发
@@ -134,20 +145,20 @@ report: .state/collaboration-baseline/run-2026-10-19T16-21-46-269Z-9dbc1aa6/repo
 
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
-- `npm test`：311/311
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-7M0kCV/report.json`，271.3s）
+- `npm test`：313/313
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-1bbrdO/report.json`，213.3s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-WE1UhD/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-2JOIEe/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-19T16-21-46-269Z-9dbc1aa6/report.json`
-- `.state/collaboration-baseline/run-2026-10-19T16-21-46-269Z-9dbc1aa6/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-19T16-21-46-269Z-9dbc1aa6/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-19T16-21-46-269Z-9dbc1aa6/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T16-35-04-846Z-e7523498/report.json`
+- `.state/collaboration-baseline/run-2026-10-19T16-35-04-846Z-e7523498/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T16-35-04-846Z-e7523498/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-19T16-35-04-846Z-e7523498/replay.stdout.txt`
 
 ## 未完成 / 下一波
 

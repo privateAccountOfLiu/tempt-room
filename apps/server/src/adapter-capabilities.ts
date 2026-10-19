@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { AgentDescriptor } from '../../../packages/protocol/src/index.ts';
 
 /** Stable names for adapters capabilities. These are probe subjects, not
  * provider promises: a capability only has meaning with matching evidence. */
@@ -98,4 +99,31 @@ export function capabilitySummary(evidence: readonly CapabilityEvidence[]): Reco
   const summary: Record<CapabilityState, number> = {verified_supported: 0, verified_unsupported: 0, unverified: 0};
   for (const item of evidence) summary[item.state]++;
   return summary;
+}
+
+/** Bind capability evidence to the configured adapter fingerprint. */
+export function agentCapabilityFingerprint(agent: AgentDescriptor): string {
+  return adapterFingerprint({
+    provider: agent.provider,
+    adapterVersion: 'tempt-room-0.1-adapter',
+    executableVersion: agent.version || undefined,
+    runtimeLayout: agent.executionMode === 'host' ? 'host' : agent.runtimeDirectory ? 'runtime-directory' : 'managed',
+    connectionMode: agent.connectionMode,
+    executionMode: agent.executionMode,
+    model: agent.model || undefined,
+    configDigest: digest({responseFormat: agent.responseFormat ?? 'text', credentialConfigured: Boolean(agent.credentialEnv)})
+  });
+}
+
+/** Only deterministic demo behavior is a verified contract here. Real CLI
+ * adapters stay unverified until an explicit authorized probe run. */
+export function probeConfiguredAgent(agent: AgentDescriptor, testedAt = new Date().toISOString()): {fingerprint: string; evidence: CapabilityEvidence[]} {
+  const fingerprint = agentCapabilityFingerprint(agent);
+  const supported = agent.provider === 'demo' ? ['streamOutput', 'nextTurnInput'] as CapabilityName[] : [];
+  const unsupported = agent.provider === 'demo' ? [] as CapabilityName[] : [];
+  return {fingerprint, evidence: probeSimulatedCapabilities({supported, unsupported}, fingerprint, {suiteVersion: 'capabilities-sim-v1', testedAt})};
+}
+
+export function capabilityEvidenceId(fingerprint: string, capability: CapabilityName): string {
+  return 'cap_' + digest([fingerprint, capability]).slice(0, 64);
 }

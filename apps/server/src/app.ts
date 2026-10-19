@@ -8,8 +8,9 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { join, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { z } from 'zod';
-import { VERSION,payloadSchemas, agentToolCallSchema, ProtocolError, type AgentDescriptor, type Artifact, type RoomEvent,type ServerCapabilities,type Run,type ToolOperation } from '../../../packages/protocol/src/index.ts';
+import { VERSION,payloadSchemas, agentToolCallSchema, ProtocolError, type AgentDescriptor, type Artifact, type RoomEvent,type ServerCapabilities,type Run,type ToolOperation,type CapabilityEvidence } from '../../../packages/protocol/src/index.ts';
 import { Store, now, OWNER, uid } from './store.ts';
+import {agentCapabilityFingerprint,capabilityNames,probeConfiguredAgent,verifiedCapabilityState} from './adapter-capabilities.ts';
 import { RoomService } from './service.ts';
 import { Worker } from './worker.ts';
 import { diagnose,probeAgentProtocol } from './adapters.ts';
@@ -220,6 +221,27 @@ export async function createApp(options: AppOptions = {}) {
   app.get<{Params:{id:string}}>('/api/runs/:id/operations',request=>{
     const run=store.get<Run>('runs',request.params.id);if(!run)throw new ProtocolError('not_found','运行不存在',404);
     return store.list<ToolOperation>('operations',run.roomId).filter(operation=>operation.runId===run.id);
+  });
+  app.get<{Params:{id:string;agentId:string}}>('/api/rooms/:id/agents/:agentId/capabilities', request => {
+    const room = store.room(request.params.id); if (!room) throw new ProtocolError('not_found', '房间不存在', 404);
+    const agent = store.get<AgentDescriptor>('agents', request.params.agentId); if (!agent) throw new ProtocolError('not_found', 'Agent 不存在', 404);
+    const fingerprint = agentCapabilityFingerprint(agent);
+    const evidence = store.list<CapabilityEvidence>('capability_evidence', room.id).filter(item => item.fingerprint === fingerprint);
+    const states = capabilityNames.map(capability => {
+      const match = evidence.find(item => item.capability === capability);
+      return {capability, state: verifiedCapabilityState(fingerprint, evidence, capability), mode: match?.mode ?? 'not_run', testedAt: match?.testedAt ?? null};
+    });
+    return {fingerprint, states, member: room.members.includes(agent.id)};
+  });
+  app.post<{Params:{id:string};Body:{roomId?:string}}>('/api/agents/:id/capabilities/probe', request => {
+    const roomId = request.body?.roomId; const room = roomId ? store.room(roomId) : undefined;
+    if (!roomId || !room) throw new ProtocolError('not_found', '房间不存在', 404);
+    const agent = store.get<AgentDescriptor>('agents', request.params.id);
+    if (!agent) throw new ProtocolError('not_found', 'Agent 不存在', 404);
+    if (!room.members.includes(agent.id)) throw new ProtocolError('not_member', 'Agent 不是该房间成员', 403);
+    const {fingerprint, evidence} = probeConfiguredAgent(agent);
+    service.execute({version:VERSION,commandId:uid('capability'),type:'capability.verify',roomId,payload:{fingerprint,evidence}});
+    return {fingerprint, evidence};
   });
   app.get<{ Params: { id: string } }>('/api/agents/:id/diagnostics', async request => {
     const agent = store.get<AgentDescriptor>('agents', request.params.id); if (!agent) throw new ProtocolError('not_found', 'Agent 不存在', 404); return diagnose(agent, worker.host);

@@ -489,7 +489,7 @@ try {
     if (await clickByText('button', 'Agent 连接') !== 'ok') fail('找不到 Agent 连接入口');
     await waitFor('Agent 连接列表', async () => (await bodyText()).includes('添加 Agent'), 10000);
     if (await clickByText('button', '添加 Agent') !== 'ok') fail('找不到添加 Agent 入口');
-    await waitFor('添加 Agent 表单', async () => (await bodyText()).includes('Agent 类型'), 10000);
+    await waitFor('添加 Agent 表单', async () => { const text = await bodyText(); return text.includes('Agent 类型') && text.includes('能力证据'); }, 10000);
     if (await setSelectByLabel('Agent 类型', 'api') !== 'ok') fail('无法选择 Agent 类型');
     if (await setInputByLabel('显示名称', agentName) !== 'ok') fail('无法填写 Agent 名称');
     if (await setSelectByLabel('接入方式', 'external') !== 'ok') fail('无法选择外部会话接入');

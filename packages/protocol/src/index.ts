@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { executionSettingsSchema,type RunLimits } from './settings.ts';
 import { codexBindingSchema, type CodexRunState } from './codex.ts';
-import { subscriptionSchema } from './collaboration.ts';
+import { subscriptionSchema, capabilityEvidenceSchema } from './collaboration.ts';
 export * from './collaboration.ts';
 export { eventRegistry, eventRegistryManifest, eventDefinition, eventMetadata, EventContractError, projectionTableNames, type ProjectionTable } from './events.ts';
 export { codexBindingSchema, codexRunStateSchema, type CodexBinding, type CodexRunState } from './codex.ts';
@@ -82,6 +82,7 @@ export const payloadSchemas={
   'discussion.resume':z.object({discussionId:idSchema}).strict(),
   'subscription.set':z.object({subscription:subscriptionSchema}).strict(),
   'input.ack':z.object({batchId:idSchema,agentSessionId:idSchema,receiptEvidence:z.string().max(500).optional()}).strict(),
+  'capability.verify':z.object({fingerprint:z.string().min(1).max(200),evidence:z.array(capabilityEvidenceSchema).min(1).max(20)}).strict(),
   'task.create':z.object({title,agentId:idSchema.optional(),projectPath:z.string().max(1500).default(''),dependencies:z.array(idSchema).max(20).default([]),open:z.boolean().default(false)}).strict(),
   'task.revise':z.object({taskId:idSchema,title}).strict(),
   'task.accept':z.object({taskId:idSchema,projectPath:z.string().max(1500).optional()}).strict(),
