@@ -180,6 +180,10 @@ try {
     await waitFor('实时连接状态', async () => (await bodyText()).includes('实时连接'), 15000);
     step('app-load-and-auth', {textLength: (await bodyText()).length});
     step('connection-status-live');
+    const shortcutFocused = await evaluate("(()=>{document.body.focus();window.dispatchEvent(new KeyboardEvent('keydown',{key:'k',ctrlKey:true,bubbles:true}));return document.activeElement===document.querySelector('textarea');})()");
+    if (!shortcutFocused) fail('Ctrl+K 未聚焦输入框');
+    step('composer-keyboard-shortcut');
+
     const titleBefore = await waitFor('房间标题', async () => { const title = String(await evaluate("document.querySelector('.room-title h1')?.textContent?.trim() ?? ''")); return title && title !== '正在打开房间' ? title : undefined; }, 15000);
     const roomInUrl = String(await evaluate("new URLSearchParams(location.search).get('room') ?? ''"));
     if (!roomInUrl) fail('房间 id 未写入 URL 查询参数');

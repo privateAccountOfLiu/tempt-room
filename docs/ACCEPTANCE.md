@@ -118,9 +118,10 @@ T03 已完成重启后的真实复测：当前 Codex 会话以外部成员接入
 
 2026-10-19（Asia/Shanghai）完成**Git 基线、审计导出、CI 配置与 UI/UX 优化**：
 - `git init -b main`，首个提交 `ced6da3` 纳入 289 个源码/文档/测试文件（`.state`、node_modules、dist、`.mcp.json` 均按 `.gitignore` 排除，密钥扫描 0 发现）；新增 `.gitattributes` 统一行尾。
-- 新增 owner-only `GET /api/rooms/:id/audit/export`，按事件原样输出 NDJSON 附件；房间头部新增「导出审计日志」按钮。新增 `tests/audit-export.test.ts` 覆盖认证、401、NDJSON 字段与附件头；`npm test` 210/210。
-- 运行级 Token/费用硬预算：设置新增 `tokenBudget`/`costBudgetUsd`（0=不限），入队冻结到 Run.limits；Worker 按 provider 上报用量检查，超预算以 `failed` 结束且不发布聊天结果；未知用量不误判。`tests/budget.test.ts` 3 项 + `tests/budget-worker.test.ts` 真实 Worker 集成 1 项，`npm test` 210/210；设置对话框与用量面板显示预算。
+- 新增 owner-only `GET /api/rooms/:id/audit/export`，按事件原样输出 NDJSON 附件；房间头部新增「导出审计日志」按钮。新增 `tests/audit-export.test.ts` 覆盖认证、401、NDJSON 字段与附件头；`npm test` 211/211。
+- 运行级 Token/费用硬预算：设置新增 `tokenBudget`/`costBudgetUsd`（0=不限），入队冻结到 Run.limits；Worker 按 provider 上报用量检查，超预算以 `failed` 结束且不发布聊天结果；未知用量不误判。`tests/budget.test.ts` 3 项 + `tests/budget-worker.test.ts` 真实 Worker 集成 1 项，`npm test` 211/211；设置对话框与用量面板显示预算。
 - 新增讨论 quorum：`discussion.start` 可选每轮最少成功响应（默认全员）；达到 quorum 即推进并记录缺席成员，未达则停止；UI 显示 Quorum/缺席并可在创建表单设置。`tests/discussion-quorum.test.ts` 2 项，测试总数 200/200。
+- 新增键盘快捷入口（Ctrl/⌘+K 聚焦输入、Escape 关闭提及菜单）与超时草稿降级测试：超时前保存的 partial 不被发布为最终回复；`tests/partial-timeout.test.ts` 1 项，浏览器 E2E 39/39，测试总数 211/211。
 - 新增房间累计预算入口熔断：设置 `roomTokenBudget` / `roomCostBudgetUsd`（0=不限），入队前按房间累计已上报用量检查，达到上限返回 429 并原子回滚；未知用量不计。`tests/room-budget.test.ts` 2 项，测试总数 210/210。
 - 新增消息来源信任级：`Message.trust` 区分 owner/managed/external/remote，由认证身份与 Agent 连接方式派生；外部/远程消息在 UI 显示来源徽标，并在托管 Agent 上下文中标注为不可信资料、不得当作工具授权。`tests/trust.test.ts` 2 项，测试总数 208/208。
 - 新增最近服务公平排序：Worker 单一调度循环按 (roomId/agentId 最近服务时间, createdAt) 排序候选运行，刚工作的 Agent 排到后面，避免高速成员长期占用全局并发槽；`tests/fair-scheduler.test.ts` 2 项，测试总数 206/206。
@@ -128,7 +129,7 @@ T03 已完成重启后的真实复测：当前 Codex 会话以外部成员接入
 - 新增房间/成员待处理运行上限：设置新增 `maxQueuedRunsPerAgent`（默认 5）与 `maxQueuedRunsPerRoom`（默认 20）；入队前超限返回 429 并回滚整个命令，不留下半个运行。`tests/queue-limits.test.ts` 2 项，测试总数 202/202。
 - 新增运行详情弹窗：从进行中运行、错误卡片或用量历史打开，显示时间、任务/版本、上下文水位、提示词、错误原文、限额/预算和 Room 工具操作；支持停止与显式重试。
 - 新增显式失败重试：owner 可对 failed/canceled/interrupted/unknown 运行执行 `run.retry`，创建新运行且不覆盖原记录；拒绝外部会话、活动运行、任务改版与不可重试终态，任务重试复用同一 task version。新增 `tests/run-retry.test.ts` 2 项，运行错误卡片提供「重试」按钮。
-- UI/UX：运行用量改为紧凑格式（不再重复三个未知），任务接力下拉改为紧凑深色样式并补 `aria-label`，房间头部显示“N 进行中”，提高 owner 页脚对比度；当前房间 id 写入 URL 查询参数并同步浏览器标签标题，刷新后保持所选房间；新增右侧「用量」标签，按房间/Agent 汇总 Token、费用估值与已上报/未知运行，未知不按 0 计入。浏览器 E2E 新增 `room-url-and-title-persistence`、`usage-tab`、`run-detail-modal`，全量 38/38 通过，截图 `docs/screenshots/ui-polish-20261019.png`。
+- UI/UX：运行用量改为紧凑格式（不再重复三个未知），任务接力下拉改为紧凑深色样式并补 `aria-label`，房间头部显示“N 进行中”，提高 owner 页脚对比度；当前房间 id 写入 URL 查询参数并同步浏览器标签标题，刷新后保持所选房间；新增右侧「用量」标签，按房间/Agent 汇总 Token、费用估值与已上报/未知运行，未知不按 0 计入。浏览器 E2E 新增 `room-url-and-title-persistence`、`usage-tab`、`run-detail-modal`，全量 39/39 通过，截图 `docs/screenshots/ui-polish-20261019.png`。
 - 新增 `.github/workflows/ci.yml`（Windows runner：typecheck、密钥扫描、单元测试、replay 契约、生产构建）；仅完成本地配置，尚未在远端 CI 实际执行。
 - 计划实施记录已更新：`docs/AGENT-PARALLEL-PROGRESS.md` 增加第四批 baseSeq 上下文对账与第五批审计/UI 记录，并更新剩余工作清单；`PROTOCOL.md`/`RELEASE-NOTES.md` 同步 v6 与已实现/未实现边界。
 

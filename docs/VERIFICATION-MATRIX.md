@@ -6,7 +6,7 @@
 
 | 能力 | 结果 | 验证方式 | 证据 |
 | --- | --- | --- | --- |
-| 类型检查 / 单元测试 | PASS（210/210） | `npx tsc --noEmit`、`npm test` | 测试输出；含 replay/context/audit/budget/UI 测试 |
+| 类型检查 / 单元测试 | PASS（211/211） | `npx tsc --noEmit`、`npm test` | 测试输出；含 replay/context/audit/budget/UI 测试 |
 | 运行级 Token / 费用硬预算 | PASS | `npm test`（`tests/budget.test.ts`、`tests/budget-worker.test.ts`）；设置对话框浏览器 E2E | 测试输出 |
 | 显式失败重试 `run.retry` | PASS | `npm test`（`tests/run-retry.test.ts`） | 测试输出 |
 | 讨论 quorum / 缺席 / 迟到推进 | PASS | `npm test`（`tests/discussion-quorum.test.ts`） | 测试输出 |
@@ -15,14 +15,15 @@
 | 最近服务公平排序 / aging | PASS | `npm test`（`tests/fair-scheduler.test.ts`） | 测试输出 |
 | 消息来源信任级 / 注入标注 | PASS | `npm test`（`tests/trust.test.ts`） | 测试输出 |
 | 房间累计预算入口熔断 | PASS | `npm test`（`tests/room-budget.test.ts`） | 测试输出 |
+| 超时草稿降级 | PASS | `npm test`（`tests/partial-timeout.test.ts`） | 测试输出 |
 | 运行详情与工具操作可见性 | PASS | 浏览器 E2E `run-detail-modal` 步骤 | 上述浏览器报告 |
 | 事件回放 / fencing / partial / 上下文契约 | PASS（63/63） | `npm run test:replay` | 测试输出 |
 | 房间事件审计导出（NDJSON） | PASS | `npm test`（`tests/audit-export.test.ts`） | 测试输出 |
 | 仓库密钥扫描 | PASS（0 finding） | `npm run check:secrets` | `.state/secret-scan/latest.json` |
-| 预发布全链路 | PASS（9/9） | `npm run test:preflight -- --with-native` | `.state/preflight/run-zxfeM7/report.json` |
-| 浏览器端到端 / URL 与标题恢复 / 草稿与对账 UI / 用量看板 | PASS（38/38） | `npm run test:browser` | `.state/browser-e2e/run-u3vEJd/report.json`、`docs/screenshots/ui-polish-20261019.png` |
+| 预发布全链路 | PASS（9/9） | `npm run test:preflight -- --with-native` | `.state/preflight/run-MKaG8K/report.json` |
+| 浏览器端到端 / URL 与标题恢复 / 草稿与对账 UI / 用量看板 | PASS（39/39） | `npm run test:browser` | `.state/browser-e2e/run-ekObdQ/report.json`、`docs/screenshots/ui-polish-20261019.png` |
 | 房间用量看板（Token / 费用估值 / 未知用量） | PASS | 浏览器 E2E `usage-tab` 步骤 | 上述报告 |
-| 生产构建 + 重启恢复 + Cookie 保持 | PASS（10/10） | `npm run test:production` | `.state/production-smoke/run-frKgX0/report.json` |
+| 生产构建 + 重启恢复 + Cookie 保持 | PASS（10/10） | `npm run test:production` | `.state/production-smoke/run-nwf5ML/report.json` |
 | Windows 原生沙箱探测 | PASS（23/23） | `npm run test:sandbox` | `.state/diagnostics/sandbox.json` |
 | 连接器进程树 | PASS（9/9） | `npm run test:connectors` | `.state/connector-probes/` |
 | 原生 Agent 协议预检 | PASS（codex/claude/deepseek） | `npm run test:agent-protocols -- --check` | `.state/native-pipecompat-20261017/diagnostics/agent-protocols.json` |
@@ -72,7 +73,7 @@
 npm run dev                         # 启动（已运行会提示当前地址）
 npm run open                        # 在浏览器打开当前运行实例
 npm run typecheck
-npm test                            # 210 项单元/契约测试
+npm test                            # 211 项单元/契约测试
 npm run test:replay                 # 事件/回放/fencing/partial/上下文契约
 npm run test:browser                # 无模型浏览器 E2E（36 步）
 npm run test:preflight -- --with-native
