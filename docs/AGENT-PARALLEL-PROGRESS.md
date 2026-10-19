@@ -121,7 +121,7 @@
 - `discussion.start` 新增可选 `quorum`（默认等于参与者数）；拒绝 quorum 超过参与人数、或 maxResponses 小于 quorum 的不可达配置。
 - 每轮成功响应达到 quorum 即推进下一轮：未完成成员记入 `Discussion.absent` 并以 `superseded` 取消，避免慢成员阻塞本轮；若所有运行终止仍未达 quorum 则停止讨论。默认 quorum 为全员，保留原语义。
 - 讨论横幅显示 Quorum 与缺席成员；创建讨论表单增加 quorum 字段（0=全部）。
-- 测试：`tests/discussion-quorum.test.ts` 覆盖提前推进、缺席记录、迟到取消、quorum 不可达拒绝；`npm test` **233/233**。
+- 测试：`tests/discussion-quorum.test.ts` 覆盖提前推进、缺席记录、迟到取消、quorum 不可达拒绝；`npm test` **234/234**。
 
 ## 增量：房间 / 成员待处理运行上限
 
@@ -179,32 +179,32 @@
 
 ## 增量：公平性压力测试与移动端布局
 
-- 新增 20 Agent × 5 运行的无模型公平性压力测试：使用公平排序连续调度 100 次，所有 Agent 均被服务 5 次，无饥饿；`npm test` **233/233**。
+- 新增 20 Agent × 5 运行的无模型公平性压力测试：使用公平排序连续调度 100 次，所有 Agent 均被服务 5 次，无饥饿；`npm test` **234/234**。
 - 浏览器 E2E 新增 390×844 移动端步骤：右侧详情面板隐藏、消息输入框可见、无水平溢出；移动端截图 `docs/screenshots/ui-mobile-20261019.png`，全量 **45/45**。
 
 ## 增量：随机 seq 故障注入与 CI 门禁
 
 - 新增种子化随机命令历史测试：40 条随机消息/决策后，在 30 个任意 seq 边界重建真实投影，要求投影字节与 head 完全一致、房间游标不前进；故障扫描后的继续写入仍可回放。
 - 新增 `npm run test:faults`，并加入本地 CI 配置步骤（在单元测试、replay 契约之后，build 之前）；种子固定，失败可重放。
-- 测试：`tests/fault-injection.test.ts` 1 项；`npm test` **233/233**。GitHub Actions 仍未实际执行。
+- 测试：`tests/fault-injection.test.ts` 1 项；`npm test` **234/234**。GitHub Actions 仍未实际执行。
 
 ## 增量：Agent 权重与加权公平调度
 
 - `AgentDescriptor.schedulerWeight`（0.1–10，默认 1）加入协议与 Agent 设置表单；权重越高，最近服务虚拟时间越小，越容易获得下一次调度机会。
 - `fairOrder(runs, servedAt, weights)` 按 `servedAt / weight` 排序；未配置权重时保持原有行为。Worker 每 tick 读取本地 Agent 权重并传入。
-- 测试：`tests/fair-scheduler.test.ts` 新增静态权重偏好与 12 次调度中高权重获得更多机会的验证；`npm test` **233/233**，浏览器 E2E 45/45。
+- 测试：`tests/fair-scheduler.test.ts` 新增静态权重偏好与 12 次调度中高权重获得更多机会的验证；`npm test` **234/234**，浏览器 E2E 45/45。
 
 ## 增量：双连接并发写入门禁
 
 - 新增两个独立 SQLite 连接互发 40 条消息的并发测试：每轮比较双方快照与房间 seq，最终事件连续、投影一致；从任意水位重建后投影字节不变。
 - 新增 `npm run test:concurrency` 并加入本地 CI 配置；测试不调用模型。
-- 测试：`tests/concurrency-conflict.test.ts` 1 项；`npm test` **233/233**。
+- 测试：`tests/concurrency-conflict.test.ts` 1 项；`npm test` **234/234**。
 
 ## 增量：单成员每分钟运行上限
 
 - 设置新增 `maxAgentRunsPerMinute`（默认 30）；入队前统计该成员最近 60 秒创建的运行，超限返回 429 `agent_rate_limited` 并原子回滚，防止点名风暴/快速重试打爆模型额度。
 - 设置表单增加「单成员每分钟运行上限」；默认值高于队列上限，保持常规行为。
-- 测试：`tests/rate-limit.test.ts` 1 项；`npm test` **233/233**。
+- 测试：`tests/rate-limit.test.ts` 1 项；`npm test` **234/234**。
 
 ## 增量：快捷键帮助面板
 
@@ -216,7 +216,7 @@
 - 设置新增 `autoRetryChatRuns`（默认关闭）与 `maxAutoRetries`（默认 1，0–3）。
 - 仅对同时满足以下条件的失败运行自动重试：chat、无 task/discussion、sandbox 执行、无已记录 Room 工具操作、无已产出 artifact、失败类别为 timeout/network/provider；任务、host、unknown/interrupted、预算/上下文/工具失败一律不自动重试。
 - 新运行带 `autoRetryOf` / `autoRetryCount` 追踪字段，并写入审计事件；队列/速率/预算限制仍会阻止自动重试。
-- UI 设置新增自动重试开关与次数；测试 `tests/auto-retry.test.ts` 验证一次自动重试后成功；`npm test` **233/233**。
+- UI 设置新增自动重试开关与次数；测试 `tests/auto-retry.test.ts` 验证一次自动重试后成功；`npm test` **234/234**。
 
 ## 增量：侧边栏房间搜索
 
@@ -237,25 +237,25 @@
 
 - 设置新增 `maxToolResultBytes`（默认 2 MiB，范围 64 KiB–8 MiB）；ToolOperations 使用该上限，不再硬编码 2 MiB。
 - 超限工具结果以 `unknown` 操作结束并保留错误，不静默截断或假装成功；设置表单显示 KiB 数值。
-- 测试：`tests/tool-output-limit.test.ts` 1 项；`npm test` **233/233**。
+- 测试：`tests/tool-output-limit.test.ts` 1 项；`npm test` **234/234**。
 
 ## 增量：按 Agent 的房间工具权限
 
 - `AgentDescriptor.roomToolPolicy` 新增 allow/read-only/deny（默认 allow）；托管与外部 MCP 工具调用都在执行前统一校验。
 - read-only 只允许 room_read / room_status；deny 全部拒绝；拒绝返回 403 `tool_policy_denied`，不会产生工具副作用或扣减 agent 状态。
-- Agent 设置表单新增「房间工具权限」选择；测试 `tests/tool-policy.test.ts` 覆盖 helper 与外部 MCP 端到端拒绝；`npm test` **233/233**。
+- Agent 设置表单新增「房间工具权限」选择；测试 `tests/tool-policy.test.ts` 覆盖 helper 与外部 MCP 端到端拒绝；`npm test` **234/234**。
 
 ## 增量：可配置上下文消息窗口
 
 - 设置新增 `maxContextMessages`（默认 40，范围 1–200）；`captureContext` 使用该值限制最近消息窗口，已接受决策仍完整保留。
 - 窗口变化只影响新建上下文快照，不回写已持久化的历史 Context；设置表单新增「上下文保留消息数」。
-- 测试：`tests/context-window.test.ts` 覆盖窗口截断与 fromSeq；`npm test` **233/233**。
+- 测试：`tests/context-window.test.ts` 覆盖窗口截断与 fromSeq；`npm test` **234/234**。
 
 ## 增量：按 Agent 工具白名单
 
 - `AgentDescriptor.allowedRoomTools`（默认全部，至少 1 项）进一步限制单个 Agent 可调用的房间工具；在 roomToolPolicy 之后统一校验，托管与外部 MCP 路径一致。
 - Agent 设置表单新增工具复选框；白名单拒绝返回 403 `tool_policy_denied`，不产生副作用。
-- 测试：`tests/tool-policy.test.ts` 3 项（策略矩阵、白名单、外部 MCP 端到端）；`npm test` **233/233**。
+- 测试：`tests/tool-policy.test.ts` 3 项（策略矩阵、白名单、外部 MCP 端到端）；`npm test` **234/234**。
 
 ## 增量：用量面板失败分类
 
@@ -266,45 +266,52 @@
 
 - 新增 `room_inbox` 工具：外部 MCP 与管理运行都可按 `afterSeq` + `limit` 分页读取房间事件，返回 `nextSeq` 与 `hasMore`；由 Agent 自行持久化游标，服务端不猜测已读位置。
 - 只读工具（read-only 策略与只读模式均允许），默认工具白名单包含；Agent 表单增加「增量读取」标签。
-- 测试 `tests/agent-inbox.test.ts` 验证游标连续、无重复、`nextSeq` 前进；`npm test` **233/233**。
+- 测试 `tests/agent-inbox.test.ts` 验证游标连续、无重复、`nextSeq` 前进；`npm test` **234/234**。
 
 ## 增量：单次运行工具调用上限
 
 - 设置新增 `maxToolCallsPerRun`（默认 100，范围 1–10000）；托管运行每次工具调用前计数，超限返回 `tool_budget_exceeded`，阻止失控工具循环。
 - 运行结束清理计数；设置表单新增「单次运行工具调用上限」；外部 MCP 调用仍受租约/策略约束。
-- 测试：`tests/tool-budget.test.ts` 覆盖默认值、首次成功与超限拒绝；`npm test` **233/233**。
+- 测试：`tests/tool-budget.test.ts` 覆盖默认值、首次成功与超限拒绝；`npm test` **234/234**。
 
 ## 增量：按 Agent 发言长度上限
 
 - Agent 新增 `maxRoomPostChars`（默认 32000，范围 1–32000）；托管与外部 MCP 的 room_post 在写入前校验，超限返回 403 `tool_policy_denied`，不产生消息。
 - 这是按命令参数策略的第一步；与原全局 message schema 上限叠加，取更严格者。
-- 测试：`tests/tool-policy.test.ts` 4 项（含外部 MCP 超长发言拒绝、短发言成功）；`npm test` **233/233**。
+- 测试：`tests/tool-policy.test.ts` 4 项（含外部 MCP 超长发言拒绝、短发言成功）；`npm test` **234/234**。
 
 ## 增量：Agent 提及唤醒与链深上限
 
 - 设置新增 `allowAgentMentionsToWake`（默认关闭）与 `maxWakeChainDepth`（默认 2，范围 1–10）；关闭时保持原有「Agent 不能互相唤醒」行为。
 - 开启后仅带执行 scope 的托管 Agent 提及可唤醒其他成员，运行记录 `wakeChainDepth`；超过链深上限时消息仍入房但不再入队，并写审计事件。
 - Agent 唤醒仍受每分钟运行配额、队列上限、速率与预算约束；外部无 scope 提及不会形成链。
-- 测试：`tests/wake-chain.test.ts` 2 项（默认关闭 + 链深停止）；`npm test` **233/233**。
+- 测试：`tests/wake-chain.test.ts` 2 项（默认关闭 + 链深停止）；`npm test` **234/234**。
 
 ## 增量：大规模公平性与回放压测
 
 - 新增 100 Agent × 5 运行的公平排序压力测试：500 次调度每个 Agent 恰好 5 次，无饥饿。
 - 新增 600 条消息房间压力测试：事件序号连续、快照消息数正确、从 0 重建投影字节一致、投影状态一致。
-- 测试：`tests/pressure-scale.test.ts` 2 项；`npm test` **233/233**。
+- 测试：`tests/pressure-scale.test.ts` 2 项；`npm test` **234/234**。
 
 ## 增量：按 Agent 任务标题上限
 
 - Agent 新增 `maxTaskTitleChars`（默认 5000，范围 1–5000）；托管与外部 MCP 的 task_propose 在创建任务前校验，超限返回 403 `tool_policy_denied`，不产生任务。
 - 与全局 task.create schema 上限叠加，取更严格者；Agent 表单新增「任务标题上限（字符）」。
-- 测试：`tests/tool-policy.test.ts` 5 项（含外部 MCP 超长标题拒绝、短标题成功）；`npm test` **233/233**。
+- 测试：`tests/tool-policy.test.ts` 5 项（含外部 MCP 超长标题拒绝、短标题成功）；`npm test` **234/234**。
+
+## 增量：服务重启安全恢复（沙箱聊天）
+
+- 设置新增 `recoverInterruptedChatRuns`（默认关闭）；Worker 启动时仅在开启后扫描 interrupted 运行。
+- 仅对同时满足：chat、无 task/discussion、sandbox、无已记录 Room 工具操作、无 artifact 的运行创建恢复运行；原运行标记 recoveryCount=1 并写审计，恢复运行带 autoRetryOf。
+- 任务、host、外部连接、未知副作用运行一律不自动恢复；队列/速率/历史限制仍可阻止恢复。
+- 测试：`tests/recovery-restart.test.ts` 覆盖默认关闭与开启后安全恢复；`npm test` **234/234**。
 
 ## 原计划逐项剩余工作
 
 P0 尚未完成：
 
 1. 把可恢复副作用的操作记录扩展到适配器内部的命令执行，区分可证明幂等与结果未知的原生工作；Room 工具 fencing 与账本已完成，不能替代内部 Shell/网络副作用的验收。
-2. 带 generation/租约的崩溃恢复与安全自动重入队。中断标记、generation 撤销与显式重入队事件已具备；必须先解决外部命令副作用不受 SQLite 回滚保护的问题，当前仍不盲目重试状态不明的写运行。
+2. 带 generation/租约的崩溃恢复与显式重入队已具备；新增可选的「重启后安全恢复沙箱聊天运行」：仅对无 task/discussion、无工具操作、无 artifact 的 interrupted 沙箱聊天新建恢复运行。外部命令副作用不受 SQLite 回滚保护，适配器内部副作用账本与状态不明写运行的自动重试仍待实现。
 3. 已添加种子化随机 seq 故障注入与双 SQLite 连接交错写入/重建门禁，并写入 CI 配置；更广泛并发场景与远端 CI 实际执行仍未完成。
 
 P1 尚未完成：

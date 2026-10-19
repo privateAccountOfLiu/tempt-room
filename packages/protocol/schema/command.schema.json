@@ -993,6 +993,10 @@
               "default": false,
               "type": "boolean"
             },
+            "recoverInterruptedChatRuns": {
+              "default": false,
+              "type": "boolean"
+            },
             "maxAutoRetries": {
               "default": 1,
               "type": "integer",
@@ -1034,6 +1038,7 @@
             "maxToolCallsPerRun",
             "maxContextMessages",
             "autoRetryChatRuns",
+            "recoverInterruptedChatRuns",
             "maxAutoRetries",
             "adaptiveTimeouts",
             "roomTokenBudget",

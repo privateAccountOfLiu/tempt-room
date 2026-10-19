@@ -116,7 +116,7 @@ export class Worker {
       }
     });
   }
-  start() { this.timer = setInterval(() => this.tick(), 250); this.timer.unref(); this.tick(); }
+  start() { this.timer = setInterval(() => this.tick(), 250); this.timer.unref(); this.tick(); queueMicrotask(() => this.recoverInterrupted()); }
   tick() {
     if (this.closed) return;
     this.store.atomic(() => {
@@ -388,6 +388,27 @@ export class Worker {
     if(stored&&this.shouldAutoRetry(stored))queueMicrotask(()=>this.autoRetry(stored));
   }
   private consumeToolCall(run:Run){const max=this.store.settings().maxToolCallsPerRun,used=this.toolCalls.get(run.id)??0;if(used>=max)throw new ProtocolError('tool_budget_exceeded',`单次运行工具调用已达上限（${max}）`,429);this.toolCalls.set(run.id,used+1);}
+  /** Restart recovery only requeues sandbox chat runs that never recorded a Room tool operation or artifact. */
+  private recoverInterrupted(){
+    if(!this.store.settings().recoverInterruptedChatRuns)return;
+    for(const candidate of this.store.list<Run>('runs')){
+      if(candidate.status!=='interrupted'||candidate.taskId||candidate.discussionId||(candidate.recoveryCount??0)>=1)continue;
+      const agent=this.store.get<AgentDescriptor>('agents',candidate.agentId);
+      if(!agent?.enabled||agent.executionMode!=='sandbox'||agent.connectionMode==='external')continue;
+      if(this.store.list<ToolOperation>('operations',candidate.roomId).some(operation=>operation.runId===candidate.id))continue;
+      if(this.store.list<Artifact>('artifacts',candidate.roomId).some(artifact=>artifact.runId===candidate.id))continue;
+      const room=this.store.room(candidate.roomId);if(!room)continue;
+      try{
+        const next=this.service.enqueue(candidate.roomId,candidate.agentId,candidate.prompt,room.seq,{autoRetryOf:candidate.id,recoveryCount:1});
+        this.store.atomic(()=>{
+          const run=this.store.get<Run>('runs',candidate.id);if(!run||run.status!=='interrupted')return;
+          run.recoveryCount=1;run.updatedAt=now();
+          this.store.event(run.roomId,'run.updated',SYSTEM,{run},null,run.id);
+          this.store.event(run.roomId,'audit.recorded',SYSTEM,{action:'run.recovered:'+run.id+'->'+next.id},null,run.id);
+        });
+      }catch{/* Queue, rate, or history limits leave the run interrupted rather than guessing. */}
+    }
+  }
   /** Automatic retry is intentionally narrower than the owner retry command: sandbox-only chat runs without recorded side effects. */
   private shouldAutoRetry(run:Run){
     const settings=this.store.settings();
