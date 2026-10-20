@@ -10,3 +10,22 @@ export function dependencyInputs(store:Store,task:Task){
   if(artifacts.length>50)throw new Error('依赖交付物超过 50 个，请拆分审查任务');
   return {versions,artifacts:artifacts.map(artifact=>artifact.id)};
 }
+
+export interface DependencyReadiness { ready:boolean; blockedBy:string[]; unmet:string[] }
+/** Pure readiness check shared by scheduling and production dispatch. */
+export function dependencyRequirementsReady(task:Task,tasks:Task[]):DependencyReadiness {
+  const blockedBy:string[]=[],unmet:string[]=[];const byId=new Map(tasks.map(item=>[item.id,item]));
+  for(const requirement of task.dependencyRequirements??[]){
+    const target=byId.get(requirement.taskId);
+    if(!target||target.roomId!==task.roomId){blockedBy.push(requirement.taskId);unmet.push(requirement.taskId+':missing');continue;}
+    if(requirement.requirement==='execution'){
+      if(target.status!=='completed'||target.version<requirement.taskVersion){blockedBy.push(requirement.taskId);unmet.push(requirement.taskId+':execution');}
+    } else if(requirement.requirement==='accepted_artifact'){
+      const artifactMatch=!requirement.artifactId||Boolean(target.acceptedArtifactIds?.includes(requirement.artifactId));
+      if(target.acceptanceStatus!=='accepted'||target.version!==requirement.taskVersion||!artifactMatch){blockedBy.push(requirement.taskId);unmet.push(requirement.taskId+':accepted_artifact');}
+    } else {
+      blockedBy.push(requirement.taskId);unmet.push(requirement.taskId+':integrated');
+    }
+  }
+  return {ready:blockedBy.length===0,blockedBy:[...new Set(blockedBy)],unmet};
+}

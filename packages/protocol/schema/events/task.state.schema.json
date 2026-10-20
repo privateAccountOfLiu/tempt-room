@@ -247,6 +247,220 @@
           "type": "string",
           "pattern": "^[a-f0-9]{64}$"
         },
+        "strict": {
+          "type": "boolean"
+        },
+        "objective": {
+          "type": "string",
+          "maxLength": 20000
+        },
+        "acceptanceChecks": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              },
+              "command": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              },
+              "verifierVersion": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "verifierHash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "required": {
+                "default": true,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "description",
+              "command",
+              "verifierVersion",
+              "verifierHash",
+              "required"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "allowedPaths": {
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "requiresAcceptance": {
+          "type": "boolean"
+        },
+        "requiresIntegration": {
+          "type": "boolean"
+        },
+        "acceptanceStatus": {
+          "type": "string",
+          "enum": [
+            "not_required",
+            "pending",
+            "accepted",
+            "rejected"
+          ]
+        },
+        "acceptedArtifactIds": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          }
+        },
+        "verificationId": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "baselineRef": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "dependencyRequirements": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[a-zA-Z0-9_-]+$"
+              },
+              "taskVersion": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "requirement": {
+                "type": "string",
+                "enum": [
+                  "execution",
+                  "accepted_artifact",
+                  "integrated"
+                ]
+              },
+              "artifactId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[a-zA-Z0-9_-]+$"
+              },
+              "artifactHash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "taskId",
+              "taskVersion",
+              "requirement"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "lastVerification": {
+          "type": "object",
+          "properties": {
+            "taskId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "taskVersion": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "outcome": {
+              "type": "string",
+              "enum": [
+                "accepted",
+                "rejected"
+              ]
+            },
+            "verificationId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "artifactIds": {
+              "default": [],
+              "maxItems": 50,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[a-zA-Z0-9_-]+$"
+              }
+            },
+            "artifactHashes": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "commandRef": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "exitCode": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "outputHash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "reason": {
+              "type": "string",
+              "maxLength": 2000
+            }
+          },
+          "required": [
+            "taskId",
+            "taskVersion",
+            "outcome",
+            "verificationId",
+            "artifactIds",
+            "artifactHashes"
+          ],
+          "additionalProperties": false
+        },
         "externalContext": {
           "type": "object",
           "properties": {

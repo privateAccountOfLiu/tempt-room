@@ -17,7 +17,7 @@ import { ReadyScheduler } from './scheduler.ts';
 import { trustForActor } from './trust.ts';
 import { assertRoomPostLength, assertRoomToolAllowed, assertTaskTitleLength } from './tool-policy.ts';
 import { formatContextMessage, UNTRUSTED_CONTEXT_NOTICE } from './context-format.ts';
-import { dependencyInputs } from './dependencies.ts';
+import { dependencyInputs, dependencyRequirementsReady } from './dependencies.ts';
 import { InboxService } from './inbox.ts';
 import { prepareHostChatWorkspace, hostStatus, hostChangeReport } from './host-workspace.ts';
 import { buildProjectManifest } from './project-manifest.ts';
@@ -150,6 +150,7 @@ export class Worker {
         const dependencies=task.dependencies.map(id=>this.store.get<Task>('tasks',id));
         if(dependencies.some(t=>!t||['failed','canceled','superseded','interrupted','unknown'].includes(t.status)))continue;
         if(dependencies.some(t=>t?.status!=='completed'))continue;
+        if(task.dependencyRequirements?.length&&!dependencyRequirementsReady(task,this.store.list<Task>('tasks',run.roomId)).ready)continue;
       }
       candidates.push(run);
     }
@@ -413,7 +414,7 @@ export class Worker {
       Object.assign(run, { sandbox:current.sandbox,status, error: error?.slice(0,2000), updatedAt: now() });  this.store.event(run.roomId, reconciliation?'run.reconciled':'run.updated', SYSTEM, { run }, null, run.id);
       if (run.taskId) {
         const task = this.store.get<Task>('tasks', run.taskId);
-        if (task && task.version === run.taskVersion) { task.status = status;  this.store.event(run.roomId, 'task.updated', SYSTEM, { task }); }
+        if (task && task.version === run.taskVersion) { task.status = status; if(task.strict||task.requiresAcceptance){task.acceptanceStatus=status==='completed'?'pending':'rejected';}  this.store.event(run.roomId, 'task.updated', SYSTEM, { task }); }
       }
       this.service.settleDiscussion(run);
     });

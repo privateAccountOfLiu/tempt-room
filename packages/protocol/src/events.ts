@@ -33,6 +33,7 @@ register(['room.members.updated'],'room.members','room','room',body({members:z.a
 register(['chat.message.created','message.posted'],'message.posted','room','message',body({message:messageSchema.passthrough()}));
 register(['task.created'],'task.created','task','task',body({task:taskSchema.passthrough()}));
 register(['task.updated','task.accepted','task.completed','task.state'],'task.state','task','task',body({task:taskSchema.passthrough()}));
+register(['task.verification.recorded'],'task.verification.recorded','task','task',body({task:taskSchema.passthrough(),verification:z.object({verificationId:z.string(),outcome:z.enum(['accepted','rejected']),taskVersion:z.number().int().positive()}).passthrough()}));
 register(['task.revised','task.version'],'task.version','task','task',body({task:taskSchema.passthrough()}));
 register(['task.handoff'],'task.handoff','task','task',body({task:taskSchema.passthrough()}));
 register(['task.claimed','task.claim'],'task.claim','task','task',body({task:taskSchema.passthrough()}));

@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 5d9b9577cee898545693d699d9521d27b8bd33e9 (dirty)
+source HEAD: ed2b837b2c2e4582cafe17926c4feda18f3942ba (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T04-17-22-287Z-f1074988/report.json
+report: .state/collaboration-baseline/run-2026-10-20T04-24-10-047Z-5b53abdc/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -161,21 +161,38 @@ report: .state/collaboration-baseline/run-2026-10-20T04-17-22-287Z-f1074988/repo
 
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
-- `npm test`：324/324
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-R4B4Cd/report.json`，152.8s）
+- `npm test`：326/326
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-gKGQF1/report.json`，155.8s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-VAgy8i/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-XaJGMj/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T04-17-22-287Z-f1074988/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T04-17-22-287Z-f1074988/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T04-17-22-287Z-f1074988/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T04-17-22-287Z-f1074988/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-24-10-047Z-5b53abdc/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T04-24-10-047Z-5b53abdc/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-24-10-047Z-5b53abdc/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-24-10-047Z-5b53abdc/replay.stdout.txt`
 
+## D03a — 执行完成与验收分离
+
+- 新增 packages/protocol/src/task-acceptance.ts：
+  - acceptanceStatus: not_required/pending/accepted/rejected
+  - dependencyRequirement: execution/accepted_artifact/integrated
+  - taskVerificationRecord（verificationId、outcome、产物/哈希、命令引用、exitCode、输出哈希）
+- Task 新增 strict/objective/acceptanceChecks/allowedPaths/requiresAcceptance/requiresIntegration/acceptanceStatus/acceptedArtifactIds/verificationId/baselineRef/dependencyRequirements/lastVerification
+- 带 contract 的 task.create 自动进入严格模式：冻结验收项、allowedPaths、基线引用、依赖要求，acceptanceStatus=pending
+- 新增 task.verification.record owner 命令：
+  - 校验 taskVersion 与产物归属
+  - accepted 才写 acceptedArtifactIds 与 acceptanceStatus=accepted
+  - 写 task.verification.recorded 事件
+- Worker.finish 不再把严格任务自动视为已验收；completed 只到 pending，失败/取消为 rejected
+- task.complete 外部摘要、task.revise、task.handoff 会使严格验收失效回到 pending
+- 新增 dependencyRequirementsReady 纯函数，Worker 派发同时检查 execution/accepted_artifact/integrated；integrated 在 D02 接入前保持阻塞
+- 新增 tests/task-acceptance.test.ts 2 项：依赖条件纯函数、执行完成未验收时下游不派发、验收后派发、修订使验收失效
+- 尚未完成：独立 verifier 进程与验证环境记录、UI 验收按钮、integrated 条件、下游失效传播广度
 ## D01b — 项目绑定 UI
 
 - 房间设置新增「项目绑定」区域：

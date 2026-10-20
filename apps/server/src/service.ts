@@ -11,6 +11,7 @@ import {provideTaskContext,assertExternalContextCurrent} from './external-contex
 import {capabilityEvidenceId} from './adapter-capabilities.ts';
 import {InputDeliveryService} from './input-delivery.ts';
 import {canonicalProjectPath,buildProjectManifest,projectBaseCommit} from './project-manifest.ts';
+import {taskVerificationRecordSchema} from '../../../packages/protocol/src/index.ts';
 
 /** External (non-managed) claims must heartbeat within this window or the worker recycles the task. */
 const externalTaskLeaseMs = (store: Store) => store.settings().taskLeaseMs;
@@ -179,7 +180,8 @@ export class RoomService {
       }
       case 'task.create': {
         const roomId = this.requireRoom(command);
-        const input = z.object({ title: z.string().trim().min(1).max(5000), agentId: z.string().optional(), projectPath: z.string().max(1500).default(''), dependencies: z.array(z.string()).max(20).default([]), open: z.boolean().default(false), contract:taskContractSchema.optional(), projectBindingId:z.string().optional(), bindingVersion:z.number().int().positive().optional() }).parse(p);
+        const input = z.object({ title: z.string().trim().min(1).max(5000), agentId: z.string().optional(), projectPath: z.string().max(1500).default(''), dependencies: z.array(z.string()).max(20).default([]), open: z.boolean().default(false), contract:taskContractSchema.optional(), projectBindingId:z.string().optional(), bindingVersion:z.number().int().positive().optional(), requiresIntegration:z.boolean().default(false) }).parse(p);
+        const strictFields=input.contract?{strict:true,objective:input.contract.objective,acceptanceChecks:input.contract.acceptance.map(check=>({...check,required:true})),allowedPaths:input.contract.projectBinding.allowedPaths,requiresAcceptance:true,requiresIntegration:input.requiresIntegration,acceptanceStatus:'pending' as const,baselineRef:input.contract.projectBinding.baselineRef,dependencyRequirements:input.contract.dependencies.map(dependency=>({taskId:dependency.taskId,taskVersion:dependency.taskVersion,requirement:dependency.condition,...(dependency.artifactHash?{artifactHash:dependency.artifactHash}:{})}))}:{};
         let binding:ProjectBinding|undefined;
         if(input.projectBindingId){binding=this.store.get<ProjectBinding>('project_bindings',input.projectBindingId);if(!binding||binding.roomId!==roomId)throw new ProtocolError('binding_not_found','项目绑定不存在',404);if(input.bindingVersion!==undefined&&input.bindingVersion!==binding.version)throw new ProtocolError('binding_version_mismatch','项目绑定版本不匹配',409);if(input.contract&&(input.contract.projectBinding.id!==binding.id||input.contract.projectBinding.version!==binding.version))throw new ProtocolError('binding_contract_mismatch','任务契约与项目绑定不一致',409);}
         if(input.contract){for(const dependency of input.contract.dependencies){const target=this.store.get<Task>('tasks',dependency.taskId);if(!target||target.roomId!==roomId)throw new ProtocolError('invalid_dependency','契约依赖任务不存在',400);if(dependency.taskVersion>target.version)throw new ProtocolError('invalid_dependency','契约依赖版本晚于当前任务版本',409);}}
@@ -187,12 +189,12 @@ export class RoomService {
         if (input.open) {
           if (actor.kind !== 'human') throw new ProtocolError('forbidden', 'Agent 不能创建开放认领任务', 403);
           if (input.agentId) throw new ProtocolError('validation_error', '开放认领任务不需要指定成员', 400);
-          const task: Task = { id: uid('task'), roomId, title: input.title, agentId: 'unassigned', projectPath: binding?.sourcePath??input.projectPath, dependencies: input.dependencies, ...(input.contract?{contract:input.contract}:{}), ...(binding?{projectBindingId:binding.id,bindingVersion:binding.version,baselineManifestHash:binding.manifestHash}:{}), open: true, generation:1,version: 1, status: 'proposed', createdAt: now() };
+          const task: Task = { id: uid('task'), roomId, title: input.title, agentId: 'unassigned', projectPath: binding?.sourcePath??input.projectPath, dependencies: input.dependencies, ...(input.contract?{contract:input.contract}:{}), ...strictFields, ...(binding?{projectBindingId:binding.id,bindingVersion:binding.version,baselineManifestHash:binding.manifestHash}:{}), open: true, generation:1,version: 1, status: 'proposed', createdAt: now() };
            this.store.event(roomId, 'task.created', actor, { task },command.commandId,scope?.runId??null); return { taskId: task.id };
         }
         if (!input.agentId) throw new ProtocolError('validation_error', '请指定执行成员或选择开放认领', 400);
         this.checkAgent(roomId, input.agentId);
-        const task: Task = { id: uid('task'), roomId, title: input.title, agentId: input.agentId, projectPath: binding?.sourcePath??input.projectPath, dependencies: input.dependencies, ...(input.contract?{contract:input.contract}:{}), ...(binding?{projectBindingId:binding.id,bindingVersion:binding.version,baselineManifestHash:binding.manifestHash}:{}), generation:1,version: 1, status: actor.kind === 'agent' ? 'proposed' : 'queued', createdAt: now() };
+        const task: Task = { id: uid('task'), roomId, title: input.title, agentId: input.agentId, projectPath: binding?.sourcePath??input.projectPath, dependencies: input.dependencies, ...(input.contract?{contract:input.contract}:{}), ...strictFields, ...(binding?{projectBindingId:binding.id,bindingVersion:binding.version,baselineManifestHash:binding.manifestHash}:{}), generation:1,version: 1, status: actor.kind === 'agent' ? 'proposed' : 'queued', createdAt: now() };
          const event = this.store.event(roomId, 'task.created', actor, { task },command.commandId,scope?.runId??null);
         if (actor.kind === 'human'&&this.store.get<AgentDescriptor>('agents',task.agentId)?.connectionMode!=='external') this.enqueue(roomId, task.agentId, task.title, event.seq, { taskId: task.id, taskVersion: 1 });
         return { taskId: task.id };
@@ -234,7 +236,7 @@ export class RoomService {
         if (!['running', 'queued', 'waiting_input'].includes(task.status)) throw new ProtocolError('task_not_active', '任务已经结束', 409);
         this.requireExternalLease(task, input.taskVersion,input.generation);
         assertExternalContextCurrent(this.store,task,input.contextToken);
-        task.status = input.ok ? 'completed' : 'failed'; delete task.leaseUntil;
+        task.status = input.ok ? 'completed' : 'failed'; delete task.leaseUntil; if(task.strict||task.requiresAcceptance)task.acceptanceStatus=input.ok?'pending':'rejected';
          this.store.event(roomId, 'task.completed', actor, { task, ok: input.ok, summary: input.summary,contextToken:input.contextToken }, command.commandId);
         if (input.summary.trim()) {
           const message: Message = { id: uid('msg'), roomId, actor, text: input.summary.trim(), mentions: [], attachments: [], createdAt: now(),taskId:task.id,taskVersion:task.version,basedOnSeq:task.externalContext!.throughSeq,generation:task.generation,trust:trustForActor(this.store,actor) };
@@ -269,8 +271,26 @@ export class RoomService {
         const task = this.store.get<Task>('tasks', input.taskId); if (!task || task.roomId !== roomId) throw new ProtocolError('not_found', '任务不存在', 404);
         if(task.agentId!=='unassigned')this.checkAgent(roomId,task.agentId);
         if(input.contract){for(const dependency of input.contract.dependencies){const target=this.store.get<Task>('tasks',dependency.taskId);if(!target||target.roomId!==roomId)throw new ProtocolError('invalid_dependency','契约依赖任务不存在',400);if(dependency.taskVersion>target.version)throw new ProtocolError('invalid_dependency','契约依赖版本晚于当前任务版本',409);}}
-        const affectedTaskIds=this.reviseTaskTree(task,actor,command.commandId,current=>{current.title=input.title;if(input.contract)current.contract=input.contract;});
+        const affectedTaskIds=this.reviseTaskTree(task,actor,command.commandId,current=>{current.title=input.title;if(input.contract)current.contract=input.contract;if(current.strict){current.acceptanceStatus='pending';delete current.verificationId;current.acceptedArtifactIds=[];delete current.lastVerification;}});
         return {affectedTaskIds};
+      }
+      case 'task.verification.record': {
+        const roomId = this.requireRoom(command);
+        if (actor.kind !== 'human') throw new ProtocolError('forbidden', '只有 owner 可以记录验收结果', 403);
+        const input = payloadSchemas['task.verification.record'].parse(p);
+        const task = this.store.get<Task>('tasks', input.taskId);
+        if (!task || task.roomId !== roomId) throw new ProtocolError('not_found', '任务不存在', 404);
+        if (task.version !== input.taskVersion) throw new ProtocolError('task_version_mismatch', '验收目标版本已过期', 409);
+        if (!task.strict && !task.requiresAcceptance) throw new ProtocolError('legacy_task', '旧任务没有独立验收要求', 409);
+        for (const artifactId of input.artifactIds) {
+          const artifact = this.store.get<Artifact>('artifacts', artifactId);
+          if (!artifact || artifact.roomId !== roomId || (artifact.taskId && artifact.taskId !== task.id)) throw new ProtocolError('invalid_artifact', '验收产物不存在或不属于此任务', 400);
+        }
+        const verification = taskVerificationRecordSchema.parse(input);
+        const accepted = input.outcome === 'accepted';
+        const next: Task = {...task, acceptanceStatus: accepted ? 'accepted' : 'rejected', verificationId: input.verificationId, acceptedArtifactIds: accepted ? input.artifactIds : [], lastVerification: verification};
+        this.store.event(roomId, 'task.verification.recorded', actor, {task: next, verification});
+        return {taskId: task.id, acceptanceStatus: next.acceptanceStatus, verificationId: verification.verificationId};
       }
       case 'task.accept':{
         const roomId=this.requireRoom(command),input=payloadSchemas['task.accept'].parse(p),task=this.store.get<Task>('tasks',input.taskId);
@@ -286,7 +306,7 @@ export class RoomService {
         this.checkAgent(roomId, input.agentId);
         if (task.agentId === input.agentId) throw new ProtocolError('same_agent', '任务已经在目标成员名下', 409);
         const fromAgentId = task.agentId;
-        const affectedTaskIds=this.reviseTaskTree(task,actor,command.commandId,current=>{current.agentId=input.agentId;current.open=false;},{type:'task.handoff',payload:{fromAgentId,toAgentId:input.agentId,note:input.note},note:input.note});
+        const affectedTaskIds=this.reviseTaskTree(task,actor,command.commandId,current=>{current.agentId=input.agentId;current.open=false;if(current.strict){current.acceptanceStatus='pending';delete current.verificationId;current.acceptedArtifactIds=[];delete current.lastVerification;}},{type:'task.handoff',payload:{fromAgentId,toAgentId:input.agentId,note:input.note},note:input.note});
         return { taskId: task.id, fromAgentId, toAgentId: task.agentId, version: task.version,affectedTaskIds };
       }
       case 'run.cancel': {
