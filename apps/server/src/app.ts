@@ -225,7 +225,10 @@ export async function createApp(options: AppOptions = {}) {
   app.get<{Params:{id:string}}>('/api/runs/:id/context-segments',request=>{
     const run=store.get<Run>('runs',request.params.id);if(!run)throw new ProtocolError('not_found','运行不存在',404);
     const task=run.taskId?store.get<Task>('tasks',run.taskId):undefined;
-    return buildContextSegments(run,runContext(store,run),task);
+    const batch=run.inputBatchId?store.get<InputBatch>('input_batches',run.inputBatchId):undefined;
+    const sourceIds=new Set(batch?.sourceEventIds??[]);
+    const incremental=(batch?store.events(run.roomId).filter(event=>sourceIds.has(event.eventId)).map(event=>String((event.payload as any).message?.text??event.type)):[]).join('\n');
+    return buildContextSegments(run,runContext(store,run),task,{...(incremental?{incrementalText:incremental}:{})});
   });
   app.get<{Params:{id:string}}>('/api/runs/:id/operations',request=>{
     const run=store.get<Run>('runs',request.params.id);if(!run)throw new ProtocolError('not_found','运行不存在',404);

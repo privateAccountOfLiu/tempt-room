@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Decision, Run, RunContext, Task } from '../../../packages/protocol/src/index.ts';
 
-export type ContextSegmentKind = 'objective' | 'constraints' | 'related' | 'history';
+export type ContextSegmentKind = 'objective' | 'constraints' | 'related' | 'subscription' | 'history';
 export interface ContextSegment {
   kind: ContextSegmentKind;
   text: string;
@@ -18,14 +18,17 @@ export interface ContextSegmentOptions {
   constraintsBudgetBytes?: number;
   relatedBudgetBytes?: number;
   historyBudgetBytes?: number;
+  subscriptionBudgetBytes?: number;
+  incrementalText?: string;
 }
 
-export const defaultContextSegmentOptions: Required<ContextSegmentOptions> = {
+export const defaultContextSegmentOptions: Required<Omit<ContextSegmentOptions, 'incrementalText'>> = {
   totalBudgetBytes: 64 * 1024,
   objectiveBudgetBytes: 16 * 1024,
   constraintsBudgetBytes: 20 * 1024,
   relatedBudgetBytes: 8 * 1024,
-  historyBudgetBytes: 20 * 1024
+  historyBudgetBytes: 20 * 1024,
+  subscriptionBudgetBytes: 8 * 1024
 };
 
 /** Build deterministic prompt segments. Objective and accepted constraints are
@@ -39,7 +42,9 @@ export function buildContextSegments(run: Run, context: RunContext, task?: Task,
   if (byteLength(constraints) > config.constraintsBudgetBytes) throw new ContextSegmentTooLarge('constraints', byteLength(constraints), config.constraintsBudgetBytes);
   const related = relatedText(run, task);
   if (byteLength(related) > config.relatedBudgetBytes) throw new ContextSegmentTooLarge('related', byteLength(related), config.relatedBudgetBytes);
-  const fixedBytes = objective + byteLength(constraints) + byteLength(related);
+  const incremental = options.incrementalText ?? '';
+  if (byteLength(incremental) > config.subscriptionBudgetBytes) throw new ContextSegmentTooLarge('subscription', byteLength(incremental), config.subscriptionBudgetBytes);
+  const fixedBytes = objective + byteLength(constraints) + byteLength(related) + byteLength(incremental);
   const totalBudget = Math.max(0, config.totalBudgetBytes - fixedBytes);
   const historyBudget = Math.min(config.historyBudgetBytes, totalBudget);
   const selected: string[] = [];
@@ -54,6 +59,7 @@ export function buildContextSegments(run: Run, context: RunContext, task?: Task,
     segment('objective', run.prompt, run.basedOnSeq, run.basedOnSeq, false, 0),
     segment('constraints', constraints, context.fromSeq, context.throughSeq, false, 0),
     segment('related', related, context.fromSeq, context.throughSeq, false, 0),
+    ...(incremental ? [segment('subscription', incremental, context.fromSeq, context.throughSeq, false, 0)] : []),
     segment('history', selected.join('\n'), context.fromSeq, context.throughSeq, omitted > 0, omitted)
   ];
 }

@@ -44,3 +44,10 @@ test('related segment records project baseline evidence without inventing extern
   assert.match(related.text, /bindingVersion=3/);
   assert.equal(related.truncated, false);
 });
+
+test('subscription increments become their own bounded segment when present', () => {
+  const segments = buildContextSegments(run, context(0), undefined, {incrementalText: '订阅增量：接口版本已冻结'});
+  assert.deepEqual(segments.map(segment => segment.kind), ['objective', 'constraints', 'related', 'subscription', 'history']);
+  assert.match(segments.find(segment => segment.kind === 'subscription')!.text, /接口版本已冻结/);
+  assert.throws(() => buildContextSegments(run, context(0), undefined, {incrementalText: 'x'.repeat(20_000), subscriptionBudgetBytes: 100}), (error: unknown) => error instanceof ContextSegmentTooLarge && error.segment === 'subscription');
+});
