@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 412f33ebadee8a758aae62bdad8c45d57d791d49 (dirty)
+source HEAD: f93f0682bc6d403ce7b2f23f945d3157fe5cd4c7 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T09-41-23-002Z-9cebf75a/report.json
+report: .state/collaboration-baseline/run-2026-10-20T09-47-54-402Z-73b1c594/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T09-41-23-002Z-9cebf75a/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-hn3MN8/report.json`，167.5s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-PC3Krs/report.json`，163.2s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-dSX1tB/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-7rz4pw/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T09-41-23-002Z-9cebf75a/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T09-41-23-002Z-9cebf75a/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T09-41-23-002Z-9cebf75a/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T09-41-23-002Z-9cebf75a/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-47-54-402Z-73b1c594/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T09-47-54-402Z-73b1c594/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-47-54-402Z-73b1c594/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-47-54-402Z-73b1c594/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -517,4 +517,8 @@ report: .state/collaboration-baseline/run-2026-10-20T09-41-23-002Z-9cebf75a/repo
 - 轮次推进先 close 旧 round（closedSeq/closedAt/closeReason=round_complete）再 open 新 round
 - discussion 结束/停止时 close 当前 round（closeReason=结束原因）
 - 新增 tests/discussion-rounds.test.ts：open/close 生命周期与窗口截止字段
-- 尚未完成：Worker 按 windowDeadline 展示/关闭、late 结果事件、关闭后冻结结果集合、p95 窗口接入调度
+- settleDiscussion 检测迟到结果：run 已终态且属于更早轮次或讨论已结束
+- 写 discussion.round.late.received：绑定原 round/run/agent/generation/status，round 标记 late；不重新打开轮次、不修改已冻结决议
+- 同一 run 的 late 事件幂等
+- 新增 discussion-rounds 测试：late 事件绑定原轮次且不重复
+- 尚未完成：Worker 按 windowDeadline 展示/关闭、关闭后结果集合冻结、p95 窗口接入调度

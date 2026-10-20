@@ -572,6 +572,7 @@ export class RoomService {
         discussion.summary={runId:run.id,status:run.status==='completed'&&artifact?'completed':run.status==='canceled'?'canceled':['unknown','interrupted'].includes(run.status)?'interrupted':'failed',...(artifact?{artifactId:artifact.id}:{}),...(run.error?{error:run.error}:run.status==='completed'&&!artifact?{error:'总结运行未生成交付物'}:{})};
         this.store.event(run.roomId,'discussion.summary.updated',SYSTEM,{discussion});return;
       }
+      if(terminalStates.has(run.status)&&run.round!==undefined&&(discussion.round>run.round||!['active','paused'].includes(discussion.status))){this.recordLateDiscussionResult(discussion,run);return;}
       if(discussion.status!=='active'||run.round!==discussion.round)return;
       const round = this.store.list<Run>('runs', run.roomId).filter(r => r.discussionId === discussion.id && r.discussionRole!=='summary'&&r.round === discussion.round);
       if (!round.length) return;
@@ -614,6 +615,13 @@ export class RoomService {
     if(limit&&discussion.activationsUsed>limit){this.endDiscussion(discussion,'activation_limit','stopped',`讨论激活额度已达上限（${limit}）`);return false;}
     this.store.event(discussion.roomId,'discussion.round',SYSTEM,{discussion});
     return true;
+  }
+  private recordLateDiscussionResult(discussion:Discussion,run:Run){
+    const exists=this.store.events(discussion.roomId).some(event=>event.type==='discussion.round.late.received'&&(event.payload as any).late?.runId===run.id&&(event.payload as any).late?.round===run.round);
+    if(exists)return;
+    const base=this.store.list<DiscussionRound>('discussion_rounds',discussion.roomId).find(item=>item.discussionId===discussion.id&&item.round===run.round);
+    if(!base)return;
+    this.store.event(discussion.roomId,'discussion.round.late.received',SYSTEM,{round:{...base,status:'late'},late:{runId:run.id,agentId:run.agentId,generation:run.generation??1,round:run.round,status:run.status,receivedAt:now()}});
   }
   private openDiscussionRound(discussion:Discussion,openedSeq:number){
     const id=`round_${discussion.id}_${discussion.round}`;

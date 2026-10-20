@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { Store, uid } from '../apps/server/src/store.ts';
+import { Store, SYSTEM, uid } from '../apps/server/src/store.ts';
 import { RoomService } from '../apps/server/src/service.ts';
-import type { Discussion, DiscussionRound } from '../packages/protocol/src/index.ts';
+import type { Discussion, DiscussionRound, Run } from '../packages/protocol/src/index.ts';
 
 const parent = resolve('.state/test-data');
 test('discussion rounds persist opened and closed lifecycle facts', t => {
@@ -25,4 +25,30 @@ test('discussion rounds persist opened and closed lifecycle facts', t => {
   assert.equal(closed.status, 'closed');
   assert.equal(closed.closeReason, 'user_stop');
   assert.ok(closed.closedSeq !== undefined && closed.closedAt);
+});
+
+test('late discussion results are recorded against the original round without reopening it', t => {
+  mkdirSync(parent, {recursive: true});
+  const root = mkdtempSync(join(parent, 'discussion-late-')), store = new Store(join(root, 'room.sqlite')), service = new RoomService(store), roomId = store.rooms()[0].id;
+  t.after(() => { store.close(); rmSync(root, {recursive: true, force: true}); });
+  const command = (type: string, payload: unknown) => service.execute({version: '0.1', commandId: uid(), roomId, type, payload}) as any;
+  const started = command('discussion.start', {goal: 'Late result', participants: ['demo-planner', 'demo-reviewer'], rounds: 2, maxResponses: 4, maxDurationMs: 60_000});
+  const discussion = store.get<Discussion>('discussions', started.result.discussionId)!;
+  const queued = store.list<Run>('runs', roomId).find(run => run.discussionId === discussion.id && run.round === 1)!;
+  const at = new Date().toISOString();
+  store.event(roomId, 'run.started', SYSTEM, {run: {...queued, status: 'running', startedAt: at, updatedAt: at}});
+  const running = store.get<Run>('runs', queued.id)!;
+  const completed: Run = {...running, status: 'completed', finishedAt: at, updatedAt: at};
+  store.event(roomId, 'run.updated', SYSTEM, {run: completed});
+  const current = store.get<Discussion>('discussions', discussion.id)!;
+  store.event(roomId, 'discussion.round', SYSTEM, {discussion: {...current, round: 2, updatedAt: at}});
+  service.settleDiscussion(completed);
+  const late = store.events(roomId).find(event => event.type === 'discussion.round.late.received')!;
+  assert.equal((late.payload as any).late.runId, completed.id);
+  assert.equal((late.payload as any).late.round, 1);
+  assert.equal((late.payload as any).round.status, 'late');
+  assert.equal(store.get<DiscussionRound>('discussion_rounds', (late.payload as any).round.id)!.status, 'late');
+  const before = store.events(roomId).filter(event => event.type === 'discussion.round.late.received').length;
+  service.settleDiscussion(completed);
+  assert.equal(store.events(roomId).filter(event => event.type === 'discussion.round.late.received').length, before);
 });
