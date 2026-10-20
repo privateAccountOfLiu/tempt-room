@@ -35,7 +35,7 @@ export const capabilitiesSchema = z.object({
   execute: z.boolean(), artifacts: z.boolean(), input: z.boolean(), usage: z.boolean()
 });
 export type AgentCapabilities = z.infer<typeof capabilitiesSchema>;
-export const roomToolNames=['room_read','room_status','room_inbox','room_post','task_propose','task_claim','task_context','task_complete','task_heartbeat','artifact_publish'] as const;
+export const roomToolNames=['room_read','room_status','room_inbox','room_post','task_propose','task_claim','task_context','task_complete','task_heartbeat','artifact_publish','room_input_ack'] as const;
 export const agentSchema = z.object({
   id: idSchema, name: z.string().min(1).max(60), provider: providerSchema,
   role: z.string().max(300).default('协作助手'), color: z.enum(['blue', 'green', 'orange', 'purple', 'teal']).default('blue'), schedulerWeight: z.number().min(0.1).max(10).default(1),

@@ -2557,7 +2557,8 @@
                 "task_context",
                 "task_complete",
                 "task_heartbeat",
-                "artifact_publish"
+                "artifact_publish",
+                "room_input_ack"
               ],
               "minItems": 1,
               "type": "array",
@@ -2573,7 +2574,8 @@
                   "task_context",
                   "task_complete",
                   "task_heartbeat",
-                  "artifact_publish"
+                  "artifact_publish",
+                  "room_input_ack"
                 ]
               }
             },

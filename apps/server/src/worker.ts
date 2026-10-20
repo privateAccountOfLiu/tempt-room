@@ -679,6 +679,10 @@ export class Worker {
       const events = this.store.events(roomId, input.afterSeq, input.limit), nextSeq = events.at(-1)?.seq ?? input.afterSeq;
       return { roomId, fromSeq: input.afterSeq, nextSeq, hasMore: events.length === input.limit, events: events.map(event => ({ seq: event.seq, type: event.type, createdAt: event.createdAt, payload: event.payload })) };
     }
+    if (name === 'room_input_ack') {
+      const input = z.object({batchId: z.string(), agentSessionId: z.string(), receiptEvidence: z.string().max(500).optional()}).strict().parse(args);
+      return this.service.execute({version: VERSION, commandId, roomId, type: 'input.ack', payload: input}, actor);
+    }
     if (name === 'room_post') {
       const input = z.object({ text: z.string().min(1).max(32000), mentions: z.array(z.string()).default([]) }).strict().parse(args);
       assertRoomPostLength(agent,input.text);

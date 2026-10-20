@@ -32,7 +32,7 @@ export class RoomService {
       if (command.roomId && !this.store.room(command.roomId)) throw new ProtocolError('not_found', '房间不存在', 404);
       if (actor.kind === 'agent') {
         if (!command.roomId || !this.store.room(command.roomId)?.members.includes(actor.id)) throw new ProtocolError('forbidden', '不是该房间的成员', 403);
-        if (!['message.send', 'decision.propose', 'task.create', 'task.claim', 'task.context', 'task.complete', 'task.heartbeat'].includes(command.type)) throw new ProtocolError('forbidden', 'Agent 无权执行此命令', 403);
+        if (!['message.send', 'decision.propose', 'task.create', 'task.claim', 'task.context', 'task.complete', 'task.heartbeat', 'input.ack'].includes(command.type)) throw new ProtocolError('forbidden', 'Agent 无权执行此命令', 403);
       }
       if(scope){const run=this.store.get<Run>('runs',scope.runId);if(actor.kind!=='agent'||!run||run.roomId!==command.roomId||run.agentId!==actor.id||!['running','waiting_input'].includes(run.status))throw new ProtocolError('forbidden','工具消息不属于当前活动运行',403);}
       if(scope&&['message.send','task.create','task.claim'].includes(command.type))assertContextCurrent(this.store,this.store.get<Run>('runs',scope.runId)!);
@@ -175,7 +175,11 @@ export class RoomService {
       case 'input.ack': {
         const roomId = this.requireRoom(command);
         const input = payloadSchemas['input.ack'].parse(p);
-        const batch = this.inputDelivery.acknowledgeBatch(roomId, input.batchId, input.agentSessionId, input.receiptEvidence ?? 'owner-ack');
+        if (actor.kind === 'agent') {
+          const session = this.store.get<AgentSession>('agent_sessions', input.agentSessionId);
+          if (!session || session.roomId !== roomId || session.agentId !== actor.id) throw new ProtocolError('forbidden', '只能确认自己的输入批次', 403);
+        }
+        const batch = this.inputDelivery.acknowledgeBatch(roomId, input.batchId, input.agentSessionId, input.receiptEvidence ?? `${actor.kind}-ack`);
         return {batchId: batch.id, status: batch.status};
       }
       case 'task.create': {

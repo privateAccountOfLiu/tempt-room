@@ -38,8 +38,9 @@ test('input batch persists deliveries, provides them, and acknowledges only the 
   const provided = service.inputDelivery.provideBatch(roomId, batch.id, 'unit-provided');
   assert.equal(provided.status, 'provided');
   assert.ok(store.list<InputBatch>('input_batches', roomId).some(item => item.id === batch.id && item.status === 'provided'));
-  const acknowledged = service.inputDelivery.acknowledgeBatch(roomId, batch.id, session.id, 'unit-ack');
-  assert.equal(acknowledged.status, 'acknowledged');
+  const agentAck = service.execute({version: '0.1', commandId: uid(), roomId, type: 'input.ack', payload: {batchId: batch.id, agentSessionId: session.id, receiptEvidence: 'agent-confirmed'}}, {id: 'demo-planner', kind: 'agent'});
+  assert.equal(agentAck.result.status, 'acknowledged');
+  assert.throws(() => service.execute({version: '0.1', commandId: uid(), roomId, type: 'input.ack', payload: {batchId: batch.id, agentSessionId: session.id}}, {id: 'demo-reviewer', kind: 'agent'}), /自己的输入批次/);
   assert.throws(() => service.inputDelivery.acknowledgeBatch(roomId, batch.id, 'other_session', 'bad'), /不属于/);
 });
 
