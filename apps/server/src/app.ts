@@ -293,7 +293,7 @@ export async function createApp(options: AppOptions = {}) {
     const evidence = store.list<CapabilityEvidence>('capability_evidence', room.id).filter(item => item.fingerprint === fingerprint);
     const states = capabilityNames.map(capability => {
       const match = evidence.find(item => item.capability === capability);
-      return {capability, state: verifiedCapabilityState(fingerprint, evidence, capability), mode: match?.mode ?? 'not_run', testedAt: match?.testedAt ?? null};
+      return {capability, state: verifiedCapabilityState(fingerprint, evidence, capability), mode: match?.mode ?? 'not_run', testedAt: match?.testedAt ?? null, reason: match?.reason ?? null};
     });
     return {fingerprint, states, member: room.members.includes(agent.id)};
   });

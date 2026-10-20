@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: a4ab853a5323ea9d9584614239fa46c94aa8e912 (dirty)
+source HEAD: 4cd314393e36492737cc51f090cdd98e4d0ea21c (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T12-33-36-160Z-4fad006b/report.json
+report: .state/collaboration-baseline/run-2026-10-20T12-40-14-048Z-f627d990/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T12-33-36-160Z-4fad006b/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-uaMLGG/report.json`，164.2s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-nhRuCw/report.json`，163.5s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-7cr9F4/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-n3NrIS/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T12-33-36-160Z-4fad006b/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T12-33-36-160Z-4fad006b/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T12-33-36-160Z-4fad006b/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T12-33-36-160Z-4fad006b/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T12-40-14-048Z-f627d990/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T12-40-14-048Z-f627d990/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T12-40-14-048Z-f627d990/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T12-40-14-048Z-f627d990/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -520,7 +520,10 @@ report: .state/collaboration-baseline/run-2026-10-20T12-33-36-160Z-4fad006b/repo
 - 新增 acp-permission 测试：拒绝→cancelled，允许→selected allow_once
 - ACP 权限异步批准完成时重新检查 signal/session 所有权，取消后的迟到批准返回 cancelled
 - 新增 acp-permission 竞态测试：异步批准途中 abort，最终回执 cancelled
-- 尚未完成：CLI 不可拦截缺口标注、MCP 权限桥接
+- 非 demo adapter 的未验证能力带显式 reason：preToolGate/steerDuringRun/toolBoundaryInput 未声明通道
+- capabilities API 返回 reason；Agent 能力面板展示缺口原因
+- 新增 probeConfiguredAgent 测试：真实 adapter 未验证原因存在，demo 不附加噪声
+- 尚未完成：MCP 权限桥接、按宿主的不可拦截清单
 
 ## B09 起点 — 讨论窗口估算
 

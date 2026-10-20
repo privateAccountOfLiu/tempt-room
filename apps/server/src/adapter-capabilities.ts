@@ -43,6 +43,7 @@ export interface ProbeContract {
   supported?: readonly CapabilityName[];
   unsupported?: readonly CapabilityName[];
   mode?: Partial<Record<CapabilityName, string>>;
+  reasons?: Partial<Record<CapabilityName, string>>;
 }
 export interface ProbeOptions {
   suiteVersion?: string;
@@ -84,7 +85,7 @@ export function probeSimulatedCapabilities(contract: ProbeContract, fingerprint:
     const state: CapabilityState = supported.has(capability) ? 'verified_supported' : unsupported.has(capability) ? 'verified_unsupported' : 'unverified';
     const mode = state === 'unverified' ? 'not_run' : contract.mode?.[capability] ?? 'simulated-contract';
     const evidenceHash = digest({fingerprint, capability, state, mode, suiteVersion});
-    return {fingerprint, capability, state, mode, testedAt, suiteVersion, evidenceHash};
+    return {fingerprint, capability, state, mode, testedAt, suiteVersion, evidenceHash, ...(state === 'unverified' && contract.reasons?.[capability] ? {reason: contract.reasons[capability]} : {})};
   });
 }
 
@@ -121,7 +122,8 @@ export function probeConfiguredAgent(agent: AgentDescriptor, testedAt = new Date
   const fingerprint = agentCapabilityFingerprint(agent);
   const supported = agent.provider === 'demo' ? ['streamOutput', 'nextTurnInput'] as CapabilityName[] : [];
   const unsupported = agent.provider === 'demo' ? [] as CapabilityName[] : [];
-  return {fingerprint, evidence: probeSimulatedCapabilities({supported, unsupported}, fingerprint, {suiteVersion: 'capabilities-sim-v1', testedAt})};
+  const reasons: Partial<Record<CapabilityName, string>> = agent.provider === 'demo' ? {} : {preToolGate: 'adapter 未声明可拦截的权限通道', steerDuringRun: 'adapter 未声明运行中 steer 通道', toolBoundaryInput: 'adapter 未声明工具边界输入通道'};
+  return {fingerprint, evidence: probeSimulatedCapabilities({supported, unsupported, reasons}, fingerprint, {suiteVersion: 'capabilities-sim-v1', testedAt})};
 }
 
 export function capabilityEvidenceId(fingerprint: string, capability: CapabilityName): string {

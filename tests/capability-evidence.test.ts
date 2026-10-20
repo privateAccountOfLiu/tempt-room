@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createApp } from '../apps/server/src/app.ts';
+import { probeConfiguredAgent } from '../apps/server/src/adapter-capabilities.ts';
+import { agentSchema } from '../packages/protocol/src/index.ts';
 import { agentCapabilityFingerprint } from '../apps/server/src/adapter-capabilities.ts';
 import type { AgentDescriptor } from '../packages/protocol/src/index.ts';
 
@@ -57,4 +59,14 @@ test('capability verify command rejects a mismatched fingerprint', async t => {
   const response = await app.inject({method: 'POST', url: '/api/commands', headers, payload: {version: '0.1', commandId: 'capability-mismatch', roomId, type: 'capability.verify', payload: {fingerprint: 'fp_expected', evidence: [{fingerprint: 'fp_other', capability: 'streamOutput', state: 'verified_supported', mode: 'simulated', testedAt: new Date().toISOString(), suiteVersion: 'sim-v1', evidenceHash: 'a'.repeat(64)}]}}});
   assert.equal(response.statusCode, 400);
   assert.equal(store.list('capability_evidence', roomId).length, 0);
+});
+
+test('unverified adapter capabilities carry explicit gap reasons', () => {
+  const agent = agentSchema.parse({id: 'gap-agent', name: 'Gap', provider: 'deepseek', connectionMode: 'managed', runtimeDirectory: '.', credentialEnv: 'GAP_KEY'});
+  const evidence = probeConfiguredAgent(agent).evidence;
+  const preTool = evidence.find(item => item.capability === 'preToolGate')!;
+  assert.equal(preTool.state, 'unverified');
+  assert.match(String(preTool.reason), /未声明可拦截/);
+  const demo = agentSchema.parse({id: 'demo-x', name: 'Demo', provider: 'demo'});
+  assert.equal(probeConfiguredAgent(demo).evidence.find(item => item.capability === 'preToolGate')!.reason, undefined);
 });
