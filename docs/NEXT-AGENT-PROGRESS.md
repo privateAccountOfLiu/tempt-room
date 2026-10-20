@@ -101,7 +101,7 @@ report: .state/collaboration-baseline/run-2026-10-20T09-18-02-562Z-f60c4391/repo
 - 自动路由仍待接入：当前调度继续使用兼容能力提示，不会把未验证证据当成支持
 ### 运行环境状态（2026-10-20）
 
-- 按用户明确授权启动本地服务验证；服务运行于 http://127.0.0.1:4317（PID 9776；2026-10-20 17:14 重启到用量 CSV 导出构建）
+- 按用户明确授权启动本地服务验证；服务运行于 http://127.0.0.1:4317（PID 23372；2026-10-20 17:21 重启到讨论额度/绑定 manifest UI 构建）
 - 日常数据库 `.state/room.sqlite` 已从 v9 迁移到 v16
 - 迁移前自动备份：`.state/room.sqlite.v9.1792484018897.bak`
 - 已验证：GET /（200）、GET /api/rooms（200）、房间 snapshot（200）、GET /api/metrics（200）、capability-history（200）、resource-leases（200）；resource.reserve→resource.release 实测 200
