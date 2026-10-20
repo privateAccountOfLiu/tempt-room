@@ -74,3 +74,24 @@ test('owner can import an exported room twice without entity collisions', async 
   assert.equal((await state.app.inject({url:'/api/rooms/'+roomId+'/snapshot',headers})).statusCode,200);
   assert.equal((await state.app.inject({method:'POST',url:'/api/rooms/import',headers:{host:headers.host,'room-protocol-version':'0.1','content-type':'application/json'},payload:{export:exported.json()}})).statusCode,401);
 });
+
+test('room import remaps basedOnSeq and context seq references after skipped room events', () => {
+  const sequenced = {
+    room: {id: 'room_old', name: 'Seq room', members: [], seq: 4},
+    events: [
+      {seq: 1, type: 'room.created', payload: {room: {id: 'room_old'}}},
+      {seq: 2, type: 'chat.message.created', payload: {message: {id: 'msg_seq123', roomId: 'room_old', text: 'hi'}}},
+      {seq: 3, type: 'run.created', payload: {run: {id: 'run_seq456', roomId: 'room_old', basedOnSeq: 2}}},
+      {seq: 4, type: 'run.context.advanced', payload: {run: {id: 'run_seq456', roomId: 'room_old', contextSeq: 3}, delta: {fromSeq: 1, throughSeq: 3, headSeq: 3}}}
+    ]
+  };
+  const plan = planRoomImport(sequenced, {newRoomId: 'room_newseq', salt: 'seq-salt'});
+  assert.deepEqual(plan.seqMap, {'1': 0, '2': 1, '3': 2, '4': 3});
+  const run = plan.events.find(event => event.type === 'run.created')!.payload as any;
+  assert.equal(run.run.basedOnSeq, 1);
+  const advanced = plan.events.find(event => event.type === 'run.context.advanced')!.payload as any;
+  assert.equal(advanced.run.contextSeq, 2);
+  assert.equal(advanced.delta.fromSeq, 0);
+  assert.equal(advanced.delta.throughSeq, 2);
+  assert.equal(advanced.delta.headSeq, 2);
+});

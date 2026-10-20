@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 export interface ImportedEvent {
   eventId?: string;
+  seq?: number;
   type: string;
   actor?: unknown;
   payload: unknown;
@@ -19,6 +20,7 @@ export interface RoomImportPlan {
   events: ImportedEvent[];
   remappedIds: number;
   idMap: Record<string,string>;
+  seqMap: Record<number,number>;
 }
 
 const idPattern = /^[a-z][a-z0-9]*_[a-z0-9]{6,}$/i;
@@ -49,10 +51,13 @@ export function planRoomImport(source: RoomExportLike, options: {newRoomId: stri
     if (value && typeof value === 'object') for (const item of Object.values(value)) collect(item);
   };
   for (const event of source.events) collect(event.payload);
-  const replace = (value: any): any => {
+  const seqKeys = new Set(['basedOnSeq','throughSeq','fromSeq','headSeq','contextSeq','scanSeq','fromScanSeq','throughScanSeq','sourceSeq','seq','nextSeq']);
+  const seqMap = new Map<number,number>();
+  const replace = (value: any, key?: string): any => {
+    if (typeof value === 'number' && key && seqKeys.has(key) && seqMap.has(value)) return seqMap.get(value);
     if (typeof value === 'string') return value === oldRoomId ? options.newRoomId : ids.get(value) ?? value;
-    if (Array.isArray(value)) return value.map(replace);
-    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, replace(item)]));
+    if (Array.isArray(value)) return value.map(item => replace(item, key));
+    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([childKey, item]) => [childKey, replace(item, childKey)]));
     return value;
   };
   const createdAt = options.now ?? new Date().toISOString();
@@ -63,8 +68,14 @@ export function planRoomImport(source: RoomExportLike, options: {newRoomId: stri
     seq: 0,
     createdAt
   };
-  const events = source.events
-    .filter(event => event && typeof event.type === 'string' && !['room.created', 'room.updated', 'projection.checkpoint'].includes(event.type))
-    .map(event => ({...event, payload: replace(event.payload ?? {})}));
-  return {room, events, remappedIds: ids.size, idMap: Object.fromEntries(ids)};
+  const events: ImportedEvent[] = [];
+  let inserted = 0;
+  for (const event of source.events) {
+    if (!event || typeof event.type !== 'string') continue;
+    const skipped = ['room.created', 'room.updated', 'projection.checkpoint'].includes(event.type);
+    if (!skipped) inserted++;
+    if (typeof event.seq === 'number') seqMap.set(event.seq, inserted);
+    if (!skipped) events.push({...event, payload: replace(event.payload ?? {})});
+  }
+  return {room, events, remappedIds: ids.size, idMap: Object.fromEntries(ids), seqMap: Object.fromEntries(seqMap)};
 }
