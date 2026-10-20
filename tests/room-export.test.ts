@@ -16,8 +16,11 @@ test('owner can export one room as events and metadata', async t => {
   const headers = {host: '127.0.0.1:4317', authorization: 'Bearer export-owner', 'room-protocol-version': '0.1'};
   const exported = await app.inject({url: `/api/rooms/${roomId}/export`, headers});
   assert.equal(exported.statusCode, 200);
-  const body = exported.json() as {version: string; room: {id: string}; events: {type: string}[]};
+  const body = exported.json() as {version: string; room: {id: string}; events: {type: string}[]; exportHash: string};
   assert.equal(body.room.id, roomId);
   assert.ok(body.events.some(event => event.type === 'chat.message.created'));
+  assert.match(body.exportHash, /^[a-f0-9]{64}$/i);
+  const repeated = await app.inject({url: `/api/rooms/${roomId}/export`, headers});
+  assert.equal(repeated.json().exportHash, body.exportHash);
   assert.equal((await app.inject({url: `/api/rooms/${roomId}/export`, headers: {host: headers.host, 'room-protocol-version': '0.1'}})).statusCode, 401);
 });

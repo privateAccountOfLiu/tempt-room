@@ -11,7 +11,7 @@ import { join, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { z } from 'zod';
 import { VERSION,payloadSchemas, agentToolCallSchema, ProtocolError, type AgentDescriptor, type Artifact, type RoomEvent,type ServerCapabilities,type Run,type Task,type ToolOperation,type Discussion,type DiscussionRound,type CapabilityEvidence,type ProjectBinding,type Integration,type InputBatch,type UsageSample,type BudgetReservation,type ResourceLease,type Subscription } from '../../../packages/protocol/src/index.ts';
-import { Store, now, OWNER, uid } from './store.ts';
+import { Store, digest, now, OWNER, uid } from './store.ts';
 import {agentCapabilityFingerprint,capabilityNames,probeConfiguredAgent,verifiedCapabilityState} from './adapter-capabilities.ts';
 import { aggregateUsage } from './usage.ts';
 import { collectMetrics, metricsText } from './metrics.ts';
@@ -232,7 +232,7 @@ export async function createApp(options: AppOptions = {}) {
   });
   app.get<{Params:{id:string}}>('/api/rooms/:id/export',request=>{
     const room=store.room(request.params.id);if(!room)throw new ProtocolError('not_found','房间不存在',404);
-    return {version:VERSION,exportedAt:new Date().toISOString(),room,events:store.events(room.id)};
+    const events=store.events(room.id);return {version:VERSION,exportedAt:new Date().toISOString(),room,events,exportHash:digest({room,events})};
   });
   app.get<{Params:{id:string;discussionId:string}}>('/api/rooms/:id/discussions/:discussionId/rounds',request=>{
     const room=store.room(request.params.id);if(!room)throw new ProtocolError('not_found','房间不存在',404);

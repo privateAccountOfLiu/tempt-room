@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 52843283e0705b6dceb1cc1f3996ca904aeeeb21 (dirty)
+source HEAD: a20e5ae8133aca218228f1d4214042a0ec070646 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T13-38-07-272Z-4345fb3d/report.json
+report: .state/collaboration-baseline/run-2026-10-20T13-46-09-258Z-355babf4/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -209,19 +209,19 @@ report: .state/collaboration-baseline/run-2026-10-20T13-38-07-272Z-4345fb3d/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-xMB9dh/report.json`，164.2s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-HDl4wQ/report.json`，167.7s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-ZkLies/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-P4UxJl/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T13-38-07-272Z-4345fb3d/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T13-38-07-272Z-4345fb3d/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T13-38-07-272Z-4345fb3d/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T13-38-07-272Z-4345fb3d/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T13-46-09-258Z-355babf4/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T13-46-09-258Z-355babf4/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T13-46-09-258Z-355babf4/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T13-46-09-258Z-355babf4/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -624,4 +624,6 @@ report: .state/collaboration-baseline/run-2026-10-20T13-38-07-272Z-4345fb3d/repo
 - 新增 GET /api/rooms/:id/export：owner 导出 room 元数据与全部 durable 事件
 - RoomSettings 新增「导出房间 JSON」按钮
 - 新增 room-export 测试：事件包含 chat.message.created、未认证 401
-- 尚未完成：导入/可靠外发、导出脱敏与 artifacts 内容包
+- export 增加 exportHash（room+events digest），重复导出稳定；测试断言 64 hex 与一致性
+- 导入尝试评估：需要全局实体 ID 命名空间重映射（Store 投影 id 主键跨房间冲突），本轮未提交半成品
+- 尚未完成：导出脱敏、artifacts 内容包、可靠外发；导入需 ID remap
