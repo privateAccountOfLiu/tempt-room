@@ -611,7 +611,8 @@ export class Worker {
       if(status==='completed'&&run.discussionRole==='summary'&&!this.store.list<Artifact>('artifacts',run.roomId).some(a=>a.runId===run.id&&a.discussionId===run.discussionId)){status='failed';error='总结运行未生成交付物';}
       if(current.stopReason==='superseded'&&['completed','failed','canceled','superseded'].includes(status))status='superseded';
       Object.assign(run,current);delete run.leaseUntil;
-      Object.assign(run, { sandbox:current.sandbox,status, error: error?.slice(0,2000), finishedAt: now(), updatedAt: now() });  this.store.event(run.roomId, reconciliation?'run.reconciled':'run.updated', SYSTEM, { run }, null, run.id);
+      if(['completed','failed','canceled','superseded','interrupted','unknown'].includes(status)&&!current.cleanupProof){const agent=this.store.get<AgentDescriptor>('agents',current.agentId);if(agent&&['demo','api','a2a'].includes(agent.provider))current.cleanupProof={checkedAt:now(),remainingProcesses:0,evidence:'adapter-has-no-local-process-tree'};}
+      Object.assign(run, { sandbox:current.sandbox,cleanupProof:current.cleanupProof,status, error: error?.slice(0,2000), finishedAt: now(), updatedAt: now() });  this.store.event(run.roomId, reconciliation?'run.reconciled':'run.updated', SYSTEM, { run }, null, run.id);
       if (run.taskId) {
         const task = this.store.get<Task>('tasks', run.taskId);
         if (task && task.version === run.taskVersion) { task.status = status; if(task.strict||task.requiresAcceptance){task.acceptanceStatus=status==='completed'?'pending':'rejected';}  this.store.event(run.roomId, 'task.updated', SYSTEM, { task }); }

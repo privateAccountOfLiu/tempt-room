@@ -25,3 +25,21 @@ test('sandbox job-empty exit evidence becomes a durable cleanup proof', async t 
   assert.equal(proof?.exitCode, 0);
   assert.ok(proof?.checkedAt);
 });
+
+test('demo adapters record a no-local-process-tree cleanup proof on completion', async t => {
+  mkdirSync(parent, {recursive: true});
+  const root = mkdtempSync(join(parent, 'cleanup-proof-demo-')), store = new Store(join(root, 'room.sqlite')), service = new RoomService(store), worker = new Worker(store, service, root, {adapter: async function* () { yield {type: 'text', text: 'done'}; }}), roomId = store.rooms()[0].id;
+  t.after(async () => { await worker.close(); store.close(); rmSync(root, {recursive: true, force: true}); });
+  const taskId = (service.execute({version: '0.1', commandId: uid(), roomId, type: 'task.create', payload: {title: 'Cleanup demo', agentId: 'demo-planner'}}).result as any).taskId as string;
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    worker.tick();
+    const run = store.list<Run>('runs', roomId).find(item => item.taskId === taskId);
+    if (run && ['completed', 'failed', 'canceled'].includes(run.status)) break;
+    await new Promise(done => setTimeout(done, 25));
+  }
+  const run = store.list<Run>('runs', roomId).find(item => item.taskId === taskId)!;
+  assert.equal(run.status, 'completed', run.error);
+  assert.equal(run.cleanupProof?.remainingProcesses, 0);
+  assert.equal(run.cleanupProof?.evidence, 'adapter-has-no-local-process-tree');
+});
