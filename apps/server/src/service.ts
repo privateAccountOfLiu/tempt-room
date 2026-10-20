@@ -286,9 +286,10 @@ export class RoomService {
           const artifact = this.store.get<Artifact>('artifacts', artifactId);
           if (!artifact || artifact.roomId !== roomId || (artifact.taskId && artifact.taskId !== task.id)) throw new ProtocolError('invalid_artifact', '验收产物不存在或不属于此任务', 400);
         }
-        const verification = taskVerificationRecordSchema.parse(input);
+        const verification = taskVerificationRecordSchema.parse({...input, recordedAt: input.recordedAt ?? now()});
         const accepted = input.outcome === 'accepted';
-        const next: Task = {...task, acceptanceStatus: accepted ? 'accepted' : 'rejected', verificationId: input.verificationId, acceptedArtifactIds: accepted ? input.artifactIds : [], lastVerification: verification};
+        const verificationHistory = [...(task.verificationHistory ?? []), verification].slice(-20);
+        const next: Task = {...task, acceptanceStatus: accepted ? 'accepted' : 'rejected', verificationId: input.verificationId, acceptedArtifactIds: accepted ? input.artifactIds : [], lastVerification: verification, verificationHistory};
         this.store.event(roomId, 'task.verification.recorded', actor, {task: next, verification});
         return {taskId: task.id, acceptanceStatus: next.acceptanceStatus, verificationId: verification.verificationId};
       }
@@ -396,12 +397,12 @@ export class RoomService {
   /** Any upstream version change invalidates the complete accepted dependency tree. */
   private reviseTaskTree(task:Task,actor:Actor,commandId:string,updateRoot:(task:Task)=>void,rootEvent={type:'task.revised',payload:{} as Record<string,unknown>,note:undefined as string|undefined}){
     const roomId=task.roomId,affected=new Map([[task.id,task]]),all=this.store.list<Task>('tasks',roomId);
-    let changed=true;while(changed){changed=false;for(const candidate of all)if(!affected.has(candidate.id)&&candidate.dependencies.some(id=>affected.has(id))){affected.set(candidate.id,candidate);changed=true;}}
+    let changed=true;while(changed){changed=false;for(const candidate of all)if(!affected.has(candidate.id)&&(candidate.dependencies.some(id=>affected.has(id))||candidate.dependencyRequirements?.some(requirement=>affected.has(requirement.taskId)))){affected.set(candidate.id,candidate);changed=true;}}
     const queued:{task:Task;prompt:string;causationId:string}[]=[];
     for(const current of affected.values()){
       const isRoot=current.id===task.id,proposed=current.status==='proposed'&&(!isRoot||rootEvent.type!=='task.handoff');
       for(const run of this.store.list<Run>('runs',roomId).filter(run=>run.taskId===current.id&&!terminalStates.has(run.status)))this.cancel(run,'superseded');
-      if(isRoot)updateRoot(current);current.version++;current.generation=(current.generation??1)+1;delete current.workspaceId;delete current.leaseUntil;delete current.externalContext;
+      if(isRoot)updateRoot(current);if(current.strict||current.requiresAcceptance){current.acceptanceStatus='pending';delete current.verificationId;current.acceptedArtifactIds=[];delete current.lastVerification;}current.version++;current.generation=(current.generation??1)+1;delete current.workspaceId;delete current.leaseUntil;delete current.externalContext;
       const member=this.store.get<AgentDescriptor>('agents',current.agentId),available=member?.enabled&&this.store.room(roomId)!.members.includes(current.agentId),open=Boolean(current.open&&current.agentId==='unassigned');
       current.status=proposed||open?'proposed':available?'queued':'interrupted';
       const event=this.store.event(roomId,isRoot?rootEvent.type:'task.revised',actor,{task:current,...(isRoot?rootEvent.payload:{dependencyTaskId:task.id,reason:'依赖任务版本已变化'})},commandId);

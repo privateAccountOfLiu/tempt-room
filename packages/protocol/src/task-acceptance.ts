@@ -21,6 +21,7 @@ export const taskVerificationRecordSchema = z.object({
   taskId: id,
   taskVersion: z.number().int().positive(),
   outcome: z.enum(['accepted', 'rejected']),
+  recordedAt: z.string().datetime().optional(),
   verificationId: z.string().min(1).max(200),
   artifactIds: z.array(id).max(50).default([]),
   artifactHashes: z.record(z.string(), hash).default({}),

@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: e80b5af333714c4891e1e539de3de68e7b10c8fc (dirty)
+source HEAD: 0e4dc10b0a97cf75a7c8e197eda6cb93641d19e6 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T05-04-55-206Z-bcb8961a/report.json
+report: .state/collaboration-baseline/run-2026-10-20T05-10-53-827Z-8f45f40b/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -164,19 +164,19 @@ report: .state/collaboration-baseline/run-2026-10-20T05-04-55-206Z-bcb8961a/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-yk8Cay/report.json`，153.8s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-RSuGaN/report.json`，152.5s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-E9jwrq/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-JgRtXZ/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T05-04-55-206Z-bcb8961a/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T05-04-55-206Z-bcb8961a/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T05-04-55-206Z-bcb8961a/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T05-04-55-206Z-bcb8961a/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T05-10-53-827Z-8f45f40b/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T05-10-53-827Z-8f45f40b/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T05-10-53-827Z-8f45f40b/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T05-10-53-827Z-8f45f40b/replay.stdout.txt`
 
 ## M1 验收 — 并行任务确定性 fixture
 
@@ -243,7 +243,11 @@ report: .state/collaboration-baseline/run-2026-10-20T05-04-55-206Z-bcb8961a/repo
   - 通过：携带该任务现有产物 ID，写 task.verification.recorded
   - 拒绝：写 rejected 验收记录
 - 验收按钮只在 strict 且执行 completed 且未通过时出现，避免把执行完成误显示成验收通过
-- 尚未完成：真实 verifier 命令执行环境、exitCode/输出哈希自动记录、验收历史列表、integrated 条件
+- 验收历史：Task.verificationHistory 保留最近 20 条 verification record（outcome、recordedAt、verificationId、reason），lastVerification 同步最新
+- 任务卡片新增「验收历史」折叠列表，显示最近 5 条通过/拒绝记录
+- 修订/交接失效传播扩展：reviseTaskTree 同时遍历 dependencyRequirements，严格依赖后继的 acceptanceStatus 统一回到 pending、版本递增
+- 新增测试：rejected→accepted 历史与时间戳、上游修订使 accepted 下游失效
+- 尚未完成：独立 verifier 进程与完整环境记录、验收历史分页/导出、integrated 条件真实集成状态已接入但历史未在 UI 展示
 ## D03a — 执行完成与验收分离
 
 - 新增 packages/protocol/src/task-acceptance.ts：

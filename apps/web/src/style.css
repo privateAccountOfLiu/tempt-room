@@ -170,3 +170,12 @@
 .form-error{color:#e0a08a;font-size:10px;margin:6px 0 0}
 /* D03 acceptance status */
 .task-acceptance{font-size:9px!important;color:#9bad8e!important;background:#161d13;border:1px solid #2c3728;border-radius:4px;padding:3px 6px!important;margin:4px 0 0!important;display:inline-block}
+/* D03b verification history */
+.task-verification-history{margin-top:6px;font-size:9px;color:#9ead92}
+.task-verification-history summary{cursor:pointer;color:#829277}
+.task-verification-history>div{display:grid;grid-template-columns:38px 1fr;gap:2px 6px;margin-top:5px;padding:5px 6px;border:1px solid #283024;border-radius:4px;background:#121710}
+.task-verification-history span{font-weight:600}
+.task-verification-history span.accepted{color:#a8d28a}
+.task-verification-history span.rejected{color:#d9a58a}
+.task-verification-history small{color:#718069}
+.task-verification-history p{grid-column:1/-1;margin:2px 0 0;color:#9ead92}

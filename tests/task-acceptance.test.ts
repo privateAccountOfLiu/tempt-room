@@ -55,6 +55,25 @@ test('completed execution does not unlock accepted-artifact dependents until own
   assert.equal(verification.result.acceptanceStatus, 'accepted');
   await tickUntil(worker, store, () => store.get<Run>('runs', downstreamRun.id)!.status === 'completed');
   assert.equal(store.get<Run>('runs', downstreamRun.id)!.status, 'completed');
+  command('task.verification.record', {taskId: downstreamId, taskVersion: 1, outcome: 'accepted', verificationId: 'verification_downstream', artifactIds: [], artifactHashes: {}, commandRef: 'npm test', exitCode: 0, outputHash: hash, reason: 'owner verified downstream'});
+  assert.equal(store.get<Task>('tasks', downstreamId)!.acceptanceStatus, 'accepted');
   command('task.revise', {taskId: upstreamId, title: 'Upstream revised'});
   assert.equal(store.get<Task>('tasks', upstreamId)!.acceptanceStatus, 'pending');
+  const invalidatedDownstream = store.get<Task>('tasks', downstreamId)!;
+  assert.equal(invalidatedDownstream.version, 2);
+  assert.equal(invalidatedDownstream.acceptanceStatus, 'pending');
+  assert.equal(store.get<Task>('tasks', upstreamId)!.verificationHistory?.length, 1);
+});
+
+test('verification history retains rejected and accepted records with timestamps', t => {
+  const {store, roomId, command} = fixture(t);
+  const taskId = command('task.create', {title: 'History task', agentId: 'demo-planner', contract: contract('history task')}).result.taskId as string;
+  command('task.verification.record', {taskId, taskVersion: 1, outcome: 'rejected', verificationId: 'verification_rejected', artifactIds: [], artifactHashes: {}, reason: 'failed review'});
+  command('task.verification.record', {taskId, taskVersion: 1, outcome: 'accepted', verificationId: 'verification_accepted', artifactIds: [], artifactHashes: {}, reason: 'passed review'});
+  const task = store.get<Task>('tasks', taskId)!;
+  assert.equal(task.verificationHistory?.length, 2);
+  assert.deepEqual(task.verificationHistory?.map(record => record.outcome), ['rejected', 'accepted']);
+  assert.ok(task.verificationHistory?.every(record => record.recordedAt));
+  assert.equal(task.lastVerification?.verificationId, 'verification_accepted');
+  assert.equal(store.events(roomId).filter(event => event.type === 'task.verification.recorded').length, 2);
 });
