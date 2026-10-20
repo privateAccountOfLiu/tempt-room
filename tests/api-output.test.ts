@@ -4,7 +4,7 @@ import { Readable } from 'node:stream';
 import { runAdapter,type AdapterContext } from '../apps/server/src/adapters.ts';
 import { agentSchema,capabilitiesFor } from '../packages/protocol/src/index.ts';
 
-function context(transport:any,structured=true):AdapterContext{return {agent:agentSchema.parse({id:'custom',name:'Custom',provider:'api',endpoint:'https://model.example/v1',model:'configured-model',responseFormat:structured?'room-json':'text'}),run:{id:'run-api',roomId:'room-api',agentId:'custom',status:'running',prompt:'make report',basedOnSeq:1,createdAt:'',updatedAt:''},prompt:'make report',workspace:'',home:'',stateRoot:'',signal:new AbortController().signal,host:{} as any,transport};}
+function context(transport:any,structured=true,externalReads:any[]=[]):AdapterContext{return {onExternalRead:evidence=>externalReads.push(evidence),agent:agentSchema.parse({id:'custom',name:'Custom',provider:'api',endpoint:'https://model.example/v1',model:'configured-model',responseFormat:structured?'room-json':'text'}),run:{id:'run-api',roomId:'room-api',agentId:'custom',status:'running',prompt:'make report',basedOnSeq:1,createdAt:'',updatedAt:''},prompt:'make report',workspace:'',home:'',stateRoot:'',signal:new AbortController().signal,host:{} as any,transport};}
 const json=(value:unknown)=>Object.assign(Readable.from([Buffer.from(JSON.stringify(value))]),{headers:{'content-type':'application/json'}}) as any;
 const stream=(frames:unknown[])=>Object.assign(Readable.from(frames.map(frame=>Buffer.from(`data: ${JSON.stringify(frame)}\n\n`)).concat(Buffer.from('data: [DONE]\n\n'))),{headers:{'content-type':'text/event-stream'}}) as any;
 async function collect(ctx:AdapterContext){const result=[];for await(const output of runAdapter(ctx))result.push(output);return result;}
@@ -27,4 +27,16 @@ test('API truncation or missing completion markers fail instead of reporting suc
  await assert.rejects(async()=>{for await(const item of runAdapter(context(async()=>json({choices:[{finish_reason:'length',message:{content:'partial'}}],usage:{prompt_tokens:4,completion_tokens:5}}),false)))outputs.push(item);},/完成标志/);
  assert.deepEqual(outputs,[{type:'usage',usage:{inputTokens:4,outputTokens:5}}]);
  await assert.rejects(()=>collect(context(async()=>stream([{choices:[{delta:{content:'partial'}}]}]),false)),/完成标志/);
+});
+
+test('API responses emit network read evidence with response version headers', async () => {
+  const withEtag:any[]=[];const response=json({choices:[{finish_reason:'stop',message:{content:'ok'}}]});response.headers.etag='"v1"';
+  await collect(context(async()=>response,false,withEtag));
+  assert.equal(withEtag.length,1);
+  assert.equal(withEtag[0].kind,'network');
+  assert.equal(withEtag[0].source,'https://model.example/v1/chat/completions');
+  assert.equal(withEtag[0].version,'"v1"');
+  assert.ok(withEtag[0].fetchedAt);
+  const noVersion:any[]=[];await collect(context(async()=>json({choices:[{finish_reason:'stop',message:{content:'ok'}}]}),false,noVersion));
+  assert.equal(noVersion[0].version,undefined);
 });

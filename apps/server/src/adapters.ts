@@ -23,7 +23,7 @@ import {NativeEvidenceParser,type NativeEvidence} from './native-evidence.ts';
 import {nativeExecutionStream} from './native-stream.ts';
 export { ExecutionUnknown, RemoteCanceled } from './errors.ts';
 
-export interface AdapterContext { onNativeEvidence?:(evidence:NativeEvidence)=>void; executionId?:string; agent: AgentDescriptor; run: Run; prompt: string; workspace: string; home: string; stateRoot: string; nativeSession?: string; signal: AbortSignal; host: SandboxHost; hostMode?: boolean; onRoomTool?: (request:any)=>Promise<any>; requestInput?: (question:string,signal?:AbortSignal)=>Promise<string>; transport?:typeof remoteRequest; onToolPermission?: (request:any)=>boolean|Promise<boolean>; saveCodexState?:(state:CodexRunState)=>void }
+export interface AdapterContext { onNativeEvidence?:(evidence:NativeEvidence)=>void; onExternalRead?: (evidence:{kind:'file'|'database'|'network';source:string;version?:string;hash?:string;fetchedAt:string})=>void; executionId?:string; agent: AgentDescriptor; run: Run; prompt: string; workspace: string; home: string; stateRoot: string; nativeSession?: string; signal: AbortSignal; host: SandboxHost; hostMode?: boolean; onRoomTool?: (request:any)=>Promise<any>; requestInput?: (question:string,signal?:AbortSignal)=>Promise<string>; transport?:typeof remoteRequest; onToolPermission?: (request:any)=>boolean|Promise<boolean>; saveCodexState?:(state:CodexRunState)=>void }
 export type AgentAdapter = ProtocolAdapter<AdapterContext,SandboxHost>;
 const native = new Set(['codex', 'claude', 'deepseek']);
 export async function diagnose(agent: AgentDescriptor, host: SandboxHost): Promise<Diagnostic> {
@@ -391,6 +391,7 @@ async function* apiRun(ctx:AdapterContext):AsyncGenerator<AgentOutput> {
   const structured=ctx.agent.responseFormat==='room-json',request=ctx.transport??remoteRequest;
   const messages=[...(structured?[{role:'system',content:structuredReplyInstruction}]:[]),{role:'user',content:ctx.prompt}];
   const response=await request(url,{body:{model:ctx.agent.model,messages,stream:true,stream_options:{include_usage:true},...(structured?{response_format:{type:'json_object'}}:{})},token:process.env[ctx.agent.credentialEnv],signal:ctx.signal});
+  emitNetworkRead(ctx,url,response);
   let buffer='';
   const receive=(text:string)=>{buffer+=text;if(buffer.length>8*1024*1024)throw new Error('结构化回复超过 8 MiB 文本上限');};
   if(String(response.headers['content-type']).includes('text/event-stream')) {
@@ -414,7 +415,8 @@ async function* a2aRun(ctx:AdapterContext):AsyncGenerator<AgentOutput> {
   const request=ctx.transport??remoteRequest;
   const base=new URL(ctx.agent.endpoint);const cardUrl=base.pathname.endsWith('.json')?base.toString():new URL('/.well-known/agent-card.json',base).toString();
   const token=ctx.agent.credentialEnv?process.env[ctx.agent.credentialEnv]:undefined;
-  const card=await readJson(await request(cardUrl,{token,signal:ctx.signal}));
+  const cardResponse=await request(cardUrl,{token,signal:ctx.signal});emitNetworkRead(ctx,cardUrl,cardResponse);
+  const card=await readJson(cardResponse);
   const iface=card.supportedInterfaces?.find((i:any)=>i.protocolVersion==='1.0'&&['HTTP+JSON','HTTPJSON','JSONRPC'].includes(i.protocolBinding));
   if(!iface)throw new Error('远程 Agent 未声明可用的 A2A 1.0 HTTP/JSON 或 JSON-RPC 接口');
   const rpc=iface.protocolBinding==='JSONRPC',endpoint=String(iface.url).replace(/\/$/,'');
@@ -422,7 +424,8 @@ async function* a2aRun(ctx:AdapterContext):AsyncGenerator<AgentOutput> {
   const call=async(method:string,params:any,signal=ctx.signal)=>{
     const url=rpc?endpoint:method==='SendMessage'?endpoint+'/message:send':endpoint+'/tasks/'+encodeURIComponent(params.id)+(method==='CancelTask'?':cancel':'');
     const body=rpc?{jsonrpc:'2.0',id:uid('rpc'),method,params}:method==='SendMessage'?params:method==='CancelTask'?{}:undefined;
-    const response=await readJson(await request(url,{body,token,signal,headers:{'A2A-Version':'1.0'}}));if(response.error)throw new Error(response.error.message);return rpc?response.result:response;
+    const transportResponse=await request(url,{body,token,signal,headers:{'A2A-Version':'1.0'}});emitNetworkRead(ctx,url,transportResponse);
+    const response=await readJson(transportResponse);if(response.error)throw new Error(response.error.message);return rpc?response.result:response;
   };
   const send=(text:string,task?:any)=>call('SendMessage',{message:{messageId:uid('msg'),role:'ROLE_USER',parts:[{text}],metadata:{'https://temptroom.local/protocol/0.1':{roomId:ctx.run.roomId,runId:ctx.run.id,basedOnSeq:contextSeqOf(ctx.run),taskVersion:ctx.run.taskVersion}},...(task?{taskId:task.id,contextId:task.contextId}:ctx.nativeSession?{contextId:ctx.nativeSession}:{})},configuration:{returnImmediately:true}});
   let result=await send(ctx.prompt);
@@ -463,4 +466,6 @@ async function* demoRun(ctx:AdapterContext):AsyncGenerator<AgentOutput> {
   }
   for(const chunk of text.match(/.{1,8}|\n/g)??[]){await delay(25,undefined,{signal:ctx.signal});yield {type:'text',text:chunk};}
 }
+function emitNetworkRead(ctx:AdapterContext,url:string,response:any){const version=response?.headers?.etag??response?.headers?.['last-modified'];ctx.onExternalRead?.({kind:'network',source:url,...(version?{version:String(version)}:{}),fetchedAt:new Date().toISOString()});}
+
 export function runAdapter(ctx:AdapterContext):AsyncIterable<AgentOutput> { return ctx.agent.connectionMode==='attach'?attachedCodexRun(ctx):native.has(ctx.agent.provider)?nativeRun(ctx):ctx.agent.provider==='api'?apiRun(ctx):ctx.agent.provider==='a2a'?a2aRun(ctx):demoRun(ctx); }
