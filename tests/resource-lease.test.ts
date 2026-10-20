@@ -41,3 +41,13 @@ test('quarantined leases block reuse and restart recovery quarantines active lea
   assert.equal(store.list<ResourceLease>('resource_leases', roomId).find(item => item.id === active.id)!.status, 'quarantined');
   assert.throws(() => acquireResource(store, {roomId, kind: 'workspace', key: 'C:/workspace/a', run: {id: 'run_d', generation: 1}}), /隔离状态/);
 });
+
+test('agent-session leases are exclusive and released only with proof', t => {
+  const {store, roomId} = fixture(t);
+  const lease = acquireResource(store, {roomId, kind: 'session', key: 'agent-session:room:demo-planner', run: {id: 'run_session_a', generation: 1}});
+  assert.equal(lease.kind, 'session');
+  assert.throws(() => acquireResource(store, {roomId, kind: 'session', key: 'agent-session:room:demo-planner', run: {id: 'run_session_b', generation: 1}}), /资源已被其他运行占用/);
+  releaseResource(store, roomId, lease.id, {checkedAt: now(), remainingProcesses: 0, evidence: 'session worker exited'});
+  const next = acquireResource(store, {roomId, kind: 'session', key: 'agent-session:room:demo-planner', run: {id: 'run_session_c', generation: 1}});
+  assert.equal(next.status, 'active');
+});

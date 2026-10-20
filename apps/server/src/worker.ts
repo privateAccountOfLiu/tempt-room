@@ -335,10 +335,15 @@ export class Worker {
       const task=this.store.get<Task>('tasks',run.taskId)!;
       try{const inputs=dependencyInputs(this.store,task);run.dependencyVersions=inputs.versions;run.inputArtifacts=inputs.artifacts;}catch(error){this.finish(run,'failed',(error as Error).message);return false;}
     }
+    let sessionLeaseId:string|undefined;
+    if(run.agentSessionId){
+      try{const lease=acquireResource(this.store,{roomId:run.roomId,kind:'session',key:`agent-session:${run.roomId}:${run.agentSessionId}`,run,capacity:1});sessionLeaseId=lease.id;run.sessionLeaseId=lease.id;}
+      catch{return false;}
+    }
     const resourceKey=this.hostProjectKey(run);
     if(resourceKey){
       try{const lease=acquireResource(this.store,{roomId:run.roomId,kind:'project',key:resourceKey,run,capacity:1});run.resourceLeaseId=lease.id;}
-      catch(error){this.finish(run,'failed',(error as Error).message);return false;}
+      catch(error){if(sessionLeaseId)try{releaseResource(this.store,run.roomId,sessionLeaseId,{checkedAt:now(),remainingProcesses:0,evidence:'startup-abort'});}catch{}this.finish(run,'failed',(error as Error).message);return false;}
     }
     const controller = new AbortController(); this.active.set(run.id, controller);
     // Legacy queued work keeps its original authorization: no implicit extra
@@ -597,8 +602,8 @@ export class Worker {
       }
       this.service.settleDiscussion(run);
       this.service.settleBudgetForRun(run);
-      if(run.resourceLeaseId){
-        try{if(['completed','failed','canceled','superseded'].includes(status))releaseResource(this.store,run.roomId,run.resourceLeaseId,{checkedAt:now(),remainingProcesses:0,evidence:'worker-terminal'});else quarantineResource(this.store,run.roomId,run.resourceLeaseId,'terminal_state_'+status);}catch{/* Quarantine/release evidence remains auditable via events. */}
+      for(const leaseId of [...new Set([run.resourceLeaseId,run.sessionLeaseId].filter(Boolean) as string[])]){
+        try{if(['completed','failed','canceled','superseded'].includes(status))releaseResource(this.store,run.roomId,leaseId,{checkedAt:now(),remainingProcesses:0,evidence:'worker-terminal'});else quarantineResource(this.store,run.roomId,leaseId,'terminal_state_'+status);}catch{/* Quarantine/release evidence remains auditable via events. */}
       }
     });
     this.toolCalls.delete(run.id);

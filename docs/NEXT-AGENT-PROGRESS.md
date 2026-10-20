@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 43baba5023deadb85915dc95d82522442e4b4dd2 (dirty)
+source HEAD: 8cbab4cad2c5717e48f376fef34045eeb72e978f (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T08-18-16-683Z-bd7f1943/report.json
+report: .state/collaboration-baseline/run-2026-10-20T08-26-01-484Z-481fefaa/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -205,19 +205,19 @@ report: .state/collaboration-baseline/run-2026-10-20T08-18-16-683Z-bd7f1943/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-mSx5Db/report.json`，170.4s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-loCrlu/report.json`，169.9s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-nTqosp/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-DepXIK/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T08-18-16-683Z-bd7f1943/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T08-18-16-683Z-bd7f1943/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T08-18-16-683Z-bd7f1943/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T08-18-16-683Z-bd7f1943/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T08-26-01-484Z-481fefaa/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T08-26-01-484Z-481fefaa/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T08-26-01-484Z-481fefaa/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T08-26-01-484Z-481fefaa/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -242,6 +242,9 @@ report: .state/collaboration-baseline/run-2026-10-20T08-18-16-683Z-bd7f1943/repo
 - 新增 room-concurrency 1 项测试：外部/另一 Worker 持久 running Run 占满房间时本 Worker 保持 queued
 - 新增 GET /api/rooms/:id/resource-leases
 - 集成面板新增「资源租约」区：kind/状态/canonicalKey/holderRun/capacity，quarantined/active 可填写清理证据后 release
+- AgentSession 持久 session 租约：Worker 启动带 agentSessionId 的 Run 前 acquire kind=session、capacity=1 的租约；终态释放/隔离
+- 与 runs_agent_session_active 唯一索引互补：索引阻止同会话并发活动 Run，租约提供跨进程审计与崩溃隔离证据
+- 新增 resource-lease 测试：session 租约排他、清理证明释放、释放后可复用
 - 尚未完成：真实进程树清理证明、端口/数据库容量分配、自动解除隔离策略## E01 起点 — 有界可观测指标
 
 - 新增 apps/server/src/metrics.ts：collectMetrics/metricsText

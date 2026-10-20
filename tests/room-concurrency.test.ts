@@ -43,3 +43,4 @@ test('a persisted running run from another worker occupies the room slot', async
   worker.tick();
   assert.equal(store.get<Run>('runs', queued.id)!.status, 'queued');
 });
+
