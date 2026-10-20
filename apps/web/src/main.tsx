@@ -180,7 +180,7 @@ function App(){
  </div>;
 }
 function RunDetailModal({run,revision,agents,onClose,onRetry,onCancel}:{run:Run;revision:number;agents:AgentDescriptor[];onClose:()=>void;onRetry:()=>void;onCancel:()=>void}){
- const [operations,setOperations]=useState<ToolOperation[]|null>(null);
+ const [operations,setOperations]=useState<ToolOperation[]|null>(null),[traceEvents,setTraceEvents]=useState<any[]|null>(null);
  const currentRevision=useRef(revision);currentRevision.current=revision;
  useEffect(()=>{
    let active=true,inFlight=false,loaded=-1;setOperations(null);
@@ -190,6 +190,7 @@ function RunDetailModal({run,revision,agents,onClose,onRetry,onCancel}:{run:Run;
    };
    void refresh();const timer=setInterval(()=>void refresh(),250);return()=>{active=false;clearInterval(timer);};
  },[run.id]);
+ useEffect(()=>{if(!run.traceId)return;let active=true;void client.request<any[]>(`/api/rooms/${encodeURIComponent(run.roomId)}/traces/${encodeURIComponent(run.traceId)}`).then(events=>{if(active)setTraceEvents(events);}).catch(()=>{if(active)setTraceEvents([]);});return()=>{active=false;};},[run.traceId,run.roomId]);
  const agent=agents.find(item=>item.id===run.agentId);
  const retryable=(!run.discussionId||run.discussionRole==='summary')&&['failed','canceled','interrupted','unknown'].includes(run.status);
  const active=!terminalStates.has(run.status);
@@ -204,7 +205,7 @@ function RunDetailModal({run,revision,agents,onClose,onRetry,onCancel}:{run:Run;
    </div>
    <div className="run-detail-block"><small>提示词</small><pre>{run.prompt}</pre></div>
    {run.error&&<div className="run-detail-block error"><small>错误原文 · {classifyFailure(run.error,run.status).label}</small><pre>{run.error}</pre><p className="muted">{classifyFailure(run.error,run.status).advice}</p></div>}
-   <RunSummary run={run}/>
+   <RunSummary run={run}/> <div className="run-detail-block"><small>追踪链路{traceEvents?.length?` · ${traceEvents.length} 个事件`:""}{run.traceId?` · ${run.traceId}`:""}</small>{traceEvents?.length?<div className="trace-events">{traceEvents.slice(-12).map(event=><div key={event.eventId}><code>{event.type}</code><span>seq {event.seq}</span><small>{new Date(event.createdAt).toLocaleTimeString("zh-CN")}</small></div>)}</div>:<p className="muted">{run.traceId?"读取中或没有可展示的追踪事件。":"该运行没有 traceId（历史数据）。"}</p>}</div> <div className="run-detail-block"><small>追踪链路{traceEvents?.length?` · ${traceEvents.length} 个事件`:""}{run.traceId?` · ${run.traceId}`:""}</small>{traceEvents?.length?<div className="trace-events">{traceEvents.slice(-12).map(event=><div key={event.eventId}><code>{event.type}</code><span>seq {event.seq}</span><small>{new Date(event.createdAt).toLocaleTimeString("zh-CN")}</small></div>)}</div>:<p className="muted">{run.traceId?"读取中或没有可展示的追踪事件。":"该运行没有 traceId（历史数据）。"}</p>}</div>
    {operations?.some(operation=>operation.native)&&<p className="muted">原生工具回执来自 CLI 通知；执行意图在启动前保存。收到回执不代表副作用已撤销或可以安全重做。</p>}
    <div className="run-detail-block"><div className="form-section-title"><strong>执行与工具操作</strong><small>{operations===null?'读取中…':`${operations.length} 条`}</small></div>{operations?.length?<div className="run-operations">{operations.map(operation=><div key={operation.id}><code>{operation.native?(operation.native.scope==='execution'?'原生执行意图':'原生工具回执 · '+operation.native.kind):operation.name}</code><span className={`status ${operationStatus(operation.native&&(operation.result as any)?.outcome==='failed'?'unknown':operation.status)}`}>{operation.native?(operation.status==='unknown'?'结果未知':operation.status==='started'?'等待回执':(operation.result as any)?.outcome==='failed'?'失败回执':'收到回执'):operation.status}</span><small>{new Date(operation.createdAt).toLocaleTimeString('zh-CN')}</small></div>)}</div>:<p className="muted">{operations===null?'读取中…':'本次运行没有执行或工具操作记录。'}</p>}</div>
   </div>

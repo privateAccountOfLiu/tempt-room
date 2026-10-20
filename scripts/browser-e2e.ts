@@ -417,7 +417,7 @@ try {
     await evaluate("(()=>{const details=document.querySelector('.usage-history');if(details)details.open=true;return !!details;})()");
     const detailClicked = await evaluate("(()=>{const button=[...document.querySelectorAll('.usage-history button')].find(item=>(item.textContent??'').includes('详情'));if(!button)return false;button.click();return true;})()");
     if (!detailClicked) fail('找不到运行详情入口');
-    await waitFor('运行详情', async () => { const text = await bodyText(); return text.includes('运行详情') && text.includes('执行与工具操作'); }, 10000);
+    await waitFor('运行详情', async () => { const text = await bodyText(); return text.includes('运行详情') && text.includes('执行与工具操作') && text.includes('追踪链路'); }, 10000);
     await evaluate("(()=>{const button=[...document.querySelectorAll('dialog.modal button')].find(item=>(item.textContent??'').trim()==='关闭');if(button)button.click();return !!button;})()");
     await waitFor('关闭运行详情', async () => !(await bodyText()).includes('执行与工具操作'), 10000);
     step('run-detail-modal');

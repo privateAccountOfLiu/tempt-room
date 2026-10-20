@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: d18042fbf604fe7a2ae45f28abb85ddf0a583c01 (dirty)
+source HEAD: f106709fed93d0e69333df7dd9ac266f9abff5cf (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T07-23-38-308Z-6e7f9d3f/report.json
+report: .state/collaboration-baseline/run-2026-10-20T07-30-16-651Z-6d31db96/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -185,19 +185,19 @@ report: .state/collaboration-baseline/run-2026-10-20T07-23-38-308Z-6e7f9d3f/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-4TC77C/report.json`，159.8s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-1KTATv/report.json`，167.9s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-pz018q/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-8NdItK/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T07-23-38-308Z-6e7f9d3f/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T07-23-38-308Z-6e7f9d3f/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T07-23-38-308Z-6e7f9d3f/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T07-23-38-308Z-6e7f9d3f/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T07-30-16-651Z-6d31db96/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T07-30-16-651Z-6d31db96/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T07-30-16-651Z-6d31db96/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T07-30-16-651Z-6d31db96/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -242,7 +242,9 @@ report: .state/collaboration-baseline/run-2026-10-20T07-23-38-308Z-6e7f9d3f/repo
 - Worker 在 startRun/finish 记录 startedAt/finishedAt
 - metrics 新增 enqueueToStartAvgMs / enqueueToStartP95Ms / runDurationAvgMs
 - UsagePanel 指标卡展示平均排队→启动、P95 排队、平均运行时长；浏览器 E2E 断言可见
-- 尚未完成：完整延迟直方图、指标图表化、trace UI## D04a — 用量样本去重与统一聚合
+- Run 详情新增「追踪链路」：展示 traceId 与最近 12 个同 trace durable 事件（type/seq/时间）
+- 浏览器 E2E 运行详情断言新增「追踪链路」
+- 尚未完成：完整延迟直方图、指标图表化、trace 全链路树形视图## D04a — 用量样本去重与统一聚合
 
 - 新增 packages/protocol/src/usage.ts：UsageSample（provider/session/turn/request/scope/counterEpoch/tokens/cost/source）
 - 新增 apps/server/src/usage.ts 纯聚合器：

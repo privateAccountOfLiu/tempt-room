@@ -200,3 +200,8 @@
 .usage-metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:4px;margin-top:6px}
 .usage-metric-grid span{font-size:9px;color:#819175;border:1px solid #283024;border-radius:4px;padding:4px 6px;background:#121710;display:flex;justify-content:space-between;gap:6px}
 .usage-metric-grid b{color:#c6d5bb;font-weight:600}
+/* E01 trace chain */
+.trace-events{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+.trace-events>div{display:flex;gap:7px;font-size:9px;color:#9ead92;border-bottom:1px solid #222b1f;padding:2px 0}
+.trace-events code{color:#c6d5bb}
+.trace-events small{margin-left:auto;color:#66745d}
