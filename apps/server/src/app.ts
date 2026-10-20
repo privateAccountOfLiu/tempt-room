@@ -3,12 +3,14 @@ import cookie from '@fastify/cookie';
 import websocket from '@fastify/websocket';
 import multipart from '@fastify/multipart';
 import staticFiles from '@fastify/static';
+import {runContext} from './context.ts';
+import {buildContextSegments} from './context-segments.ts';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { z } from 'zod';
-import { VERSION,payloadSchemas, agentToolCallSchema, ProtocolError, type AgentDescriptor, type Artifact, type RoomEvent,type ServerCapabilities,type Run,type ToolOperation,type CapabilityEvidence,type ProjectBinding,type Integration,type InputBatch,type UsageSample,type BudgetReservation,type ResourceLease,type Subscription } from '../../../packages/protocol/src/index.ts';
+import { VERSION,payloadSchemas, agentToolCallSchema, ProtocolError, type AgentDescriptor, type Artifact, type RoomEvent,type ServerCapabilities,type Run,type Task,type ToolOperation,type CapabilityEvidence,type ProjectBinding,type Integration,type InputBatch,type UsageSample,type BudgetReservation,type ResourceLease,type Subscription } from '../../../packages/protocol/src/index.ts';
 import { Store, now, OWNER, uid } from './store.ts';
 import {agentCapabilityFingerprint,capabilityNames,probeConfiguredAgent,verifiedCapabilityState} from './adapter-capabilities.ts';
 import { aggregateUsage } from './usage.ts';
@@ -220,6 +222,11 @@ export async function createApp(options: AppOptions = {}) {
   });
   app.get('/api/capabilities',request=>({version:VERSION,supportedVersions:[VERSION],clientType:request.headers['room-client-type']==='browser'?'browser':'sdk',actor:OWNER,commands:Object.keys(payloadSchemas),messageFormats:['text/plain','application/json'],visibility:['room-public'],transports:['http','websocket']} satisfies ServerCapabilities));
   app.get('/api/settings',()=>store.settings());
+  app.get<{Params:{id:string}}>('/api/runs/:id/context-segments',request=>{
+    const run=store.get<Run>('runs',request.params.id);if(!run)throw new ProtocolError('not_found','运行不存在',404);
+    const task=run.taskId?store.get<Task>('tasks',run.taskId):undefined;
+    return buildContextSegments(run,runContext(store,run),task);
+  });
   app.get<{Params:{id:string}}>('/api/runs/:id/operations',request=>{
     const run=store.get<Run>('runs',request.params.id);if(!run)throw new ProtocolError('not_found','运行不存在',404);
     return store.list<ToolOperation>('operations',run.roomId).filter(operation=>operation.runId===run.id);

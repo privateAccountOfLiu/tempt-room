@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: f93f0682bc6d403ce7b2f23f945d3157fe5cd4c7 (dirty)
+source HEAD: 166e96a6028fa2d299a56881994cfcf4edccb61d (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T09-47-54-402Z-73b1c594/report.json
+report: .state/collaboration-baseline/run-2026-10-20T09-54-56-435Z-c653301f/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T09-47-54-402Z-73b1c594/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-PC3Krs/report.json`，163.2s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-45ZMud/report.json`，162.1s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-7rz4pw/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-ymRdfz/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T09-47-54-402Z-73b1c594/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T09-47-54-402Z-73b1c594/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T09-47-54-402Z-73b1c594/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T09-47-54-402Z-73b1c594/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-54-56-435Z-c653301f/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T09-54-56-435Z-c653301f/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-54-56-435Z-c653301f/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-54-56-435Z-c653301f/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -522,3 +522,15 @@ report: .state/collaboration-baseline/run-2026-10-20T09-47-54-402Z-73b1c594/repo
 - 同一 run 的 late 事件幂等
 - 新增 discussion-rounds 测试：late 事件绑定原轮次且不重复
 - 尚未完成：Worker 按 windowDeadline 展示/关闭、关闭后结果集合冻结、p95 窗口接入调度
+
+## B08 起点 — 上下文分段与字节预算
+
+- 新增 apps/server/src/context-segments.ts：
+  - 四段输入：objective / accepted constraints / related task / history tail
+  - UTF-8 字节预算；目标/约束/关联任务不被历史尾部挤掉
+  - 固定段超限抛 context_segment_too_large，不静默截断后标记已消费
+  - history 仅在预算内保留最近消息，记录 omitted/truncated
+  - 每段记录 fromSeq/throughSeq/hash/bytes
+- 新增 GET /api/runs/:id/context-segments 返回确定性分段预览
+- 新增 tests/context-segments.test.ts 3 项；trace 测试扩展路由断言
+- 尚未完成：Worker prompt 接入分段、逐段外部读取版本证据、订阅增量段、按实际冻结窗口生成提示词

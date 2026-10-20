@@ -24,5 +24,8 @@ test('commands produce a shared traceId that links run and artifact facts', asyn
   assert.ok(events.every(event => event.traceId === run.traceId));
   assert.ok(events.some(event => event.type === 'run.created'));
   assert.ok(events.some(event => event.type === 'task.created'));
+  const segments = await app.inject({url: `/api/runs/${run.id}/context-segments`, headers});
+  assert.equal(segments.statusCode, 200);
+  assert.deepEqual(segments.json().map((segment: any) => segment.kind), ['objective', 'constraints', 'related', 'history']);
   assert.equal((await app.inject({url: `/api/rooms/${roomId}/traces/${run.traceId}`, headers: {host: headers.host, 'room-protocol-version': '0.1'}})).statusCode, 401);
 });
