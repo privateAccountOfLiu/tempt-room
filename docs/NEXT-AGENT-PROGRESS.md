@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 4cd314393e36492737cc51f090cdd98e4d0ea21c (dirty)
+source HEAD: 8163521437e6dd486448aee9bafd03b896a4e735 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T12-40-14-048Z-f627d990/report.json
+report: .state/collaboration-baseline/run-2026-10-20T12-47-37-766Z-ca8baf59/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T12-40-14-048Z-f627d990/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-nhRuCw/report.json`，163.5s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-wyShfQ/report.json`，164.2s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-n3NrIS/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-a6lEpY/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T12-40-14-048Z-f627d990/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T12-40-14-048Z-f627d990/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T12-40-14-048Z-f627d990/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T12-40-14-048Z-f627d990/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T12-47-37-766Z-ca8baf59/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T12-47-37-766Z-ca8baf59/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T12-47-37-766Z-ca8baf59/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T12-47-37-766Z-ca8baf59/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -257,7 +257,11 @@ report: .state/collaboration-baseline/run-2026-10-20T12-40-14-048Z-f627d990/repo
 - Run 新增 cleanupProof；Worker 监听 sandbox.exit(jobEmpty=true) 并持久化 AppContainer 进程树退出证明
 - 资源租约释放：sandbox run 无 jobEmpty 证明时 quarantine(sandbox_cleanup_not_proven)，有证明时用证明释放；非 sandbox run 保持 worker-terminal 证据
 - 新增 cleanup-proof 测试：host sandbox.exit jobEmpty 事件写入 run.cleanupProof
-- 尚未完成：自动解除隔离策略、非 AppContainer 运行的真实进程树证明## E01 起点 — 有界可观测指标
+- ExecutionSettings 新增 resourceQuarantineTtlMs（默认 0=关闭）
+- Worker.tick 调用 expireQuarantinedLeases：owner 启用后将超过 TTL 的 quarantined 租约标记 revoked 并写 resource.released
+- 运行设置 UI 新增「隔离租约自动解除（分钟）」；浏览器断言可见
+- 新增 resource-lease 测试：默认不自动解除、启用 TTL 后 revoked 且 key 可复用
+- 尚未完成：非 AppContainer 运行的真实进程树证明、按 host 清理证据分级## E01 起点 — 有界可观测指标
 
 - 新增 apps/server/src/metrics.ts：collectMetrics/metricsText
 - 指标覆盖：

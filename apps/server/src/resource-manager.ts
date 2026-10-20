@@ -49,6 +49,18 @@ export function quarantineResource(store: Store, roomId: string, leaseId: string
 }
 
 /** Leases from a previous process have no trustworthy cleanup proof. */
+export function expireQuarantinedLeases(store: Store, ttlMs: number): number {
+  if (ttlMs <= 0) return 0;
+  const cutoff = Date.now() - ttlMs;
+  let expired = 0;
+  for (const lease of store.list<ResourceLease>('resource_leases').filter(item => item.status === 'quarantined' && Date.parse(item.updatedAt) <= cutoff)) {
+    const next: ResourceLease = {...lease, status: 'revoked', updatedAt: now()};
+    store.event(lease.roomId, 'resource.released', SYSTEM, {lease: next});
+    expired++;
+  }
+  return expired;
+}
+
 export function recoverResourceLeases(store: Store): number {
   let recovered = 0;
   for (const lease of store.list<ResourceLease>('resource_leases').filter(item => item.status === 'active')) {

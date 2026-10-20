@@ -209,6 +209,12 @@
             "warn",
             "enforce"
           ]
+        },
+        "resourceQuarantineTtlMs": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2592000000
         }
       },
       "required": [
@@ -241,7 +247,8 @@
         "roomCostBudgetUsd",
         "unknownCostPolicy",
         "stagingRetentionMs",
-        "toolAuthorizationMode"
+        "toolAuthorizationMode",
+        "resourceQuarantineTtlMs"
       ],
       "additionalProperties": false
     }

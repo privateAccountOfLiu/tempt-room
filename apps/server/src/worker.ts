@@ -25,7 +25,7 @@ import { buildProjectManifest } from './project-manifest.ts';
 import { buildContextSegments } from './context-segments.ts';
 import { agentCapabilityFingerprint, verifiedCapabilityState } from './adapter-capabilities.ts';
 import { authorizeTool } from './tool-authorization.ts';
-import { acquireResource, expireResourceLeases, quarantineResource, recoverResourceLeases, releaseResource } from './resource-manager.ts';
+import { acquireResource, expireQuarantinedLeases, expireResourceLeases, quarantineResource, recoverResourceLeases, releaseResource } from './resource-manager.ts';
 import { codexThreadKey, reconcileAttachedRun } from './codex-attach.ts';
 import { assertRunFence,assertRunIdentity,executionFence } from './execution.ts';
 import { ToolOperations } from './tool-operations.ts';
@@ -213,6 +213,7 @@ export class Worker {
     this.scanSubscriptions();
     this.cleanupStaging();
     expireResourceLeases(this.store);
+    expireQuarantinedLeases(this.store,this.store.settings().resourceQuarantineTtlMs);
     this.service.expireDiscussionWindows();
   }
   private cleanupStaging(){

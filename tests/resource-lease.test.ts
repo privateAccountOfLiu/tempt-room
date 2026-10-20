@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Store, now, uid } from '../apps/server/src/store.ts';
 import { RoomService } from '../apps/server/src/service.ts';
-import { acquireResource, expireResourceLeases, quarantineResource, recoverResourceLeases, releaseResource } from '../apps/server/src/resource-manager.ts';
+import { acquireResource, expireQuarantinedLeases, expireResourceLeases, quarantineResource, recoverResourceLeases, releaseResource } from '../apps/server/src/resource-manager.ts';
 import type { ResourceLease, Run } from '../packages/protocol/src/index.ts';
 
 const parent = resolve('.state/test-data');
@@ -78,4 +78,16 @@ test('leases with a TTL are revoked and become reusable', async t => {
   assert.throws(() => releaseResource(store, roomId, lease.id, {checkedAt: now(), remainingProcesses: 0, evidence: 'late'}), /只有 active\/quarantined/);
   const next = acquireResource(store, {roomId, kind: 'port', key: '127.0.0.1:4399', run: {...run, id: 'run_next'}});
   assert.equal(next.status, 'active');
+});
+
+test('quarantined leases auto-expire only when owner enables the TTL', async t => {
+  const {store, roomId, run} = fixture(t);
+  assert.equal(expireQuarantinedLeases(store, 0), 0);
+  const lease = acquireResource(store, {roomId, kind: 'database', key: 'sqlite:quarantine', run});
+  quarantineResource(store, roomId, lease.id, 'owner review required');
+  assert.equal(expireQuarantinedLeases(store, 0), 0);
+  await new Promise(done => setTimeout(done, 15));
+  assert.equal(expireQuarantinedLeases(store, 5), 1);
+  assert.equal(store.get<ResourceLease>('resource_leases', lease.id)!.status, 'revoked');
+  assert.equal(acquireResource(store, {roomId, kind: 'database', key: 'sqlite:quarantine', run: {...run, id: 'run_after_quarantine'}}).status, 'active');
 });
