@@ -16,9 +16,30 @@ export function hostDebug(line: string): void {
 }
 
 /** Kill a native child together with everything it spawned. */
+export interface ProcessTreeProof { checkedAt: string; remainingProcesses: number; trackedProcesses: number; evidence: 'taskkill-tree-scan' }
+/** Kill a native child tree, then verify every descendant observed before the kill is gone. */
 export function killProcessTree(pid: number | undefined): void {
   if (!pid) return;
   try { spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }); } catch { /* best effort */ }
+}
+export function killProcessTreeWithProof(pid: number | undefined): ProcessTreeProof | undefined {
+  if (!pid || process.platform !== 'win32') return undefined;
+  const tracked = new Set<number>([pid]);
+  try {
+    const raw = execSync('powershell -NoProfile -Command "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId | ConvertTo-Json -Compress"', {encoding: 'utf8', timeout: 15000, windowsHide: true}).trim();
+    const rows: any[] = raw ? JSON.parse(raw) : [], children = new Map<number, number[]>();
+    for (const row of rows) { const parent = Number(row.ParentProcessId), child = Number(row.ProcessId); if (Number.isSafeInteger(parent) && Number.isSafeInteger(child)) children.set(parent, [...(children.get(parent) ?? []), child]); }
+    const pending = [pid];
+    while (pending.length) { const parent = pending.pop()!; for (const child of children.get(parent) ?? []) { if (!tracked.has(child)) { tracked.add(child); pending.push(child); } } }
+  } catch { /* treat missing process scan as untracked descendants */ }
+  killProcessTree(pid);
+  let remaining = tracked.size;
+  try {
+    const ids=[...tracked].join(',');
+    const alive = execSync(`powershell -NoProfile -Command "$ids=@(${ids}); for($i=0;$i -lt 30;$i++){ $alive=@(Get-Process -Id $ids -ErrorAction SilentlyContinue); if($alive.Count -eq 0){ Write-Output 0; exit 0 }; Start-Sleep -Milliseconds 100 }; Write-Output $alive.Count"`, {encoding: 'utf8', timeout: 20000, windowsHide: true}).trim();
+    remaining = Number(alive) || 0;
+  } catch { /* leave conservative count */ }
+  return {checkedAt: new Date().toISOString(), remainingProcesses: remaining, trackedProcesses: tracked.size, evidence: 'taskkill-tree-scan'};
 }
 
 /** Debug helper: log direct children of a host-mode Agent process. */
@@ -102,6 +123,7 @@ export class HostChannel {
   rawStdout = '';
   stderr = '';
   onFrame?: (frame: any) => void;
+  cleanupProof?: ProcessTreeProof;
   private buffer = '';
   private counter = 0;
   private readonly rpc = new Map<number, { resolve: (value: any) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }>();
@@ -163,7 +185,7 @@ export class HostChannel {
 
   async terminate(): Promise<void> {
     if (this.ended) return;
-    killProcessTree(this.child.pid);
+    this.cleanupProof = killProcessTreeWithProof(this.child.pid);
     try {
       await Promise.race([this.exit, delay(10000).then(() => { throw new ExecutionUnknown('未确认本机 Agent 进程树退出'); })]);
     } catch (error) {
