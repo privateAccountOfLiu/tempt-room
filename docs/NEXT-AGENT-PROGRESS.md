@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: ef8b9e65c5cadeba2813f1967d22afc79a3bd185 (dirty)
+source HEAD: d192a4e9e7d111ff4e350423f88022a5fc86d290 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T09-03-22-804Z-7542ab17/report.json
+report: .state/collaboration-baseline/run-2026-10-20T09-10-36-132Z-3fbda2a7/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -207,19 +207,19 @@ report: .state/collaboration-baseline/run-2026-10-20T09-03-22-804Z-7542ab17/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-zihd1v/report.json`，170.8s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-CsWQdn/report.json`，169.6s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-G4CVMH/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-JBnK1q/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T09-03-22-804Z-7542ab17/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T09-03-22-804Z-7542ab17/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T09-03-22-804Z-7542ab17/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T09-03-22-804Z-7542ab17/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-10-36-132Z-3fbda2a7/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T09-10-36-132Z-3fbda2a7/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-10-36-132Z-3fbda2a7/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-10-36-132Z-3fbda2a7/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -316,7 +316,9 @@ report: .state/collaboration-baseline/run-2026-10-20T09-03-22-804Z-7542ab17/repo
   - owner 可切换 allow 显式允许未知成本执行
 - 运行设置 UI 新增「未知成本策略」选择；浏览器 E2E 断言可见
 - 新增 tests/unknown-cost-policy.test.ts：未验证阻止、能力验证后允许、policy allow 后允许
-- 尚未完成：按请求级预留估算、预算账本导出、未知费用自动停止策略细化
+- 用量账本新增「导出 CSV」：导出 usage 样本与预算预留（kind/id/agentId/runId/time/tokens/cost/status）
+- 浏览器 E2E 断言新增「导出 CSV」
+- 尚未完成：按请求级预留估算、未知费用自动停止策略细化
 ## M1 验收 — 并行任务确定性 fixture
 
 - 新增 scripts/acceptance-parallel-tasks.ts：
