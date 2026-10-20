@@ -192,3 +192,23 @@ test('applied integration can be rolled back only while source still matches the
   assert.equal(conflicted.result.errorCode, 'rollback_conflict');
   assert.equal(readFileSync(join(second.project, 'answer.txt'), 'utf8'), 'user edit\n');
 });
+
+test('restart rolls back an incomplete apply journal before keeping the integration unknown', async t => {
+  const {root, project, store, service, worker, roomId, command, artifact} = await fixture(t);
+  const queued = command('artifact.integrate', {artifactId: artifact.id});
+  const changes = JSON.parse(readFileSync(join(root, 'artifacts', artifact.id + '.changes.json'), 'utf8'));
+  const backupData = changes.manifest.files['answer.txt'].content;
+  const after = changes.changes.find((change: any) => change.path === 'answer.txt').after;
+  writeFileSync(join(project, 'answer.txt'), Buffer.from(after, 'base64'));
+  const journalDir = join(root, 'apply', 'apply_partial'); mkdirSync(journalDir, {recursive: true});
+  writeFileSync(join(journalDir, 'journal.json'), JSON.stringify({state: 'prepared', source: project, changes: changes.changes, backups: [{path: join(project, 'answer.txt'), data: backupData}]}));
+  const integration = {...store.get<Integration>('integrations', queued.result.integrationId as string)!, status: 'applying' as const, updatedAt: new Date().toISOString()};
+  store.event(roomId, 'integration.updated', {id: 'system', kind: 'system'}, {integration});
+  const restarted = new Worker(store, service, root, {});
+  t.after(async () => { await restarted.close(); await worker.close(); });
+  const recovered = store.get<Integration>('integrations', integration.id)!;
+  assert.equal(recovered.status, 'unknown');
+  assert.equal(recovered.errorCode, 'journal_recovered_rollback');
+  assert.equal(readFileSync(join(project, 'answer.txt'), 'utf8'), 'original\n');
+  assert.equal(readFileSync(join(journalDir, 'complete'), 'utf8'), 'reconciled-rollback');
+});

@@ -100,7 +100,8 @@ export class Worker {
   }
   private recoverIntegrations(){
     for(const integration of this.store.list<Integration>('integrations').filter(item=>['validating','staging','testing','ready_to_apply','applying'].includes(item.status))){
-      const evidence=this.integrationRecoveryEvidence(integration);
+      let evidence=this.integrationRecoveryEvidence(integration);
+      if(evidence==='journal_incomplete')evidence=this.recoverIncompleteJournal(integration);
       const artifact=this.store.get<Artifact>('artifacts',integration.artifactId);
       if(evidence==='journal_applied'&&artifact){
         const next:Integration={...integration,status:'applied',errorCode:undefined,updatedAt:now()};
@@ -110,6 +111,35 @@ export class Worker {
       const next:Integration={...integration,status:'unknown',errorCode:evidence,updatedAt:now()};
       this.store.atomic(()=>{this.store.event(integration.roomId,'integration.updated',SYSTEM,{integration:next});});
     }
+  }
+  private recoverIncompleteJournal(integration:Integration):string{
+    try{
+      const changes=JSON.parse(readFileSync(join(this.root,'artifacts',integration.artifactId+'.changes.json'),'utf8'));
+      const source=String(changes.manifest?.source??'').toLowerCase(),applyRoot=join(this.root,'apply');
+      if(!source||!existsSync(applyRoot))return 'journal_incomplete';
+      for(const entry of readdirSync(applyRoot,{withFileTypes:true})){
+        if(!entry.isDirectory())continue;
+        const journalDir=join(applyRoot,entry.name),journalPath=join(journalDir,'journal.json');
+        if(!existsSync(journalPath)||existsSync(join(journalDir,'complete')))continue;
+        const journal=JSON.parse(readFileSync(journalPath,'utf8'));
+        if(String(journal.source??'').toLowerCase()!==source)continue;
+        const backups=journal.backups as {path:string;data:string|null}[];
+        const restores: {path:string;data:Buffer|null}[]=[];
+        for(const [index,change] of (journal.changes as any[]).entries()){
+          const backup=backups[index];if(!backup)return 'journal_rollback_conflict';
+          const current=existsSync(backup.path)?readFileSync(backup.path):null;
+          const expectedAfter=change.after===null?null:Buffer.from(change.after,'base64');
+          const alreadyBefore=backup.data===null?!current:Boolean(current&&backup.data&&current.equals(Buffer.from(backup.data,'base64')));
+          const applied=expectedAfter===null?!current:Boolean(current&&current.equals(expectedAfter));
+          if(!applied&&!alreadyBefore)return 'journal_rollback_conflict';
+          restores.push({path:backup.path,data:backup.data===null?null:Buffer.from(backup.data,'base64')});
+        }
+        for(const item of restores){if(item.data===null){if(existsSync(item.path))unlinkSync(item.path);}else{mkdirSync(dirname(item.path),{recursive:true});writeFileSync(item.path,item.data);}}
+        writeFileSync(join(journalDir,'complete'),'reconciled-rollback');
+        return 'journal_recovered_rollback';
+      }
+    }catch{/* Unprovable journals stay quarantined as unknown. */}
+    return 'journal_incomplete';
   }
   private integrationRecoveryEvidence(integration:Integration):string{
     try{
