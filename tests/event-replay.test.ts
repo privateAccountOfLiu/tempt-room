@@ -83,6 +83,7 @@ test('every registered durable event declares and passes its payload contract an
       payload.task={...task,id,status:'running',leaseUntil:stamp,externalContext:{token,baseSeq:throughSeq,throughSeq,hasMore:false,policy:store.settings().contextPolicy}};
     }
     if(entry.type==='artifact.applied')payload.artifact={...artifact,applied:true};
+    if(entry.type==='artifact.rolled_back')payload.artifact={...artifact,applied:false};
     assert.equal(definition.payload.safeParse(payload).success,true,entry.type);
     const event=store.event(roomId,entry.type,SYSTEM,payload);assert.equal(event.schemaVersion,entry.schemaVersion);assert.equal(event.aggregate.type,entry.aggregate);assert.ok(entry.kinds.includes(event.kind));if(entry.type==='run.recovered')run.generation=2;
   }

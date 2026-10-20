@@ -114,7 +114,8 @@ export const payloadSchemas={
   'artifact.apply':z.object({artifactId:idSchema}).strict(),
   'artifact.integrate':z.object({artifactId:idSchema,requireAuthorization:z.boolean().default(false)}).strict(),
   'integration.authorize':z.object({integrationId:idSchema}).strict(),
-  'integration.reconcile':z.object({integrationId:idSchema,decision:z.enum(['mark_applied','retry','abandon']),note:z.string().max(1000).optional()}).strict()
+  'integration.reconcile':z.object({integrationId:idSchema,decision:z.enum(['mark_applied','retry','abandon']),note:z.string().max(1000).optional()}).strict(),
+  'integration.rollback':z.object({integrationId:idSchema}).strict()
 };
 export interface Command { version:typeof VERSION;commandId:string;roomId?:string;type:keyof typeof payloadSchemas;payload:Record<string,unknown> }
 export const commandSchema:z.ZodType<Command>=z.discriminatedUnion('type',Object.entries(payloadSchemas).map(([type,payload])=>commandEnvelope.extend({type:z.literal(type),payload})) as [z.ZodObject<any>,z.ZodObject<any>,...z.ZodObject<any>[]]) as unknown as z.ZodType<Command>;

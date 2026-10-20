@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync, statSync, unlinkSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { basename, dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type AgentSession, type Artifact, type Discussion, type ExecutionSettings, type Subscription, type InputBatch, type ProjectBinding, type Integration, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
@@ -75,6 +76,7 @@ export class Worker {
       queueMicrotask(()=>input.receive(text));
     };
     service.onApply = id => this.apply(id);
+    service.onRollback = (id,actor) => this.rollbackIntegration(id,actor);
     this.host.on('notification', frame => {
       if (frame.type === 'sandbox.toolRequest') void this.handleTool(frame);
       if(frame.type==='sandbox.started'&&frame.appContainer&&frame.job){
@@ -163,6 +165,28 @@ export class Worker {
     }
     this.processIntegrations();
     this.scanSubscriptions();
+  }
+  private rollbackIntegration(integrationId:string,actor:any){
+    const integration=this.store.get<Integration>('integrations',integrationId);
+    if(!integration)throw new ProtocolError('not_found','集成不存在',404);
+    const artifact=this.store.get<Artifact>('artifacts',integration.artifactId);
+    if(!artifact)throw new ProtocolError('not_found','交付物不存在',404);
+    const changes=JSON.parse(readFileSync(join(this.root,'artifacts',artifact.id+'.changes.json'),'utf8'));
+    const source=resolve(changes.manifest.source),sha=(buffer:Buffer)=>createHash('sha256').update(buffer).digest('hex');
+    const restore=[] as {path:string;content:Buffer|null}[];
+    for(const change of changes.changes as any[]){
+      const target=safePath(source,change.path),current=existsSync(target)?readFileSync(target):null;
+      const matches=change.after===null?!current:current!==null&&sha(current)===sha(Buffer.from(change.after,'base64'));
+      if(!matches){const next:Integration={...integration,status:'blocked',errorCode:'rollback_conflict',updatedAt:now()};this.store.event(integration.roomId,'integration.updated',actor,{integration:next});return {integrationId:next.id,status:next.status,errorCode:next.errorCode};}
+      const manifestFile=(changes.manifest.files??{})[change.path];
+      restore.push({path:target,content:manifestFile?.content?Buffer.from(manifestFile.content,'base64'):null});
+    }
+    for(const item of restore){if(item.content===null){if(existsSync(item.path))unlinkSync(item.path);}else{mkdirSync(dirname(item.path),{recursive:true});writeFileSync(item.path,item.content);}}
+    const nextArtifact:Artifact={...artifact,applied:false};
+    this.store.event(integration.roomId,'artifact.rolled_back',actor,{artifact:nextArtifact});
+    const next:Integration={...integration,status:'rolled_back',errorCode:undefined,updatedAt:now()};
+    this.store.event(integration.roomId,'integration.updated',actor,{integration:next});
+    return {integrationId:next.id,status:next.status,artifactId:artifact.id};
   }
   private processIntegrations(){
     if(this.active.size>0)return;

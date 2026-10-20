@@ -19,6 +19,7 @@ const externalTaskLeaseMs = (store: Store) => store.settings().taskLeaseMs;
 export class RoomService {
   onCancel: (runId: string) => void = () => {};
   onApply: (artifactId: string) => Record<string, unknown> = () => { throw new ProtocolError('not_available', '成果应用服务不可用', 503); };
+  onRollback: (integrationId: string, actor: Actor) => Record<string, unknown> = () => { throw new ProtocolError('not_available', '集成回滚服务不可用', 503); };
   onInput: (runId: string, text: string) => void = () => {};
   readonly inputDelivery: InputDeliveryService;
   constructor(public store: Store) { this.inputDelivery = new InputDeliveryService(store); }
@@ -423,6 +424,15 @@ export class RoomService {
         const next: Integration = {...integration, status: 'blocked', errorCode: 'owner_abandoned', updatedAt: now()};
         this.store.event(roomId, 'integration.updated', actor, {integration: next});
         return {integrationId: next.id, status: next.status};
+      }
+      case 'integration.rollback': {
+        const roomId = this.requireRoom(command);
+        if (actor.kind !== 'human') throw new ProtocolError('forbidden', '只有 owner 可以回滚集成', 403);
+        const input = payloadSchemas['integration.rollback'].parse(p);
+        const integration = this.store.get<Integration>('integrations', input.integrationId);
+        if (!integration || integration.roomId !== roomId) throw new ProtocolError('not_found', '集成不存在', 404);
+        if (integration.status !== 'applied') throw new ProtocolError('invalid_state', '只有已应用集成可以回滚', 409);
+        return this.onRollback(integration.id, actor);
       }
       case 'artifact.apply': {
         const roomId = this.requireRoom(command), id = z.string().parse(p.artifactId), artifact = this.store.get<Artifact>('artifacts', id);

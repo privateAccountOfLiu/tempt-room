@@ -3,7 +3,7 @@ import { z } from 'zod';
 const id = z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/);
 const hash = z.string().regex(/^[a-f0-9]{64}$/i);
 const time = z.string().datetime();
-export const integrationStatusSchema = z.enum(['queued', 'validating', 'staging', 'testing', 'ready_to_apply', 'applying', 'applied', 'conflict', 'verification_failed', 'unknown', 'blocked']);
+export const integrationStatusSchema = z.enum(['queued', 'validating', 'staging', 'testing', 'ready_to_apply', 'applying', 'applied', 'rolled_back', 'conflict', 'verification_failed', 'unknown', 'blocked']);
 
 export const integrationSchema = z.object({
   id,

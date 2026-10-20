@@ -507,6 +507,16 @@
     ]
   },
   {
+    "type": "artifact.rolled_back",
+    "durability": "durable",
+    "aggregate": "artifact",
+    "projector": "artifact",
+    "schemaVersion": 1,
+    "kinds": [
+      "artifact.rolled_back"
+    ]
+  },
+  {
     "type": "discussion.started",
     "durability": "durable",
     "aggregate": "room",

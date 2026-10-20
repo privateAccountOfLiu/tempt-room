@@ -69,6 +69,7 @@
             "ready_to_apply",
             "applying",
             "applied",
+            "rolled_back",
             "conflict",
             "verification_failed",
             "unknown",

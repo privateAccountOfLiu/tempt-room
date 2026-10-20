@@ -173,3 +173,25 @@ test('unknown integration can be retried by owner and then requires authorizatio
   worker.tick();
   assert.equal(store.get<Integration>('integrations', recovered.id)!.status, 'applied');
 });
+
+test('applied integration can be rolled back only while source still matches the patch', async t => {
+  const first = await fixture(t);
+  const queued = first.command('artifact.integrate', {artifactId: first.artifact.id});
+  first.worker.tick();
+  assert.equal(first.store.get<Integration>('integrations', queued.result.integrationId as string)!.status, 'applied');
+  assert.equal(readFileSync(join(first.project, 'answer.txt'), 'utf8'), 'candidate\n');
+  const rolled = first.command('integration.rollback', {integrationId: queued.result.integrationId});
+  assert.equal(rolled.result.status, 'rolled_back');
+  assert.equal(readFileSync(join(first.project, 'answer.txt'), 'utf8'), 'original\n');
+  assert.equal(first.store.get<Artifact>('artifacts', first.artifact.id)!.applied, false);
+  assert.equal(first.store.events(first.roomId).filter(event => event.type === 'artifact.rolled_back').length, 1);
+
+  const second = await fixture(t);
+  const secondQueued = second.command('artifact.integrate', {artifactId: second.artifact.id});
+  second.worker.tick();
+  writeFileSync(join(second.project, 'answer.txt'), 'user edit\n');
+  const conflicted = second.command('integration.rollback', {integrationId: secondQueued.result.integrationId});
+  assert.equal(conflicted.result.status, 'blocked');
+  assert.equal(conflicted.result.errorCode, 'rollback_conflict');
+  assert.equal(readFileSync(join(second.project, 'answer.txt'), 'utf8'), 'user edit\n');
+});
