@@ -1,4 +1,4 @@
-import { discussionWindowMs, isDiscussionWindowExpired } from './discussion-windows.ts';
+import { discussionWindowEstimate, isDiscussionWindowExpired } from './discussion-windows.ts';
 import { z } from 'zod';
 import {discussionPrompt,assessConvergence,discussionSummaryPrompt} from './discussions.ts';
 import { agentSchema,contextSeqOf,taskContractSchema, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type DiscussionRound, type Task, type Decision, type AgentSession, type Subscription, type WakeIntent, type ProjectBinding, type Integration, type BudgetReservation, type CapabilityEvidence } from '../../../packages/protocol/src/index.ts';
@@ -709,6 +709,6 @@ export class RoomService {
 
 function p95DiscussionWindow(store:Store,discussion:Discussion):number{
   const samples=store.list<Run>('runs',discussion.roomId).filter(run=>run.startedAt&&run.finishedAt&&run.status==='completed').map(run=>{const agent=store.get<AgentDescriptor>('agents',run.agentId);return agent?{durationMs:Math.max(0,Date.parse(run.finishedAt!)-Date.parse(run.startedAt!)),provider:agent.provider,adapterFingerprint:agentCapabilityFingerprint(agent),model:agent.model,taskClass:'discussion'}:undefined;}).filter(Boolean) as {durationMs:number;provider:string;adapterFingerprint:string;model?:string;taskClass:string}[];
-  const windows=discussion.participants.map(agentId=>{const agent=store.get<AgentDescriptor>('agents',agentId);return agent?discussionWindowMs(samples,{provider:agent.provider,adapterFingerprint:agentCapabilityFingerprint(agent),model:agent.model,taskClass:'discussion'}):undefined;}).filter((value):value is number=>value!==undefined);
+  const windows=discussion.participants.map(agentId=>{const agent=store.get<AgentDescriptor>('agents',agentId);return agent?discussionWindowEstimate(samples,{provider:agent.provider,adapterFingerprint:agentCapabilityFingerprint(agent),model:agent.model,taskClass:'discussion'}).windowMs:undefined;}).filter((value):value is number=>value!==undefined);
   return windows.length?Math.max(...windows):90_000;
 }

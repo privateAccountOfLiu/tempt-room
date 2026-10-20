@@ -22,6 +22,19 @@ export const defaultDiscussionWindowConfig: DiscussionWindowConfig = {
   quantile: 0.95
 };
 
+export interface DiscussionWindowEstimate { windowMs: number; method: 'default' | 'ewma' | 'p95'; sampleCount: number; }
+
+export function discussionWindowEstimate(samples: readonly DiscussionDurationSample[], bucket: Pick<DiscussionDurationSample, 'provider' | 'adapterFingerprint' | 'model' | 'taskClass'>, config: DiscussionWindowConfig = defaultDiscussionWindowConfig): DiscussionWindowEstimate {
+  const key = discussionBucketKey(bucket);
+  const durations = samples.filter(sample => durationSafe(sample.durationMs) && discussionBucketKey(sample) === key).slice(-config.sampleLimit).map(sample => sample.durationMs);
+  if (!durations.length) return {windowMs: clamp(config.defaultMs, config), method: 'default', sampleCount: 0};
+  if (durations.length < 5) {
+    const ewma = ewmaDiscussionDuration(samples, bucket);
+    return {windowMs: clamp(ewma ?? config.defaultMs, config), method: 'ewma', sampleCount: durations.length};
+  }
+  return {windowMs: discussionWindowMs(samples, bucket, config), method: 'p95', sampleCount: durations.length};
+}
+
 export function isDiscussionWindowExpired(round: {windowDeadline?: string}, nowMs = Date.now()): boolean {
   if (!round.windowDeadline) return false;
   const deadline = Date.parse(round.windowDeadline);

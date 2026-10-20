@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { discussionBucketKey, discussionWindowMs, ewmaDiscussionDuration, isDiscussionWindowExpired, type DiscussionDurationSample } from '../apps/server/src/discussion-windows.ts';
+import { discussionBucketKey, discussionWindowMs, discussionWindowEstimate, ewmaDiscussionDuration, isDiscussionWindowExpired, type DiscussionDurationSample } from '../apps/server/src/discussion-windows.ts';
 
 const bucket = {provider: 'codex', adapterFingerprint: 'fp_a', model: 'gpt', taskClass: 'code'};
 function sample(durationMs: number, overrides: Partial<DiscussionDurationSample> = {}): DiscussionDurationSample {
@@ -28,4 +28,14 @@ test('discussion windows expire after their deadline', () => {
   assert.equal(isDiscussionWindowExpired({windowDeadline: new Date(Date.now() - 1000).toISOString()}), true);
   assert.equal(isDiscussionWindowExpired({windowDeadline: new Date(Date.now() + 60_000).toISOString()}), false);
   assert.equal(isDiscussionWindowExpired({}), false);
+});
+
+test('window estimate uses cold start, EWMA for sparse samples and p95 for dense samples', () => {
+  assert.deepEqual(discussionWindowEstimate([], bucket), {windowMs: 90_000, method: 'default', sampleCount: 0});
+  assert.deepEqual(discussionWindowEstimate([sample(20_000), sample(40_000)], bucket), {windowMs: 25_000, method: 'ewma', sampleCount: 2});
+  const dense = Array.from({length: 10}, (_, index) => sample((index + 1) * 10_000));
+  const estimate = discussionWindowEstimate(dense, bucket);
+  assert.equal(estimate.method, 'p95');
+  assert.equal(estimate.sampleCount, 10);
+  assert.equal(estimate.windowMs, 100_000);
 });

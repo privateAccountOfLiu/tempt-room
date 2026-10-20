@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 57a4d31e0f44296806b7f7e47596fc5be34761c8 (dirty)
+source HEAD: 376412669d28292ad01b3501d24880bbe6f382f6 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T11-09-51-833Z-f4710c2e/report.json
+report: .state/collaboration-baseline/run-2026-10-20T11-16-11-893Z-27c1b76f/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T11-09-51-833Z-f4710c2e/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-PcmSKh/report.json`，162.9s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-Jr43nD/report.json`，163.0s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-izvpTf/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-5gtrjv/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T11-09-51-833Z-f4710c2e/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T11-09-51-833Z-f4710c2e/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T11-09-51-833Z-f4710c2e/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T11-09-51-833Z-f4710c2e/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T11-16-11-893Z-27c1b76f/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T11-16-11-893Z-27c1b76f/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T11-16-11-893Z-27c1b76f/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T11-16-11-893Z-27c1b76f/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -538,7 +538,10 @@ report: .state/collaboration-baseline/run-2026-10-20T11-09-51-833Z-f4710c2e/repo
 - openDiscussionRound 在未显式设置 roundWindowMs 时，从已完成 Run 的 startedAt/finishedAt 取真实时长样本
 - 按 provider + agentCapabilityFingerprint + model + taskClass=discussion 分桶计算 P95；多参与者取最大窗口；无样本回退 90s
 - 新增 discussion-rounds 测试：观测 30s 完成后新讨论窗口约 30s（而非默认 90s）
-- 尚未完成：持久历史样本表、EWMA 平滑接入
+- discussion-windows 新增 discussionWindowEstimate：无样本 default、样本<5 用 EWMA、样本>=5 用 P95，并返回 method/sampleCount
+- 讨论窗口调度改用 estimate.windowMs；EWMA 仅作为稀疏样本平滑，不冒充 P95
+- 新增估计方法测试
+- 尚未完成：持久历史样本表、跨重启样本保留
 
 ## B08 起点 — 上下文分段与字节预算
 
