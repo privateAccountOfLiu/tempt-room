@@ -803,7 +803,7 @@ try {
     await clickByText('dialog.modal button','关闭');await sleep(150);step('mobile-room-switcher-and-settings');
     const mobilePanelOpened = await evaluate("(()=>{const button=document.querySelector('button[aria-label=\"打开协作面板\"]');if(!button)return false;button.click();return true;})()");
     if (!mobilePanelOpened) fail('找不到移动端协作面板入口');
-    await waitFor('移动端协作面板', async () => { const text = await bodyText(); return text.includes('协作面板') && text.includes('交付物') && text.includes('修改目标'); }, 10000);
+    await waitFor('移动端协作面板', async () => { const text = await bodyText(); return text.includes('协作面板') && text.includes('交付物') && text.includes('集成') && text.includes('修改目标'); }, 10000);
     await sleep(250);
     const mobilePanelShot = await send('Page.captureScreenshot', {format: 'png'}, sessionId);
     const mobilePanelShotPath = join(runDir, 'ui-mobile-panel.png');

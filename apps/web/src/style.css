@@ -179,3 +179,9 @@
 .task-verification-history span.rejected{color:#d9a58a}
 .task-verification-history small{color:#718069}
 .task-verification-history p{grid-column:1/-1;margin:2px 0 0;color:#9ead92}
+/* D02 integration queue */
+.integration-list{display:flex;flex-direction:column;gap:7px}
+.integration-card{border:1px solid #2b3527;border-radius:5px;padding:8px;background:#141a12;display:flex;flex-direction:column;gap:4px}
+.integration-top{display:flex;justify-content:space-between;align-items:center}
+.integration-card strong{font-size:11px;color:#d3e3c7}
+.integration-card small{font-size:9px;color:#819175}

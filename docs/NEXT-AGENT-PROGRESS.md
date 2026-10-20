@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 3c137e07a812fa1b547d5f3d5a50ecbd48ee7d33 (dirty)
+source HEAD: edd55f56e873730fde1b52cb6bfca1c8d4880967 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T05-20-48-369Z-d2ba8b6d/report.json
+report: .state/collaboration-baseline/run-2026-10-20T05-27-42-008Z-3f1b1db1/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -169,19 +169,19 @@ report: .state/collaboration-baseline/run-2026-10-20T05-20-48-369Z-d2ba8b6d/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-Xntz9q/report.json`，155.1s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-SHI8GL/report.json`，154.0s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-PvUgsx/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-tMqBEn/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T05-20-48-369Z-d2ba8b6d/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T05-20-48-369Z-d2ba8b6d/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T05-20-48-369Z-d2ba8b6d/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T05-20-48-369Z-d2ba8b6d/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T05-27-42-008Z-3f1b1db1/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T05-27-42-008Z-3f1b1db1/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T05-27-42-008Z-3f1b1db1/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T05-27-42-008Z-3f1b1db1/replay.stdout.txt`
 
 ## M1 验收 — 并行任务确定性 fixture
 
@@ -228,7 +228,9 @@ report: .state/collaboration-baseline/run-2026-10-20T05-20-48-369Z-d2ba8b6d/repo
   - retry：unknown/blocked 记录回到 queued + authorization=waiting，需再次 owner 授权才应用
   - abandon：标记 blocked(owner_abandoned)
 - 集成测试新增 journal 核对 mark_applied 与 retry 重新授权路径
-- 尚未完成：journal 自动回滚、staging 保留策略与 UI、旧 command shell 路径移除
+- 集成队列 UI：新增「集成」面板页，展示状态、授权等待、artifact、verificationId、errorCode，并提供授权应用/标记已应用/重试/放弃操作；2 秒轮询刷新
+- 浏览器 E2E 移动端协作面板断言新增「集成」可见
+- 尚未完成：journal 自动回滚、staging 保留策略、旧 command shell 路径移除
 ## D02a — 持久集成队列主体
 
 - 新增 packages/protocol/src/integration.ts：Integration schema 与状态机（queued/validating/staging/testing/ready_to_apply/applying/applied/conflict/verification_failed/unknown/blocked）
