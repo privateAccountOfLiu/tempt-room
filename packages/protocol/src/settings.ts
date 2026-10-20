@@ -33,7 +33,8 @@ export const executionSettingsSchema=z.object({
   roomTokenBudget:z.number().int().min(0).max(1000000000).default(0),
   roomCostBudgetUsd:z.number().min(0).max(1000000).default(0),
   unknownCostPolicy:z.enum(['block','allow']).default('block'),
-  stagingRetentionMs:z.number().int().min(0).max(30*24*60*60*1000).default(24*60*60*1000)
+  stagingRetentionMs:z.number().int().min(0).max(30*24*60*60*1000).default(24*60*60*1000),
+  toolAuthorizationMode:z.enum(['off','warn','enforce']).default('off')
 }).strict();
 export type ExecutionSettings=z.infer<typeof executionSettingsSchema>;
 export const defaultExecutionSettings:ExecutionSettings=executionSettingsSchema.parse({});

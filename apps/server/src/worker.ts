@@ -23,6 +23,8 @@ import { InboxService } from './inbox.ts';
 import { prepareHostChatWorkspace, hostStatus, hostChangeReport } from './host-workspace.ts';
 import { buildProjectManifest } from './project-manifest.ts';
 import { buildContextSegments } from './context-segments.ts';
+import { agentCapabilityFingerprint } from './adapter-capabilities.ts';
+import { authorizeTool } from './tool-authorization.ts';
 import { acquireResource, expireResourceLeases, quarantineResource, recoverResourceLeases, releaseResource } from './resource-manager.ts';
 import { codexThreadKey, reconcileAttachedRun } from './codex-attach.ts';
 import { assertRunFence,assertRunIdentity,executionFence } from './execution.ts';
@@ -734,7 +736,10 @@ export class Worker {
       if (!run || !this.active.has(run.id) || this.active.get(run.id)!.signal.aborted || !['running','waiting_input'].includes(run.status)) throw new ProtocolError('run_not_active','运行没有活动授权',409);
       if(fence)assertRunFence(this.store,fence);
       else if(run.executionId)throw new ProtocolError('execution_identity_required','工具通道缺少不可变的执行授权',409);
-      const args=request?.arguments??{},name=request?.name,actor={id:run.agentId,kind:'agent' as const};const toolAgent=this.store.get<AgentDescriptor>('agents',run.agentId);assertRoomToolAllowed(toolAgent?.roomToolPolicy,String(name),toolAgent?.allowedRoomTools);this.consumeToolCall(run);
+      const args=request?.arguments??{},name=request?.name,actor={id:run.agentId,kind:'agent' as const};const toolAgent=this.store.get<AgentDescriptor>('agents',run.agentId);assertRoomToolAllowed(toolAgent?.roomToolPolicy,String(name),toolAgent?.allowedRoomTools);
+      const authorizationMode=this.store.settings().toolAuthorizationMode;
+      if(authorizationMode!=='off'&&toolAgent){const fingerprint=agentCapabilityFingerprint(toolAgent),decision=authorizeTool({actor,runFence:fence??{runId:run.id,generation:run.generation,executionId:run.executionId},fingerprint,capabilityEvidence:this.store.list('capability_evidence',run.roomId).filter((item:any)=>item.fingerprint===fingerprint) as any,tool:String(name),args});if(decision.decision==='deny'&&authorizationMode==='enforce')throw new ProtocolError('tool_denied',`工具未获授权：${decision.reason}`,403);}
+      this.consumeToolCall(run);
       const commandId=fence?'tool_'+digest([run.id,fence.generation,request?.operationId]).slice(0,64):uid('tool');
       const scope={runId:run.id,...(fence?{generation:fence.generation,executionId:fence.executionId}:{})};
       let action:()=>unknown;

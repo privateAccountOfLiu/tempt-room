@@ -197,6 +197,15 @@
       "type": "integer",
       "minimum": 0,
       "maximum": 2592000000
+    },
+    "toolAuthorizationMode": {
+      "default": "off",
+      "type": "string",
+      "enum": [
+        "off",
+        "warn",
+        "enforce"
+      ]
     }
   },
   "required": [
@@ -228,7 +237,8 @@
     "roomTokenBudget",
     "roomCostBudgetUsd",
     "unknownCostPolicy",
-    "stagingRetentionMs"
+    "stagingRetentionMs",
+    "toolAuthorizationMode"
   ],
   "additionalProperties": false
 }

@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 4be8ba409bc53598dc1acf9e5ef9fa7307f59773 (dirty)
+source HEAD: 6250781fa437da94e696193fd2364cec00fa7b09 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T10-52-55-785Z-3760adc8/report.json
+report: .state/collaboration-baseline/run-2026-10-20T11-00-33-798Z-cad38ceb/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T10-52-55-785Z-3760adc8/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-bvcGeB/report.json`，161.1s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-z2563T/report.json`，161.4s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-DJepyu/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-t1b8ju/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T10-52-55-785Z-3760adc8/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T10-52-55-785Z-3760adc8/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T10-52-55-785Z-3760adc8/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T10-52-55-785Z-3760adc8/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T11-00-33-798Z-cad38ceb/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T11-00-33-798Z-cad38ceb/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T11-00-33-798Z-cad38ceb/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T11-00-33-798Z-cad38ceb/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -503,7 +503,10 @@ report: .state/collaboration-baseline/run-2026-10-20T10-52-55-785Z-3760adc8/repo
   - 只收窄既有 roomToolPolicy/allowlist，不扩大权限
   - 返回结构化 decision/reason/argumentDigest
 - 新增 tests/tool-authorization.test.ts 2 项
-- 尚未完成：接入真实 MCP/ACP/host 工具入口、授权记录持久化、批准/取消竞态处理和 CLI 不可拦截缺口标注
+- ExecutionSettings 新增 toolAuthorizationMode：off（默认）/warn/enforce
+- Worker.executeTool 在 executeTool 入口调用 authorizeTool；enforce 下写工具缺少 preToolGate 证据时返回 tool_denied
+- 运行设置 UI 新增「工具授权模式」；浏览器 E2E 断言可见
+- 尚未完成：授权记录持久化、warn 模式审计事件、MCP/ACP 宿主桥接、批准/取消竞态
 
 ## B09 起点 — 讨论窗口估算
 
