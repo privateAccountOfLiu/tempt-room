@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {discussionPrompt,assessConvergence,discussionSummaryPrompt} from './discussions.ts';
-import { agentSchema,contextSeqOf,taskContractSchema, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type Task, type Decision, type AgentSession, type Subscription, type WakeIntent, type ProjectBinding, type Integration, type BudgetReservation, type CapabilityEvidence } from '../../../packages/protocol/src/index.ts';
+import { agentSchema,contextSeqOf,taskContractSchema, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type DiscussionRound, type Task, type Decision, type AgentSession, type Subscription, type WakeIntent, type ProjectBinding, type Integration, type BudgetReservation, type CapabilityEvidence } from '../../../packages/protocol/src/index.ts';
 import { digest, now, OWNER, Store, SYSTEM, uid } from './store.ts';
 import {assertContextCurrent} from './context-reconciliation.ts';
 import { assertRunFence } from './execution.ts';
@@ -138,7 +138,7 @@ export class RoomService {
           this.store.event(roomId, 'agent_session.created', actor, {agentSession});
         }
         const event = this.store.event(roomId, 'discussion.started', actor, { discussion });
-        discussion.startedSeq=event.seq;this.scheduleRound(discussion, event.seq); return { discussionId: discussion.id };
+        discussion.startedSeq=event.seq;this.openDiscussionRound(discussion,event.seq);this.scheduleRound(discussion, event.seq); return { discussionId: discussion.id };
       }
       case 'discussion.stop': {
         const roomId = this.requireRoom(command), id = z.string().parse(p.discussionId), discussion = this.store.get<Discussion>('discussions', id);
@@ -589,7 +589,9 @@ export class RoomService {
       const converged=discussion.stopOnConvergence&&assessConvergence(this.store,discussion,completed);
       const reason:Discussion['endReason']=Date.now()>=Date.parse(discussion.deadline)?'time_limit':converged?'converged':discussion.responses>=discussion.maxResponses?'response_limit':!discussion.stopOnConvergence&&discussion.round>=discussion.rounds?'round_limit':undefined;
       if(reason){this.endDiscussion(discussion,reason,'completed');return;}
+      this.closeDiscussionRound(discussion,'round_complete');
       discussion.round++; const event = this.store.event(run.roomId, 'discussion.round', SYSTEM, { discussion });
+      this.openDiscussionRound(discussion,event.seq);
       // Scheduling failures must not roll back an already accepted Agent response.
       try{this.scheduleRound(discussion,event.seq);}
       catch(error){this.endDiscussion(discussion,'scheduling_failed','stopped',(error as Error).message);}
@@ -613,8 +615,21 @@ export class RoomService {
     this.store.event(discussion.roomId,'discussion.round',SYSTEM,{discussion});
     return true;
   }
+  private openDiscussionRound(discussion:Discussion,openedSeq:number){
+    const id=`round_${discussion.id}_${discussion.round}`;
+    if(this.store.get<DiscussionRound>('discussion_rounds',id))return;
+    const round:DiscussionRound={id,discussionId:discussion.id,round:discussion.round,status:'open',openedSeq,openedAt:now(),windowDeadline:new Date(Date.now()+(discussion.roundWindowMs??90_000)).toISOString(),slotIds:discussion.participants.slice(),quorum:discussion.quorum};
+    this.store.event(discussion.roomId,'discussion.round.opened',SYSTEM,{round});
+  }
+  private closeDiscussionRound(discussion:Discussion,reason:string){
+    const current=this.store.list<DiscussionRound>('discussion_rounds',discussion.roomId).find(item=>item.discussionId===discussion.id&&item.round===discussion.round&&item.status==='open');
+    if(!current)return;
+    const closedSeq=this.store.room(discussion.roomId)!.seq;
+    this.store.event(discussion.roomId,'discussion.round.closed',SYSTEM,{round:{...current,status:'closed',closedSeq,closedAt:now(),closeReason:reason}});
+  }
   private endDiscussion(discussion:Discussion,reason:NonNullable<Discussion['endReason']>,status:'completed'|'stopped',detail?:string){
     if(discussion.status!=='active'&&discussion.status!=='paused')return;
+    this.closeDiscussionRound(discussion,reason);
     discussion.status=status;discussion.endReason=reason;discussion.endedAt=now();
     for(const run of this.store.list<Run>('runs',discussion.roomId).filter(r=>r.discussionId===discussion.id&&r.discussionRole!=='summary'&&!terminalStates.has(r.status)))this.cancel(run,status==='completed'?'superseded':'user_cancel');
     discussion.endedSeq=this.store.room(discussion.roomId)!.seq;
