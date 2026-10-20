@@ -4,14 +4,14 @@ import { dirname, join } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { VERSION, capabilitiesFor, executionSettingsSchema,eventSchema,eventMetadata,EventContractError,projectionTableNames,type ProjectionTable,type ExecutionSettings, type Actor, type AgentDescriptor, type Room, type RoomEvent, type RoomSnapshot, type Run, type Task, type Discussion,type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { MemoryProjectionSink,SqlProjectionSink,projectEvent,projectionJson } from './event-projections.ts';
-export const DATABASE_VERSION=14;
+export const DATABASE_VERSION=15;
 
 export const uid = (prefix = 'id') => `${prefix}_${randomUUID().replaceAll('-', '')}`;
 export const now = () => new Date().toISOString();
 export const OWNER: Actor = { id: 'owner', kind: 'human' };
 export const SYSTEM: Actor = { id: 'system', kind: 'system' };
-type Table = 'agents' | 'messages' | 'tasks' | 'runs' | 'artifacts' | 'discussions' | 'decisions' | 'contexts' | 'operations' | 'agent_sessions' | 'subscriptions' | 'inbox_deliveries' | 'input_batches' | 'wake_intents' | 'capability_evidence' | 'discussion_rounds' | 'project_bindings' | 'integrations' | 'usage_samples' | 'budget_reservations';
-const tables = new Set(['agents', 'messages', 'tasks', 'runs', 'artifacts', 'discussions', 'decisions','contexts','operations','agent_sessions','subscriptions','inbox_deliveries','input_batches','wake_intents','capability_evidence','discussion_rounds','project_bindings','integrations','usage_samples','budget_reservations']);
+type Table = 'agents' | 'messages' | 'tasks' | 'runs' | 'artifacts' | 'discussions' | 'decisions' | 'contexts' | 'operations' | 'agent_sessions' | 'subscriptions' | 'inbox_deliveries' | 'input_batches' | 'wake_intents' | 'capability_evidence' | 'discussion_rounds' | 'project_bindings' | 'integrations' | 'usage_samples' | 'budget_reservations' | 'resource_leases';
+const tables = new Set(['agents', 'messages', 'tasks', 'runs', 'artifacts', 'discussions', 'decisions','contexts','operations','agent_sessions','subscriptions','inbox_deliveries','input_batches','wake_intents','capability_evidence','discussion_rounds','project_bindings','integrations','usage_samples','budget_reservations','resource_leases']);
 export function canonical(value: unknown): string {
   if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
   if (value && typeof value === 'object') return '{' + Object.keys(value).sort().map(k => JSON.stringify(k) + ':' + canonical((value as any)[k])).join(',') + '}';
@@ -45,7 +45,8 @@ CREATE TABLE IF NOT EXISTS discussion_rounds(id TEXT PRIMARY KEY, room_id TEXT N
 CREATE TABLE IF NOT EXISTS project_bindings(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS project_bindings_room ON project_bindings(room_id);
 CREATE TABLE IF NOT EXISTS integrations(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS integrations_room ON integrations(room_id);
 CREATE TABLE IF NOT EXISTS usage_samples(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS usage_samples_room ON usage_samples(room_id);
-CREATE TABLE IF NOT EXISTS budget_reservations(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS budget_reservations_room ON budget_reservations(room_id);`);
+CREATE TABLE IF NOT EXISTS budget_reservations(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS budget_reservations_room ON budget_reservations(room_id);
+CREATE TABLE IF NOT EXISTS resource_leases(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS resource_leases_room ON resource_leases(room_id);`);
     if (version < 1) {
       this.db.exec(`BEGIN;
         CREATE TABLE IF NOT EXISTS rooms(id TEXT PRIMARY KEY, seq INTEGER NOT NULL, body TEXT NOT NULL);
@@ -100,7 +101,7 @@ CREATE TABLE IF NOT EXISTS budget_reservations(id TEXT PRIMARY KEY, room_id TEXT
     // v10 adds the B02 collaboration projections. Old databases receive the
     // tables and uniqueness indexes before any new event can be appended.
     if(version<10)this.atomic(()=>{
-      for(const table of ['agent_sessions','subscriptions','inbox_deliveries','input_batches','wake_intents','capability_evidence','discussion_rounds','project_bindings','integrations','usage_samples','budget_reservations'])
+      for(const table of ['agent_sessions','subscriptions','inbox_deliveries','input_batches','wake_intents','capability_evidence','discussion_rounds','project_bindings','integrations','usage_samples','budget_reservations','resource_leases'])
         this.db.exec(`CREATE TABLE IF NOT EXISTS ${table}(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS ${table}_room ON ${table}(room_id);`);
       this.db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS inbox_delivery_unique ON inbox_deliveries(json_extract(body,'$.agentSessionId'),json_extract(body,'$.sourceEventId'));
         CREATE UNIQUE INDEX IF NOT EXISTS wake_scope_unique ON wake_intents(json_extract(body,'$.scopeKey'),json_extract(body,'$.sourceEventId'));
@@ -112,6 +113,7 @@ CREATE TABLE IF NOT EXISTS budget_reservations(id TEXT PRIMARY KEY, room_id TEXT
     if(version<12)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS integrations(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS integrations_room ON integrations(room_id); PRAGMA user_version=12;`);});
     if(version<13)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS usage_samples(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS usage_samples_room ON usage_samples(room_id); PRAGMA user_version=13;`);});
     if(version<14)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS budget_reservations(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS budget_reservations_room ON budget_reservations(room_id); PRAGMA user_version=14;`);});
+    if(version<15)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS resource_leases(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS resource_leases_room ON resource_leases(room_id); PRAGMA user_version=15;`);});
     });
     this.seed();
     this.atomic(() => {
@@ -160,8 +162,8 @@ CREATE TABLE IF NOT EXISTS budget_reservations(id TEXT PRIMARY KEY, room_id TEXT
     if(this.rebuilding)throw new Error('Projection rebuild is read-only');
     if((projectionTableNames as readonly string[]).includes(table)){
       if(!value.roomId)throw new Error('Projected rows require a roomId');
-      const field=({messages:'message',tasks:'task',runs:'run',artifacts:'artifact',discussions:'discussion',decisions:'decision',contexts:'context',operations:'operation',agent_sessions:'agentSession',subscriptions:'subscription',inbox_deliveries:'delivery',input_batches:'batch',wake_intents:'wakeIntent',capability_evidence:'capabilityEvidence',discussion_rounds:'round',project_bindings:'projectBinding',integrations:'integration',usage_samples:'sample',budget_reservations:'reservation'} as Record<string,string>)[table];
-      const type=({messages:'chat.message.created',tasks:'task.updated',runs:'run.updated',artifacts:'artifact.created',discussions:'discussion.round',decisions:(value as any).accepted?'decision.accepted':'decision.proposed',contexts:'context.captured',operations:'operation.'+(value as any).status,agent_sessions:'agent_session.created',subscriptions:'subscription.updated',inbox_deliveries:'inbox.delivered',input_batches:'input.batch.created',wake_intents:'wake.requested',capability_evidence:'capability.verified',discussion_rounds:'discussion.round.opened',project_bindings:'project.bound',integrations:'integration.queued',usage_samples:'usage.recorded',budget_reservations:'budget.reserved'} as Record<string,string>)[table];
+      const field=({messages:'message',tasks:'task',runs:'run',artifacts:'artifact',discussions:'discussion',decisions:'decision',contexts:'context',operations:'operation',agent_sessions:'agentSession',subscriptions:'subscription',inbox_deliveries:'delivery',input_batches:'batch',wake_intents:'wakeIntent',capability_evidence:'capabilityEvidence',discussion_rounds:'round',project_bindings:'projectBinding',integrations:'integration',usage_samples:'sample',budget_reservations:'reservation',resource_leases:'lease'} as Record<string,string>)[table];
+      const type=({messages:'chat.message.created',tasks:'task.updated',runs:'run.updated',artifacts:'artifact.created',discussions:'discussion.round',decisions:(value as any).accepted?'decision.accepted':'decision.proposed',contexts:'context.captured',operations:'operation.'+(value as any).status,agent_sessions:'agent_session.created',subscriptions:'subscription.updated',inbox_deliveries:'inbox.delivered',input_batches:'input.batch.created',wake_intents:'wake.requested',capability_evidence:'capability.verified',discussion_rounds:'discussion.round.opened',project_bindings:'project.bound',integrations:'integration.queued',usage_samples:'usage.recorded',budget_reservations:'budget.reserved',resource_leases:'resource.acquired'} as Record<string,string>)[table];
       this.event(value.roomId,type,SYSTEM,{[field]:value});return;
     }
     this.db.prepare(`INSERT INTO ${table}(id,room_id,body) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET room_id=excluded.room_id,body=excluded.body`).run(value.id, value.roomId ?? null, JSON.stringify(value));

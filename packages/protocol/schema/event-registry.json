@@ -917,6 +917,36 @@
     ]
   },
   {
+    "type": "resource.acquired",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "resource-lease",
+    "schemaVersion": 1,
+    "kinds": [
+      "resource.updated"
+    ]
+  },
+  {
+    "type": "resource.released",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "resource-lease",
+    "schemaVersion": 1,
+    "kinds": [
+      "resource.updated"
+    ]
+  },
+  {
+    "type": "resource.quarantined",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "resource-lease",
+    "schemaVersion": 1,
+    "kinds": [
+      "resource.updated"
+    ]
+  },
+  {
     "type": "discussion.round.opened",
     "durability": "durable",
     "aggregate": "room",

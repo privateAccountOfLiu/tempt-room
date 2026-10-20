@@ -22,6 +22,7 @@ import { dependencyInputs, dependencyRequirementsReady } from './dependencies.ts
 import { InboxService } from './inbox.ts';
 import { prepareHostChatWorkspace, hostStatus, hostChangeReport } from './host-workspace.ts';
 import { buildProjectManifest } from './project-manifest.ts';
+import { acquireResource, quarantineResource, recoverResourceLeases, releaseResource } from './resource-manager.ts';
 import { codexThreadKey, reconcileAttachedRun } from './codex-attach.ts';
 import { assertRunFence,assertRunIdentity,executionFence } from './execution.ts';
 import { ToolOperations } from './tool-operations.ts';
@@ -87,6 +88,7 @@ export class Worker {
     });
     this.recoverIntegrations();
     this.recoverInputBatches();
+    recoverResourceLeases(this.store);
   }
   private recoverInputBatches(){
     for(const batch of this.store.list<InputBatch>('input_batches').filter(item=>['created','provided'].includes(item.status))){
@@ -292,6 +294,11 @@ export class Worker {
     if(run.taskId){
       const task=this.store.get<Task>('tasks',run.taskId)!;
       try{const inputs=dependencyInputs(this.store,task);run.dependencyVersions=inputs.versions;run.inputArtifacts=inputs.artifacts;}catch(error){this.finish(run,'failed',(error as Error).message);return false;}
+    }
+    const resourceKey=this.hostProjectKey(run);
+    if(resourceKey){
+      try{const lease=acquireResource(this.store,{roomId:run.roomId,kind:'project',key:resourceKey,run,capacity:1});run.resourceLeaseId=lease.id;}
+      catch(error){this.finish(run,'failed',(error as Error).message);return false;}
     }
     const controller = new AbortController(); this.active.set(run.id, controller);
     // Legacy queued work keeps its original authorization: no implicit extra
@@ -550,6 +557,9 @@ export class Worker {
       }
       this.service.settleDiscussion(run);
       this.service.settleBudgetForRun(run);
+      if(run.resourceLeaseId){
+        try{if(['completed','failed','canceled','superseded'].includes(status))releaseResource(this.store,run.roomId,run.resourceLeaseId,{checkedAt:now(),remainingProcesses:0,evidence:'worker-terminal'});else quarantineResource(this.store,run.roomId,run.resourceLeaseId,'terminal_state_'+status);}catch{/* Quarantine/release evidence remains auditable via events. */}
+      }
     });
     this.toolCalls.delete(run.id);
     const stored=this.store.get<Run>('runs',run.id);
