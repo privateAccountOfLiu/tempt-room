@@ -5,7 +5,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { parseAgentOutput,heartbeatDelayMs } from './room-runner-output.mjs';
-import {completeClaimedTask} from './room-task-context.mjs';
+import {buildRecoveryPrompt} from './room-runner-recovery.mjs';
 
 /**
  * Optional "room duty" runner for external Agents.
@@ -29,6 +29,7 @@ import {completeClaimedTask} from './room-task-context.mjs';
  *   ROOM_POST_RESULT                          - "0" disables posting stdout back
  *   ROOM_CLAIM_OPEN                           - "1" also claims open tasks and completes them
  *   ROOM_CONTEXT_MAX_ROUNDS                   - explicit extra model-turn budget for task reconciliation (default 0, max 12)
+ *   ROOM_AGENT_SESSION_ID                     - optional explicit AgentSession id for pending-delivery recovery
  */
 const args = parseArgs({ options: {
   url: { type: 'string' }, token: { type: 'string' }, room: { type: 'string' },
@@ -59,6 +60,7 @@ if (process.env.ROOM_AGENT_RESUME_ARGS) {
   if (!Array.isArray(resumeTemplate) || resumeTemplate.some(item => typeof item !== 'string')) { console.error('ROOM_AGENT_RESUME_ARGS must be a JSON array of strings'); process.exit(2); }
 }
 const agentId = token.split('.')[0];
+const agentSessionId = process.env.ROOM_AGENT_SESSION_ID;
 const sessionFile = process.env.ROOM_AGENT_SESSION_FILE ?? join(tmpdir(), `tempt-room-agent-${agentId}-${roomId}.json`);
 let sessionId;
 try { sessionId = JSON.parse(readFileSync(sessionFile, 'utf8'))?.sessionId; } catch { /* first run */ }
@@ -185,6 +187,36 @@ try { const status = await tool('room_status'); cursor = status.room?.seq ?? 0; 
 log(`listening room=${roomId} wake=${wakeOn} mode=${persistentMode ? 'persistent' : 'oneshot'} cursor=${cursor} command=${command}`);
 log(`session=${sessionId ? sessionId + ' (resume enabled)' : 'none (first wake starts a new session)'} file=${sessionFile}`);
 if (claimOpen) log('open-task claim polling enabled (ROOM_CLAIM_OPEN=1)');
+
+async function recoverSessionInbox() {
+  if (!agentSessionId) return;
+  try {
+    const entries = []; let afterSeq = 0;
+    for (let page = 0; page < 20; page++) {
+      const inbox = await tool('session_inbox', {agentSessionId, afterSeq, limit: 100});
+      for (const delivery of inbox.deliveries ?? []) {
+        let text = '';
+        try {
+          const history = await tool('room_inbox', {afterSeq: Math.max(0, delivery.seq - 1), limit: 1});
+          const event = (history.events ?? []).find(item => item.seq === delivery.seq) ?? history.events?.[0];
+          text = event?.payload?.message?.text ?? '';
+        } catch { /* keep the delivery pending when its source cannot be read */ }
+        entries.push({deliveryId: delivery.deliveryId, eventId: delivery.eventId, seq: delivery.seq, text});
+      }
+      if (!inbox.hasMore) break;
+      afterSeq = inbox.nextSeq;
+    }
+    const plan = buildRecoveryPrompt(entries);
+    if (!plan.prompt) return;
+    log(`recovering ${plan.deliveryIds.length} pending session delivery(ies)`);
+    const output = await runPrompt(plan.prompt);
+    if (postResult && output) await tool('room_post', {text: output.slice(0, 30000)});
+    await tool('session_ack', {agentSessionId, deliveryIds: plan.deliveryIds});
+    cursor = Math.max(cursor, plan.maxSeq);
+    log(`recovered ${plan.deliveryIds.length} delivery(ies)`);
+  } catch (error) { log('session inbox recovery failed: ' + error.message); }
+}
+await recoverSessionInbox();
 
 while (running) {
   if (claimOpen) {

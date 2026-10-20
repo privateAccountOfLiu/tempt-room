@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 0288e8b4fefa96c91714104a30c2a94d6c8bcc5e (dirty)
+source HEAD: 964828b522a3e81480ed668ac55ed7fd2d225080 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T12-13-00-730Z-6da71a70/report.json
+report: .state/collaboration-baseline/run-2026-10-20T12-21-48-384Z-e9781af5/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T12-13-00-730Z-6da71a70/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-l2A8G8/report.json`，164.3s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-azwmXz/report.json`，162.8s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-hcDUrq/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-IJ1J8k/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T12-13-00-730Z-6da71a70/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T12-13-00-730Z-6da71a70/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T12-13-00-730Z-6da71a70/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T12-13-00-730Z-6da71a70/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T12-21-48-384Z-e9781af5/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T12-21-48-384Z-e9781af5/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T12-21-48-384Z-e9781af5/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T12-21-48-384Z-e9781af5/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -588,4 +588,7 @@ report: .state/collaboration-baseline/run-2026-10-20T12-13-00-730Z-6da71a70/repo
 - scripts/room-agent-mcp.mjs 与 Claude 插件同步暴露 session_inbox / session_ack 工具 schema（显式 agentSessionId、分页/限流参数）
 - room_wait 返回 head/historyFloor/resetRequired，与 room_inbox 游标契约一致
 - room-agent-runner 检测 resetRequired 时把 cursor 重置到 historyFloor 并记录日志，不假装缺口已补齐
-- 尚未完成：runner 按显式 AgentSession 恢复未完成 delivery
+- room-agent-runner 支持 ROOM_AGENT_SESSION_ID：启动时通过 session_inbox 拉取 pending/batched delivery，读取对应 room event 文本，消费成功后 session_ack
+- 新增 scripts/room-runner-recovery.mjs：确定性恢复 prompt（按 seq 排序、deliveryId 去重、缺失正文显式标记）
+- 新增 room-runner-recovery 测试 2 项
+- 尚未完成：离线超过 historyFloor 的恢复 UI/人工决策
