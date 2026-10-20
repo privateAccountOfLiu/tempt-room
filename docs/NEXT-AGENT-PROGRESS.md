@@ -1,3 +1,7 @@
+# Next Agent 进度
+
+> 能力完成定义（E04）见 [CAPABILITY-COMPLETION.md](CAPABILITY-COMPLETION.md)。
+
 # Next Agent 实施进度（v1.1 / M0 波次）
 
 本文件记录 `next-agent-implementation-plan-v1.1.md` 的实际实施状态，不能替代计划本身或验收证据。目标仍是 M0–M1 的完整闭环；当前完成的是 M0 中可独立验收的一波：A00 基线证据、A01 审计分页、A02 调度公平。
@@ -647,3 +651,8 @@ report: .state/collaboration-baseline/run-2026-10-20T14-38-30-166Z-604ba276/repo
 - 新增 export-redaction 测试 2 项 + room-export 路由脱敏断言
 - RoomForm 新增「导入房间 JSON」：读取 export 文件 → POST /api/rooms/import → 广播 rooms-changed 刷新房间列表，错误显示在绑定区
 - 尚未完成：可靠外发；导入的 seq/throughSeq 引用按原顺序近似；artifact contentBase64 不做内容扫描
+
+## E04 能力完成定义（第 109 轮）
+
+- 新增 docs/CAPABILITY-COMPLETION.md：完成/部分完成/未完成三档，逐项列出实现、自动化证据、运行证据与缺口
+- 明确 native host 进程树证明、真实模型实验、可靠外发为未完成外部/原生依赖
