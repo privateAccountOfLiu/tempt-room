@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: a6ed4318eb15ded8072adc8651c1eb0fff32b0c6 (dirty)
+source HEAD: c5541873ac567c98217a6e2d3c7ec1527ebaedda (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T09-24-44-494Z-47d421cd/report.json
+report: .state/collaboration-baseline/run-2026-10-20T09-30-11-943Z-2d1af39f/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T09-24-44-494Z-47d421cd/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-r9zllk/report.json`，168.9s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-1GMJpA/report.json`，170.5s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-SbFrYT/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-W7OUMP/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T09-24-44-494Z-47d421cd/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T09-24-44-494Z-47d421cd/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T09-24-44-494Z-47d421cd/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T09-24-44-494Z-47d421cd/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-30-11-943Z-2d1af39f/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T09-30-11-943Z-2d1af39f/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-30-11-943Z-2d1af39f/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-30-11-943Z-2d1af39f/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -493,3 +493,14 @@ report: .state/collaboration-baseline/run-2026-10-20T09-24-44-494Z-47d421cd/repo
 - 运行 `npm run test:preflight`：typecheck、单测、secret scan、build、SDK consumer、browser E2E、production smoke
 - 上传 `.state/preflight/**` 与 `.state/browser-e2e/**` 作为 release evidence artifact，保留 14 天
 - 尚未完成：真实模型双 CLI 实验的 CI 条件门禁、跨平台（非 Windows）隔离验证
+
+## C02 起点 — 工具前置授权策略模块
+
+- 新增 apps/server/src/tool-authorization.ts：authorizeTool 纯函数
+  - agent 调用必须有 run fence（runId/generation/executionId）
+  - 写工具要求 fingerprint 匹配的 preToolGate=verified_supported
+  - 参数路径拒绝 traversal、Windows ADS、保留设备名
+  - 只收窄既有 roomToolPolicy/allowlist，不扩大权限
+  - 返回结构化 decision/reason/argumentDigest
+- 新增 tests/tool-authorization.test.ts 2 项
+- 尚未完成：接入真实 MCP/ACP/host 工具入口、授权记录持久化、批准/取消竞态处理和 CLI 不可拦截缺口标注
