@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 3ba922639a1c890958c4f14be76dd9cd3fb4f106 (dirty)
+source HEAD: e98412c229592751e217707e8424152ed39f3f7e (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T11-36-34-300Z-3ae332db/report.json
+report: .state/collaboration-baseline/run-2026-10-20T11-42-09-711Z-3db706ff/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T11-36-34-300Z-3ae332db/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-CPcrri/report.json`，162.0s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-oCkxnW/report.json`，163.5s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-p9WPKg/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-hjHvxa/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T11-36-34-300Z-3ae332db/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T11-36-34-300Z-3ae332db/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T11-36-34-300Z-3ae332db/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T11-36-34-300Z-3ae332db/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T11-42-09-711Z-3db706ff/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T11-42-09-711Z-3db706ff/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T11-42-09-711Z-3db706ff/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T11-42-09-711Z-3db706ff/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -568,3 +568,11 @@ report: .state/collaboration-baseline/run-2026-10-20T11-36-34-300Z-3ae332db/repo
 - related 段新增 task contract baselineRef/manifestHash；受控 workspace 路径未采集逐文件外部读版本时明确写 externalReadVersion=unknown
 - 新增 context-segments 测试覆盖 baseline ref 与 unknown 标记
 - 尚未完成：逐文件读取版本证据、网络 ETag/DB 行版本采集
+
+## B07 起点 — 外部 inbox 游标/重置契约
+
+- room_inbox 返回新增 head、historyFloor、resetRequired
+- 客户端低于 historyFloor 时必须走重置而不是假装缺口已补齐
+- room_inbox 保持 afterSeq/limit/nextSeq/hasMore 兼容字段
+- tool-authorization 集成测试覆盖 read 工具在 enforce 模式下仍可用且游标字段完整
+- 尚未完成：独立 session inbox ack 接口、runner 恢复未完成 delivery、旧 cursor 重置流程

@@ -52,5 +52,10 @@ test('executeTool enforces and audits tool authorization decisions', async t => 
   assert.equal((audit.payload as any).authorizationMode, 'enforce');
   assert.equal((audit.payload as any).runId, queued.id);
   assert.ok((audit.payload as any).argumentDigest);
+  const inbox = await worker.executeTool(queued.id, {name: 'room_inbox', arguments: {afterSeq: 0, limit: 10}, operationId: 'op_inbox'}, fence);
+  assert.equal(inbox.roomId, roomId);
+  assert.equal(inbox.historyFloor, 0);
+  assert.equal(inbox.resetRequired, false);
+  assert.ok(inbox.head <= store.room(roomId)!.seq);
   (worker as any).active.delete(queued.id);
 });

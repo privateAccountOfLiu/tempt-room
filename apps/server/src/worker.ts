@@ -747,7 +747,7 @@ export class Worker {
         action=()=>{const snapshot=runContext(this.store,run);return {roomId:run.roomId,contextStatus:{providedThroughSeq:contextSeqOf(run),headSeq:this.store.room(run.roomId)!.seq,requiresReconciliation:Boolean(contextDelta(this.store,run))},fromSeq:snapshot.fromSeq,throughSeq:snapshot.throughSeq,members:snapshot.members,messages:snapshot.messages.map(message=>({...message,text:message.text.slice(0,6000),truncated:message.text.length>6000})),decisions:snapshot.decisions};};
       }else if(name==='room_inbox'){
         const input=z.object({afterSeq:z.number().int().nonnegative().default(0),limit:z.number().int().min(1).max(200).default(100)}).strict().parse(args);
-        action=()=>{const events=this.store.events(run.roomId,input.afterSeq,input.limit);const nextSeq=events.at(-1)?.seq??input.afterSeq;return {roomId:run.roomId,fromSeq:input.afterSeq,nextSeq,hasMore:events.length===input.limit,events:events.map(event=>({seq:event.seq,type:event.type,createdAt:event.createdAt,payload:event.payload}))};};
+        action=()=>{const events=this.store.events(run.roomId,input.afterSeq,input.limit),nextSeq=events.at(-1)?.seq??input.afterSeq,historyFloor=this.store.projectionStatus(run.roomId).historyFloor;return {roomId:run.roomId,fromSeq:input.afterSeq,nextSeq,head:this.store.room(run.roomId)!.seq,historyFloor,resetRequired:input.afterSeq<historyFloor,hasMore:events.length===input.limit,events:events.map(event=>({seq:event.seq,type:event.type,createdAt:event.createdAt,payload:event.payload}))};};
       }else if(name==='room_post'){
         const input=z.object({text:z.string().min(1).max(32000),mentions:z.array(z.string()).default([])}).strict().parse(args);
         assertRoomPostLength(toolAgent,input.text);
