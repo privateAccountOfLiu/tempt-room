@@ -230,6 +230,10 @@ export async function createApp(options: AppOptions = {}) {
     const incremental=(batch?store.events(run.roomId).filter(event=>sourceIds.has(event.eventId)).map(event=>String((event.payload as any).message?.text??event.type)):[]).join('\n');
     return buildContextSegments(run,runContext(store,run),task,{...(incremental?{incrementalText:incremental}:{})});
   });
+  app.get<{Params:{id:string}}>('/api/rooms/:id/export',request=>{
+    const room=store.room(request.params.id);if(!room)throw new ProtocolError('not_found','房间不存在',404);
+    return {version:VERSION,exportedAt:new Date().toISOString(),room,events:store.events(room.id)};
+  });
   app.get<{Params:{id:string;discussionId:string}}>('/api/rooms/:id/discussions/:discussionId/rounds',request=>{
     const room=store.room(request.params.id);if(!room)throw new ProtocolError('not_found','房间不存在',404);
     const discussion=store.get<Discussion>('discussions',request.params.discussionId);if(!discussion||discussion.roomId!==room.id)throw new ProtocolError('not_found','讨论不存在',404);

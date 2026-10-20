@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: d4bd072a415901e79387cb14f404ef6f109e65c6 (dirty)
+source HEAD: 52843283e0705b6dceb1cc1f3996ca904aeeeb21 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T13-28-32-725Z-f6a7e148/report.json
+report: .state/collaboration-baseline/run-2026-10-20T13-38-07-272Z-4345fb3d/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T13-28-32-725Z-f6a7e148/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-w5CuwT/report.json`，165.7s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-xMB9dh/report.json`，164.2s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-mN4JIW/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-ZkLies/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T13-28-32-725Z-f6a7e148/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T13-28-32-725Z-f6a7e148/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T13-28-32-725Z-f6a7e148/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T13-28-32-725Z-f6a7e148/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T13-38-07-272Z-4345fb3d/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T13-38-07-272Z-4345fb3d/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T13-38-07-272Z-4345fb3d/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T13-38-07-272Z-4345fb3d/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -617,3 +617,10 @@ report: .state/collaboration-baseline/run-2026-10-20T13-28-32-725Z-f6a7e148/repo
 - 新增 scripts/room-runner-recovery.mjs：确定性恢复 prompt（按 seq 排序、deliveryId 去重、缺失正文显式标记）
 - 新增 room-runner-recovery 测试 2 项
 - 尚未完成：离线超过 historyFloor 的恢复 UI/人工决策
+
+## F02 起点 — 单房间导出
+
+- 新增 GET /api/rooms/:id/export：owner 导出 room 元数据与全部 durable 事件
+- RoomSettings 新增「导出房间 JSON」按钮
+- 新增 room-export 测试：事件包含 chat.message.created、未认证 401
+- 尚未完成：导入/可靠外发、导出脱敏与 artifacts 内容包
