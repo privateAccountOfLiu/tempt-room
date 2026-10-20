@@ -63,6 +63,10 @@ test('outbound summaries expose delivered and failed deliveries', async t => {
   const summary = summarizeOutboundDeliveries(store.events(roomId), 1);
   assert.equal(summary.find(item => item.deliveryId === failed.result.deliveryId)!.status, 'failed');
   assert.ok(summary.find(item => item.deliveryId === failed.result.deliveryId)!.lastError);
+  const retried = command('outbound.retry', {deliveryId: failed.result.deliveryId});
+  assert.equal(retried.result.status, 'pending');
+  const afterRetry = summarizeOutboundDeliveries(store.events(roomId), 1);
+  assert.equal(afterRetry.find(item => item.deliveryId === failed.result.deliveryId)!.status, 'pending');
 });
 
 test('outbound URL policy blocks metadata and private hosts by default', async t => {

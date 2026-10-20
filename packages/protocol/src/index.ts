@@ -100,6 +100,7 @@ export const payloadSchemas={
   'resource.release':z.object({leaseId:idSchema,remainingProcesses:z.number().int().nonnegative(),evidence:z.string().min(1).max(500)}).strict(),
   'resource.reserve':z.object({kind:resourceLeaseKindSchema,canonicalKey:z.string().min(1).max(2000),capacity:z.number().int().min(1).max(64).default(1),leaseMs:z.number().int().positive().max(30*24*60*60*1000).optional()}).strict(),
   'outbound.enqueue':z.object({url:z.string().url().max(2000),throughSeq:z.number().int().nonnegative().optional(),redacted:z.boolean().default(true)}).strict(),
+  'outbound.retry':z.object({deliveryId:z.string().min(1).max(128)}).strict(),
   'run.evidence.record':z.object({runId:idSchema,kind:z.enum(['file','database','network']),source:z.string().min(1).max(2000),version:z.string().min(1).max(500).optional(),hash:z.string().regex(/^[a-f0-9]{64}$/i).optional(),fetchedAt:z.string().datetime().optional()}).strict(),
   'capability.verify':z.object({fingerprint:z.string().min(1).max(200),evidence:z.array(capabilityEvidenceSchema).min(1).max(20)}).strict(),
   'task.verification.record':taskVerificationRecordSchema,

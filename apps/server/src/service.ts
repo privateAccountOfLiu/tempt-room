@@ -12,6 +12,7 @@ import {provideTaskContext,assertExternalContextCurrent} from './external-contex
 import {agentCapabilityFingerprint,capabilityEvidenceId,verifiedCapabilityState} from './adapter-capabilities.ts';
 import {InputDeliveryService} from './input-delivery.ts';
 import { validateOutboundUrl } from './outbound.ts';
+import { summarizeOutboundDeliveries } from './outbound-summary.ts';
 import {acquireResource,releaseResource} from './resource-manager.ts';
 import {canonicalProjectPath,buildProjectManifest,projectBaseCommit} from './project-manifest.ts';
 import {taskVerificationRecordSchema} from '../../../packages/protocol/src/index.ts';
@@ -185,6 +186,17 @@ export class RoomService {
         const input=payloadSchemas['outbound.enqueue'].parse(p),url=validateOutboundUrl(input.url,this.store.settings().outboundAllowPrivate),deliveryId=uid('outbound'),throughSeq=Math.min(input.throughSeq??room.seq,room.seq);
         this.store.event(roomId,'outbound.enqueued',OWNER,{deliveryId,url:url.toString(),throughSeq,redacted:input.redacted,createdAt:now()});
         return {deliveryId,url:url.toString(),throughSeq};
+      }
+      case 'outbound.retry': {
+        const roomId=this.requireRoom(command);
+        if(actor.kind!=='human')throw new ProtocolError('forbidden','只有 owner 可以重试外发',403);
+        const input=payloadSchemas['outbound.retry'].parse(p);
+        const delivery=summarizeOutboundDeliveries(this.store.events(roomId),this.store.settings().outboundMaxAttempts).find(item=>item.deliveryId===input.deliveryId);
+        if(!delivery)throw new ProtocolError('not_found','外发投递不存在',404);
+        if(delivery.status!=='failed')throw new ProtocolError('invalid_state','只有 failed 的外发可重试',409);
+        validateOutboundUrl(delivery.url,this.store.settings().outboundAllowPrivate);
+        this.store.event(roomId,'outbound.enqueued',OWNER,{deliveryId:delivery.deliveryId,url:delivery.url,throughSeq:delivery.throughSeq,redacted:delivery.redacted,createdAt:now()});
+        return {deliveryId:delivery.deliveryId,status:'pending'};
       }
       case 'run.evidence.record': {
         const roomId=this.requireRoom(command);
