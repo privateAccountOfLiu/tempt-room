@@ -98,7 +98,14 @@ export class Worker {
   }
   private recoverIntegrations(){
     for(const integration of this.store.list<Integration>('integrations').filter(item=>['validating','staging','testing','ready_to_apply','applying'].includes(item.status))){
-      const next:Integration={...integration,status:'unknown',errorCode:this.integrationRecoveryEvidence(integration),updatedAt:now()};
+      const evidence=this.integrationRecoveryEvidence(integration);
+      const artifact=this.store.get<Artifact>('artifacts',integration.artifactId);
+      if(evidence==='journal_applied'&&artifact){
+        const next:Integration={...integration,status:'applied',errorCode:undefined,updatedAt:now()};
+        this.store.atomic(()=>{this.store.event(integration.roomId,'integration.updated',SYSTEM,{integration:next});if(!artifact.applied){const applied:Artifact={...artifact,applied:true};this.store.event(integration.roomId,'artifact.applied',SYSTEM,{artifact:applied,reconciledBy:'journal'});}});
+        continue;
+      }
+      const next:Integration={...integration,status:'unknown',errorCode:evidence,updatedAt:now()};
       this.store.atomic(()=>{this.store.event(integration.roomId,'integration.updated',SYSTEM,{integration:next});});
     }
   }

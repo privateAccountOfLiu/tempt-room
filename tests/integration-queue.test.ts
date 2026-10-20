@@ -140,17 +140,14 @@ test('restart recovery classifies an applying integration from its apply journal
   writeFileSync(join(journalDir, 'journal.json'), JSON.stringify({state: 'prepared', source: project, changes: []}));
   writeFileSync(join(journalDir, 'complete'), 'applied');
   const integration = {...store.get<Integration>('integrations', queued.result.integrationId as string)!, status: 'applying' as const, updatedAt: new Date().toISOString()};
+  writeFileSync(join(project, 'answer.txt'), 'candidate\n');
   store.event(roomId, 'integration.updated', {id: 'system', kind: 'system'}, {integration});
   const restarted = new Worker(store, service, root, {});
   t.after(async () => { await restarted.close(); await worker.close(); });
   const recovered = store.get<Integration>('integrations', integration.id)!;
-  assert.equal(recovered.status, 'unknown');
-  assert.equal(recovered.errorCode, 'journal_applied');
-  writeFileSync(join(project, 'answer.txt'), 'candidate\n');
-  const reconciled = command('integration.reconcile', {integrationId: recovered.id, decision: 'mark_applied', note: 'journal shows applied'});
-  assert.equal(reconciled.result.status, 'applied');
+  assert.equal(recovered.status, 'applied');
+  assert.equal(recovered.errorCode, undefined);
   assert.equal(store.get<Artifact>('artifacts', artifact.id)!.applied, true);
-  assert.equal(store.get<Integration>('integrations', recovered.id)!.errorCode, undefined);
 });
 
 test('unknown integration can be retried by owner and then requires authorization', async t => {
