@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-zA-Z0-9_-]+$"
+    },
+    "tool": {
+      "type": "string",
+      "maxLength": 100
+    },
+    "authorizationDecision": {
+      "type": "string",
+      "enum": [
+        "allow",
+        "deny"
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "maxLength": 100
+    },
+    "argumentDigest": {
+      "type": "string"
+    },
+    "fingerprint": {
+      "type": "string"
+    },
+    "authorizationMode": {
+      "type": "string",
+      "enum": [
+        "warn",
+        "enforce"
+      ]
+    }
+  },
+  "required": [
+    "runId",
+    "tool",
+    "authorizationDecision",
+    "argumentDigest",
+    "authorizationMode"
+  ],
+  "additionalProperties": {}
+}

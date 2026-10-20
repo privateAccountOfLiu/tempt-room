@@ -667,6 +667,16 @@
     ]
   },
   {
+    "type": "tool.authorization.recorded",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "audit",
+    "schemaVersion": 1,
+    "kinds": [
+      "audit.recorded"
+    ]
+  },
+  {
     "type": "agent.tool.called",
     "durability": "durable",
     "aggregate": "room",

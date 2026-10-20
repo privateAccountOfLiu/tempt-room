@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 6250781fa437da94e696193fd2364cec00fa7b09 (dirty)
+source HEAD: 57a4d31e0f44296806b7f7e47596fc5be34761c8 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T11-00-33-798Z-cad38ceb/report.json
+report: .state/collaboration-baseline/run-2026-10-20T11-09-51-833Z-f4710c2e/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T11-00-33-798Z-cad38ceb/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-z2563T/report.json`，161.4s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-PcmSKh/report.json`，162.9s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-t1b8ju/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-izvpTf/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T11-00-33-798Z-cad38ceb/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T11-00-33-798Z-cad38ceb/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T11-00-33-798Z-cad38ceb/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T11-00-33-798Z-cad38ceb/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T11-09-51-833Z-f4710c2e/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T11-09-51-833Z-f4710c2e/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T11-09-51-833Z-f4710c2e/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T11-09-51-833Z-f4710c2e/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -506,7 +506,9 @@ report: .state/collaboration-baseline/run-2026-10-20T11-00-33-798Z-cad38ceb/repo
 - ExecutionSettings 新增 toolAuthorizationMode：off（默认）/warn/enforce
 - Worker.executeTool 在 executeTool 入口调用 authorizeTool；enforce 下写工具缺少 preToolGate 证据时返回 tool_denied
 - 运行设置 UI 新增「工具授权模式」；浏览器 E2E 断言可见
-- 尚未完成：授权记录持久化、warn 模式审计事件、MCP/ACP 宿主桥接、批准/取消竞态
+- 新增 durable audit 事件 tool.authorization.recorded：runId/tool/decision/reason/argumentDigest/fingerprint/authorizationMode，不落命令全文
+- warn/enforce 模式均记录授权决定；enforce 拒绝时先记审计再抛 tool_denied
+- 尚未完成：MCP/ACP 宿主桥接、批准/取消竞态、CLI 不可拦截缺口标注
 
 ## B09 起点 — 讨论窗口估算
 

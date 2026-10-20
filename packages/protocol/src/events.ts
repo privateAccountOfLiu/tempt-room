@@ -67,6 +67,7 @@ register(['sandbox.verified'],'run.sandbox','run','sandbox',body({runId:id,sandb
 register(['agent.wake.requested'],'agent.wake.requested','room','audit',body({agentId:id,messageId:id,connectionMode:z.literal('external')}));
 register(['agent.configured'],'agent.configured','room','audit',body({agentId:id}));
 register(['run.tool.completed'],'audit.recorded','run','audit',body({runId:id,name:z.string(),success:z.boolean()}));
+register(['tool.authorization.recorded'],'audit.recorded','run','audit',body({runId:id,tool:z.string().max(100),authorizationDecision:z.enum(['allow','deny']),reason:z.string().max(100).optional(),argumentDigest:z.string(),fingerprint:z.string().optional(),authorizationMode:z.enum(['warn','enforce'])}));
 register(['agent.tool.called'],'audit.recorded','room','audit',body({agentId:id,name:z.string()}));
 register(['room.git.checkpoint'],'audit.recorded','run','audit',body({runId:id,agentId:id,workspace:z.string(),commit:z.string().nullable()}));
 register(['audit.recorded'],'audit.recorded','room','audit',body({action:z.string().min(1)}));
