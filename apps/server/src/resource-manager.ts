@@ -30,7 +30,7 @@ export function releaseResource(store: Store, roomId: string, leaseId: string, p
   return store.atomic(() => {
     const lease = store.list<ResourceLease>('resource_leases', roomId).find(item => item.id === leaseId);
     if (!lease) throw new ProtocolError('not_found', '资源租约不存在', 404);
-    if (lease.status !== 'active') throw new ProtocolError('invalid_state', '只有 active 租约可以释放', 409);
+    if (!['active', 'quarantined'].includes(lease.status)) throw new ProtocolError('invalid_state', '只有 active/quarantined 租约可以释放', 409);
     if (proof.remainingProcesses > 0) throw new ProtocolError('cleanup_unproven', '仍检测到受控进程，不能释放资源', 409);
     const next: ResourceLease = {...lease, status: 'released', cleanupProof: proof, updatedAt: now()};
     store.event(roomId, 'resource.released', SYSTEM, {lease: next});

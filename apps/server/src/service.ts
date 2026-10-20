@@ -10,6 +10,7 @@ import { trustForActor } from './trust.ts';
 import {provideTaskContext,assertExternalContextCurrent} from './external-context.ts';
 import {agentCapabilityFingerprint,capabilityEvidenceId,verifiedCapabilityState} from './adapter-capabilities.ts';
 import {InputDeliveryService} from './input-delivery.ts';
+import {releaseResource} from './resource-manager.ts';
 import {canonicalProjectPath,buildProjectManifest,projectBaseCommit} from './project-manifest.ts';
 import {taskVerificationRecordSchema} from '../../../packages/protocol/src/index.ts';
 
@@ -174,6 +175,13 @@ export class RoomService {
         if (previous && (previous.roomId !== roomId || previous.agentSessionId !== subscription.agentSessionId)) throw new ProtocolError('subscription_conflict', '订阅 ID 已绑定其他会话', 409);
         this.store.event(roomId, 'subscription.updated', actor, {subscription});
         return {subscriptionId: subscription.id, scanSeq: subscription.scanSeq};
+      }
+      case 'resource.release': {
+        const roomId = this.requireRoom(command);
+        if (actor.kind !== 'human') throw new ProtocolError('forbidden', '只有 owner 可以解除资源隔离', 403);
+        const input = payloadSchemas['resource.release'].parse(p);
+        const lease = releaseResource(this.store, roomId, input.leaseId, {checkedAt: now(), remainingProcesses: input.remainingProcesses, evidence: input.evidence});
+        return {leaseId: lease.id, status: lease.status};
       }
       case 'budget.reconcile': {
         const roomId = this.requireRoom(command);

@@ -32,8 +32,12 @@ test('quarantined leases block reuse and restart recovery quarantines active lea
   const lease = acquireResource(store, {roomId, kind: 'project', key: 'C:/shared/project', run: {id: 'run_a', generation: 1}});
   quarantineResource(store, roomId, lease.id, 'process tree unproven');
   assert.throws(() => acquireResource(store, {roomId, kind: 'project', key: 'C:/shared/project', run: {id: 'run_b', generation: 1}}), /隔离状态/);
+  assert.throws(() => releaseResource(store, roomId, lease.id, {checkedAt: now(), remainingProcesses: 2, evidence: 'children alive'}), /仍检测到受控进程/);
+  releaseResource(store, roomId, lease.id, {checkedAt: now(), remainingProcesses: 0, evidence: 'owner verified empty tree'});
+  const reacquired = acquireResource(store, {roomId, kind: 'project', key: 'C:/shared/project', run: {id: 'run_b2', generation: 1}});
+  assert.equal(reacquired.status, 'active');
   const active = acquireResource(store, {roomId, kind: 'workspace', key: 'C:/workspace/a', run: {id: 'run_c', generation: 1}});
-  assert.equal(recoverResourceLeases(store), 1);
+  assert.equal(recoverResourceLeases(store), 2);
   assert.equal(store.list<ResourceLease>('resource_leases', roomId).find(item => item.id === active.id)!.status, 'quarantined');
   assert.throws(() => acquireResource(store, {roomId, kind: 'workspace', key: 'C:/workspace/a', run: {id: 'run_d', generation: 1}}), /隔离状态/);
 });
