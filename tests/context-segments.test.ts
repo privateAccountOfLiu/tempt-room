@@ -34,3 +34,13 @@ test('segment hashes and byte counts are deterministic', () => {
   assert.deepEqual(first.map(segment => segment.bytes), second.map(segment => segment.bytes));
   assert.deepEqual(first.map(segment => segment.kind), ['objective', 'constraints', 'related', 'history']);
 });
+
+test('related segment records project baseline evidence without inventing external versions', () => {
+  const projected = {...run, taskId: 'task_ctx', taskVersion: 2, sourceCommit: 'a'.repeat(40), dirtyBaselineHash: 'b'.repeat(64), projectBindingId: 'binding_1', bindingVersion: 3};
+  const segments = buildContextSegments(projected, context(0));
+  const related = segments.find(segment => segment.kind === 'related')!;
+  assert.match(related.text, /sourceCommit=/);
+  assert.match(related.text, /dirtyBaselineHash=/);
+  assert.match(related.text, /bindingVersion=3/);
+  assert.equal(related.truncated, false);
+});

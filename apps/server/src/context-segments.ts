@@ -74,6 +74,9 @@ function relatedText(run: Run, task?: Task): string {
   const parts: string[] = [];
   if (task) parts.push(`task=${task.id} version=${task.version ?? '?'}`);
   if (run.taskId) parts.push(`run.taskId=${run.taskId} taskVersion=${run.taskVersion ?? '?'}`);
+  if (run.sourceCommit) parts.push(`sourceCommit=${run.sourceCommit}`);
+  if (run.dirtyBaselineHash) parts.push(`dirtyBaselineHash=${run.dirtyBaselineHash}`);
+  if (run.projectBindingId) parts.push(`projectBinding=${run.projectBindingId} bindingVersion=${run.bindingVersion ?? '?'}`);
   if (task?.contract) {
     parts.push(`objective=${task.contract.objective}`);
     parts.push(`acceptance=${task.contract.acceptance.map(check => check.description).join(' | ')}`);
