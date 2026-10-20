@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { join, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { z } from 'zod';
-import { VERSION,payloadSchemas, agentToolCallSchema, ProtocolError, type AgentDescriptor, type Artifact, type RoomEvent,type ServerCapabilities,type Run,type Task,type ToolOperation,type Discussion,type DiscussionRound,type CapabilityEvidence,type ProjectBinding,type Integration,type InputBatch,type UsageSample,type BudgetReservation,type ResourceLease,type Subscription } from '../../../packages/protocol/src/index.ts';
+import { VERSION,payloadSchemas, agentToolCallSchema, ProtocolError, type AgentDescriptor, type Artifact, type RoomEvent,type ServerCapabilities,type Run,type WakeIntent,type Task,type ToolOperation,type Discussion,type DiscussionRound,type CapabilityEvidence,type ProjectBinding,type Integration,type InputBatch,type UsageSample,type BudgetReservation,type ResourceLease,type Subscription } from '../../../packages/protocol/src/index.ts';
 import { Store, digest, now, OWNER, SYSTEM, uid } from './store.ts';
 import { planRoomImport } from './room-import.ts';
 import { redactExport } from './export-redaction.ts';
@@ -302,6 +302,10 @@ export async function createApp(options: AppOptions = {}) {
   app.get<{Params:{id:string}}>('/api/rooms/:id/usage-samples', request => {
     const room = store.room(request.params.id); if (!room) throw new ProtocolError('not_found', '房间不存在', 404);
     return store.list<UsageSample>('usage_samples', room.id).sort((a, b) => a.observedAt.localeCompare(b.observedAt));
+  });
+  app.get<{Params:{id:string}}>('/api/rooms/:id/wake-intents', request => {
+    const room = store.room(request.params.id); if (!room) throw new ProtocolError('not_found','房间不存在',404);
+    return store.list<WakeIntent>('wake_intents', room.id).sort((a, b) => b.sourceSeq - a.sourceSeq);
   });
   app.get<{Params:{id:string}}>('/api/rooms/:id/input-batches', request => {
     const room = store.room(request.params.id); if (!room) throw new ProtocolError('not_found', '房间不存在', 404);

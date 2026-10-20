@@ -23,11 +23,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 8b7d8f7ca4e54ad98134333a93cef63dfca92fc0 (dirty)
+source HEAD: 59e5f8d2b9ffe0c43830287861d8ef2420a9ab21 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T15-28-57-112Z-13755603/report.json
+report: .state/collaboration-baseline/run-2026-10-20T16-12-17-168Z-54b17ca4/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -220,19 +220,19 @@ report: .state/collaboration-baseline/run-2026-10-20T15-28-57-112Z-13755603/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-wuayRN/report.json`，211.1s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-YRoZZX/report.json`，225.8s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-MUG4Ai/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-DOB8gi/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T15-28-57-112Z-13755603/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T15-28-57-112Z-13755603/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T15-28-57-112Z-13755603/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T15-28-57-112Z-13755603/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T16-12-17-168Z-54b17ca4/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T16-12-17-168Z-54b17ca4/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T16-12-17-168Z-54b17ca4/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T16-12-17-168Z-54b17ca4/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -679,3 +679,9 @@ report: .state/collaboration-baseline/run-2026-10-20T15-28-57-112Z-13755603/repo
 
 - 新增 docs/CAPABILITY-COMPLETION.md：完成/部分完成/未完成三档，逐项列出实现、自动化证据、运行证据与缺口
 - 明确 native host 进程树证明、真实模型实验、可靠外发为未完成外部/原生依赖
+
+## B06 UI — 补投/唤醒可见性
+
+- 新增 GET /api/rooms/:id/wake-intents：owner 可见 wake intent 状态、deliveryMode、suppressionReason、sourceSeq
+- 协作面板新增「补投/唤醒」区：显示状态与抑制原因（如 steer_unverified），无待处理时明确空状态
+- 不改 B06 语义：steer 未验证仍保留 inbox/下一轮投递，不冒充运行中补投
