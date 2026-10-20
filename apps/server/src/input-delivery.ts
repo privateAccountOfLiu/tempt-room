@@ -64,4 +64,19 @@ export class InputDeliveryService {
   }
 
 
+  reconcileBatch(roomId: string, batchId: string, decision: 'expire' | 'unknown' | 'provided'): InputBatch {
+    return this.store.atomic(() => {
+      const batch = this.store.list<InputBatch>('input_batches', roomId).find(item => item.id === batchId);
+      if (!batch) throw new ProtocolError('not_found', '输入批次不存在', 404);
+      if (['acknowledged', 'expired'].includes(batch.status)) throw new ProtocolError('invalid_state', '终态输入批次不能再次核对', 409);
+      if (decision === 'provided' && batch.status !== 'created') throw new ProtocolError('invalid_state', '只有 created 批次可以标记 provided', 409);
+      const status: InputBatch['status'] = decision === 'expire' ? 'expired' : decision === 'unknown' ? 'unknown' : 'provided';
+      const next: InputBatch = {...batch, status};
+      const type = decision === 'expire' ? 'input.batch.expired' : decision === 'provided' ? 'input.batch.provided' : 'input.batch.updated';
+      this.store.event(roomId, type, SYSTEM, {batch: next});
+      if (decision === 'expire') for (const delivery of this.store.list<InboxDelivery>('inbox_deliveries', roomId).filter(item => item.batchId === batch.id)) this.store.event(roomId, 'inbox.delivered', SYSTEM, {delivery: {...delivery, status: 'expired'}});
+      return next;
+    });
+  }
+
 }

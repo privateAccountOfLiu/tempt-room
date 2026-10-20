@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { join, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { z } from 'zod';
-import { VERSION,payloadSchemas, agentToolCallSchema, ProtocolError, type AgentDescriptor, type Artifact, type RoomEvent,type ServerCapabilities,type Run,type ToolOperation,type CapabilityEvidence,type ProjectBinding,type Integration } from '../../../packages/protocol/src/index.ts';
+import { VERSION,payloadSchemas, agentToolCallSchema, ProtocolError, type AgentDescriptor, type Artifact, type RoomEvent,type ServerCapabilities,type Run,type ToolOperation,type CapabilityEvidence,type ProjectBinding,type Integration,type InputBatch } from '../../../packages/protocol/src/index.ts';
 import { Store, now, OWNER, uid } from './store.ts';
 import {agentCapabilityFingerprint,capabilityNames,probeConfiguredAgent,verifiedCapabilityState} from './adapter-capabilities.ts';
 import { RoomService } from './service.ts';
@@ -221,6 +221,10 @@ export async function createApp(options: AppOptions = {}) {
   app.get<{Params:{id:string}}>('/api/runs/:id/operations',request=>{
     const run=store.get<Run>('runs',request.params.id);if(!run)throw new ProtocolError('not_found','运行不存在',404);
     return store.list<ToolOperation>('operations',run.roomId).filter(operation=>operation.runId===run.id);
+  });
+  app.get<{Params:{id:string}}>('/api/rooms/:id/input-batches', request => {
+    const room = store.room(request.params.id); if (!room) throw new ProtocolError('not_found', '房间不存在', 404);
+    return store.list<InputBatch>('input_batches', room.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   });
   app.get<{Params:{id:string}}>('/api/rooms/:id/integrations', request => {
     const room = store.room(request.params.id); if (!room) throw new ProtocolError('not_found', '房间不存在', 404);

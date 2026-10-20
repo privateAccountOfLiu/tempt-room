@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync, statSy
 import { spawnSync } from 'node:child_process';
 import { basename, dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
-import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type Artifact, type Discussion, type ExecutionSettings, type Subscription, type InputBatch, type ProjectBinding, type Integration, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
+import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type AgentSession, type Artifact, type Discussion, type ExecutionSettings, type Subscription, type InputBatch, type ProjectBinding, type Integration, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { diagnose, ExecutionUnknown, RemoteCanceled, runAdapter } from './adapters.ts';
 import { SandboxHost } from './sandbox.ts';
 import { digest, now, Store, SYSTEM, uid } from './store.ts';
@@ -83,6 +83,15 @@ export class Worker {
       }
     });
     this.recoverIntegrations();
+    this.recoverInputBatches();
+  }
+  private recoverInputBatches(){
+    for(const batch of this.store.list<InputBatch>('input_batches').filter(item=>['created','provided'].includes(item.status))){
+      const run=batch.runId?this.store.get<Run>('runs',batch.runId):undefined;
+      if(run&&!terminalStates.has(run.status))continue;
+      const session=this.store.get<AgentSession>('agent_sessions',batch.agentSessionId);if(!session)continue;
+      try{this.service.inputDelivery.reconcileBatch(session.roomId,batch.id,batch.status==='created'?'expire':'unknown');}catch{/* A concurrently reconciled batch stays as recorded. */}
+    }
   }
   private recoverIntegrations(){
     for(const integration of this.store.list<Integration>('integrations').filter(item=>['validating','staging','testing','ready_to_apply','applying'].includes(item.status))){

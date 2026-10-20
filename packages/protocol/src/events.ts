@@ -69,7 +69,7 @@ register(['audit.recorded'],'audit.recorded','room','audit',body({action:z.strin
 register(['agent_session.created','agent_session.paused','agent_session.resumed','agent_session.ended'],'agent.session.state','room','agent-session',body({agentSession:agentSessionSchema.passthrough()}));
 register(['subscription.updated'],'subscription.updated','room','subscription',body({subscription:subscriptionSchema.passthrough()}));
 register(['inbox.delivered'],'inbox.delivered','room','inbox-delivery',body({delivery:inboxDeliverySchema.passthrough()}));
-register(['input.batch.created','input.batch.provided','input.batch.acknowledged','input.batch.expired'],'input.batch.state','run','input-batch',body({batch:inputBatchSchema.passthrough()}));
+register(['input.batch.created','input.batch.provided','input.batch.acknowledged','input.batch.expired','input.batch.updated'],'input.batch.state','run','input-batch',body({batch:inputBatchSchema.passthrough()}));
 register(['wake.requested','wake.assigned','wake.suppressed'],'wake.intent','room','wake-intent',body({wakeIntent:wakeIntentSchema.passthrough()}));
 register(['capability.verified'],'capability.verified','room','capability-evidence',body({capabilityEvidence:capabilityEvidenceSchema.passthrough()}));
 register(['project.bound','project.updated'],'project.binding','room','project-binding',body({projectBinding:projectBindingSchema.passthrough()}));

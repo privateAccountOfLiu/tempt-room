@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: c2292480fd6ab543ff3b8603930e439c1de26ada (dirty)
+source HEAD: b1c399d38a1f0c8ebac15b641ff6752ea57bf3c8 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T05-38-52-614Z-4fff54b8/report.json
+report: .state/collaboration-baseline/run-2026-10-20T05-46-23-847Z-a0ed1109/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -76,7 +76,12 @@ report: .state/collaboration-baseline/run-2026-10-20T05-38-52-614Z-4fff54b8/repo
   - next-turn：Run 启动前创建并 provided 输入批次（既有行为）
   - tool-boundary / steer：不在启动时创建批次；在工具调用完成边界创建并提供 InputBatch，结果附加 inputBatch 元数据
 - 新增 input-delivery 1 项测试：投递模式传播、启动无批次、工具边界注入并标记 provided
-- 尚未完成：真实 steer 适配器通道、unknown/expired 对账、UI 输入批次视图
+- input.reconcile owner 命令：expire / unknown / provided 三态核对；过期批次同步把 delivery 标为 expired
+- Worker 启动恢复：created 批次过期、provided 批次未知（仅当其 Run 已终态/不存在）
+- API GET /api/rooms/:id/input-batches
+- 集成面板新增「输入批次」区：状态、deliveryMode、seq 范围、标记未知/过期/确认回执
+- 新增 input-delivery 1 项测试：unknown→expire、delivery 过期、Agent 越权拒绝
+- 尚未完成：真实 steer 适配器通道、批次分页/筛选、推送刷新
 ### B05b — 能力证据持久化与 UI
 
 - 新增 agentCapabilityFingerprint：绑定 provider、adapter 版本、executable 版本、运行布局、connectionMode、executionMode、模型与行为配置摘要
@@ -178,19 +183,19 @@ report: .state/collaboration-baseline/run-2026-10-20T05-38-52-614Z-4fff54b8/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-t8aKZM/report.json`，154.4s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-zZhpXj/report.json`，154.8s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-XMALvf/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-8Lr3Z2/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T05-38-52-614Z-4fff54b8/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T05-38-52-614Z-4fff54b8/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T05-38-52-614Z-4fff54b8/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T05-38-52-614Z-4fff54b8/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T05-46-23-847Z-a0ed1109/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T05-46-23-847Z-a0ed1109/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T05-46-23-847Z-a0ed1109/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T05-46-23-847Z-a0ed1109/replay.stdout.txt`
 
 ## M1 验收 — 并行任务确定性 fixture
 

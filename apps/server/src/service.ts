@@ -172,6 +172,13 @@ export class RoomService {
         this.store.event(roomId, 'subscription.updated', actor, {subscription});
         return {subscriptionId: subscription.id, scanSeq: subscription.scanSeq};
       }
+      case 'input.reconcile': {
+        const roomId = this.requireRoom(command);
+        if (actor.kind !== 'human') throw new ProtocolError('forbidden', '只有 owner 可以核对输入批次', 403);
+        const input = payloadSchemas['input.reconcile'].parse(p);
+        const batch = this.inputDelivery.reconcileBatch(roomId, input.batchId, input.decision);
+        return {batchId: batch.id, status: batch.status};
+      }
       case 'input.ack': {
         const roomId = this.requireRoom(command);
         const input = payloadSchemas['input.ack'].parse(p);

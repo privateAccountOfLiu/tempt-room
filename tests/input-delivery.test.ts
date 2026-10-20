@@ -76,3 +76,15 @@ test('tool-boundary delivery mode reaches the run and injects input at a tool bo
   assert.equal(batch.status, 'provided');
   assert.equal(store.list<InboxDelivery>('inbox_deliveries', roomId).find(delivery => delivery.id === pending[0].id)!.status, 'provided');
 });
+
+test('owner can reconcile an uncertain input batch to unknown and expire it', t => {
+  const {store, service, roomId, session, run} = fixture(t);
+  const batch = service.inputDelivery.createBatch({roomId, agentSessionId: session.id, runId: run.id, generation: 1, executionId: uid('exec')})!;
+  const unknown = service.execute({version: '0.1', commandId: uid(), roomId, type: 'input.reconcile', payload: {batchId: batch.id, decision: 'unknown'}});
+  assert.equal(unknown.result.status, 'unknown');
+  assert.equal(store.list<InputBatch>('input_batches', roomId).find(item => item.id === batch.id)!.status, 'unknown');
+  const expired = service.execute({version: '0.1', commandId: uid(), roomId, type: 'input.reconcile', payload: {batchId: batch.id, decision: 'expire'}});
+  assert.equal(expired.result.status, 'expired');
+  assert.ok(store.list<InboxDelivery>('inbox_deliveries', roomId).every(delivery => delivery.status === 'expired'));
+  assert.throws(() => service.execute({version: '0.1', commandId: uid(), roomId, type: 'input.reconcile', payload: {batchId: batch.id, decision: 'expire'}}, {id: 'demo-planner', kind: 'agent'}), /owner|Agent 无权/);
+});

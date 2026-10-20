@@ -185,3 +185,6 @@
 .integration-top{display:flex;justify-content:space-between;align-items:center}
 .integration-card strong{font-size:11px;color:#d3e3c7}
 .integration-card small{font-size:9px;color:#819175}
+/* B06 input batch list */
+.input-batch-section{margin-top:12px;border-top:1px solid #263023;padding-top:9px}
+.input-batch-section .section-heading{margin-bottom:6px}

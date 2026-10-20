@@ -91,6 +91,7 @@ export const payloadSchemas={
   'discussion.resume':z.object({discussionId:idSchema}).strict(),
   'subscription.set':z.object({subscription:subscriptionSchema}).strict(),
   'input.ack':z.object({batchId:idSchema,agentSessionId:idSchema,receiptEvidence:z.string().max(500).optional()}).strict(),
+  'input.reconcile':z.object({batchId:idSchema,decision:z.enum(['expire','unknown','provided'])}).strict(),
   'capability.verify':z.object({fingerprint:z.string().min(1).max(200),evidence:z.array(capabilityEvidenceSchema).min(1).max(20)}).strict(),
   'task.verification.record':taskVerificationRecordSchema,
   'project.bind':z.object({sourcePath:z.string().min(1).max(2000),allowedExecutionModes:z.array(z.enum(['sandbox','host'])).min(1).max(2).default(['sandbox']),verificationRefs:z.array(z.string().min(1).max(500)).max(50).default([]),baseCommit:z.string().max(200).optional()}).strict(),

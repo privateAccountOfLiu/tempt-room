@@ -787,6 +787,16 @@
     ]
   },
   {
+    "type": "input.batch.updated",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "input-batch",
+    "schemaVersion": 1,
+    "kinds": [
+      "input.batch.state"
+    ]
+  },
+  {
     "type": "wake.requested",
     "durability": "durable",
     "aggregate": "room",
