@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { basename, dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
-import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type AgentSession, type Artifact, type Discussion, type UsageSample, type ExecutionSettings, type Subscription, type InputBatch, type ProjectBinding, type Integration, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
+import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type AgentSession, type Artifact, type Discussion, type UsageSample, type ExecutionSettings, type Subscription, type InputBatch, type InboxDelivery, type ProjectBinding, type Integration, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { diagnose, ExecutionUnknown, RemoteCanceled, runAdapter } from './adapters.ts';
 import { SandboxHost } from './sandbox.ts';
 import { digest, now, Store, SYSTEM, uid } from './store.ts';
@@ -801,6 +801,21 @@ export class Worker {
       const input = z.object({ afterSeq: z.number().int().nonnegative().default(0), limit: z.number().int().min(1).max(200).default(100) }).strict().parse(args);
       const events = this.store.events(roomId, input.afterSeq, input.limit), nextSeq = events.at(-1)?.seq ?? input.afterSeq;
       return { roomId, fromSeq: input.afterSeq, nextSeq, hasMore: events.length === input.limit, events: events.map(event => ({ seq: event.seq, type: event.type, createdAt: event.createdAt, payload: event.payload })) };
+    }
+    if (name === 'session_inbox') {
+      const input = z.object({agentSessionId:z.string(),afterSeq:z.number().int().nonnegative().default(0),limit:z.number().int().min(1).max(200).default(100)}).strict().parse(args);
+      const session=this.store.get<AgentSession>('agent_sessions',input.agentSessionId);
+      if(!session||session.roomId!==roomId||session.agentId!==agentId)throw new ProtocolError('session_mismatch','会话不属于当前 Agent 与房间',403);
+      const historyFloor=this.store.projectionStatus(roomId).historyFloor,head=room.seq;
+      const pending=this.store.list<InboxDelivery>('inbox_deliveries',roomId).filter(delivery=>delivery.agentSessionId===session.id&&delivery.sourceSeq>=input.afterSeq&&['pending','batched'].includes(delivery.status)).sort((left,right)=>left.sourceSeq-right.sourceSeq);
+      const page=pending.slice(0,input.limit),nextSeq=page.at(-1)?.sourceSeq??input.afterSeq;
+      return {roomId,sessionId:session.id,fromSeq:input.afterSeq,nextSeq,head,historyFloor,resetRequired:input.afterSeq<historyFloor,hasMore:pending.length>page.length,deliveries:page.map(delivery=>({deliveryId:delivery.id,eventId:delivery.sourceEventId,seq:delivery.sourceSeq,status:delivery.status,batchId:delivery.batchId}))};
+    }
+    if (name === 'session_ack') {
+      const input = z.object({agentSessionId:z.string(),deliveryIds:z.array(z.string()).min(1).max(500)}).strict().parse(args);
+      const session=this.store.get<AgentSession>('agent_sessions',input.agentSessionId);
+      if(!session||session.roomId!==roomId||session.agentId!==agentId)throw new ProtocolError('session_mismatch','会话不属于当前 Agent 与房间',403);
+      return this.store.atomic(()=>{const acked:string[]=[],skipped:string[]=[];for(const deliveryId of input.deliveryIds){const delivery=this.store.get<InboxDelivery>('inbox_deliveries',deliveryId);if(!delivery||delivery.agentSessionId!==session.id){skipped.push(deliveryId);continue;}if(!['pending','batched'].includes(delivery.status)){skipped.push(deliveryId);continue;}const next:InboxDelivery={...delivery,status:'provided'};this.store.event(roomId,'inbox.delivered',actor,{delivery:next});acked.push(deliveryId);}return {acked,skipped};});
     }
     if (name === 'room_input_ack') {
       const input = z.object({batchId: z.string(), agentSessionId: z.string(), receiptEvidence: z.string().max(500).optional()}).strict().parse(args);

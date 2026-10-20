@@ -127,7 +127,7 @@ export const payloadSchemas={
 export interface Command { version:typeof VERSION;commandId:string;roomId?:string;type:keyof typeof payloadSchemas;payload:Record<string,unknown> }
 export const commandSchema:z.ZodType<Command>=z.discriminatedUnion('type',Object.entries(payloadSchemas).map(([type,payload])=>commandEnvelope.extend({type:z.literal(type),payload})) as [z.ZodObject<any>,z.ZodObject<any>,...z.ZodObject<any>[]]) as unknown as z.ZodType<Command>;
 export interface Receipt { commandId: string; accepted: true; result: Record<string, unknown> }
-export const agentToolNameSchema=z.enum(['room_read','room_post','task_propose','task_claim','task_context','task_complete','task_heartbeat','artifact_publish','room_status','room_wait','room_inbox']);
+export const agentToolNameSchema=z.enum(['room_read','room_post','task_propose','task_claim','task_context','task_complete','task_heartbeat','artifact_publish','room_status','room_wait','room_inbox','session_inbox','session_ack']);
 export type AgentToolName=z.infer<typeof agentToolNameSchema>;
 export const agentToolCallSchema=z.object({commandId:idSchema,roomId:idSchema,name:agentToolNameSchema,arguments:z.record(z.string(),z.unknown()).default({})}).strict();
 export type AgentToolCall=z.infer<typeof agentToolCallSchema>;

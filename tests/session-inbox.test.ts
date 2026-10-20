@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { Store, SYSTEM, uid } from '../apps/server/src/store.ts';
+import { RoomService } from '../apps/server/src/service.ts';
+import { Worker } from '../apps/server/src/worker.ts';
+import type { AgentSession, InboxDelivery } from '../packages/protocol/src/index.ts';
+
+const parent = resolve('.state/test-data');
+test('external agents can page and ack a session inbox', async t => {
+  mkdirSync(parent, {recursive: true});
+  const root = mkdtempSync(join(parent, 'session-inbox-')), store = new Store(join(root, 'room.sqlite')), service = new RoomService(store), worker = new Worker(store, service, root, {adapter: async function* () { yield {type: 'text', text: 'unused'}; }}), roomId = store.rooms()[0].id;
+  t.after(async () => { await worker.close(); store.close(); rmSync(root, {recursive: true, force: true}); });
+  const at = new Date().toISOString(), session: AgentSession = {id: 'session_inbox', roomId, agentId: 'demo-planner', status: 'active', createdAt: at, updatedAt: at};
+  store.event(roomId, 'agent_session.created', SYSTEM, {agentSession: session});
+  const delivery: InboxDelivery = {id: 'delivery_inbox', agentSessionId: session.id, sourceEventId: 'event_inbox', sourceSeq: store.room(roomId)!.seq + 1, status: 'pending'};
+  store.event(roomId, 'inbox.delivered', SYSTEM, {delivery});
+  const first = await worker.agentTool('demo-planner', roomId, 'session_inbox', {agentSessionId: session.id, afterSeq: 0, limit: 10});
+  assert.equal(first.resetRequired, false);
+  assert.equal(first.historyFloor, 0);
+  assert.equal(first.deliveries.length, 1);
+  assert.equal(first.deliveries[0].deliveryId, delivery.id);
+  assert.equal(first.deliveries[0].eventId, delivery.sourceEventId);
+  assert.equal(first.deliveries[0].status, 'pending');
+  const ack = await worker.agentTool('demo-planner', roomId, 'session_ack', {agentSessionId: session.id, deliveryIds: [delivery.id]});
+  assert.deepEqual(ack.acked, [delivery.id]);
+  assert.equal(store.get<InboxDelivery>('inbox_deliveries', delivery.id)!.status, 'provided');
+  const second = await worker.agentTool('demo-planner', roomId, 'session_ack', {agentSessionId: session.id, deliveryIds: [delivery.id]});
+  assert.deepEqual(second.acked, []);
+  assert.deepEqual(second.skipped, [delivery.id]);
+  await assert.rejects(() => worker.agentTool('demo-planner', roomId, 'session_inbox', {agentSessionId: 'session_other', afterSeq: 0}), /会话不属于当前 Agent 与房间/);
+});
