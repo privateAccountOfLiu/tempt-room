@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { join, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { z } from 'zod';
-import { VERSION,payloadSchemas, agentToolCallSchema, ProtocolError, type AgentDescriptor, type Artifact, type RoomEvent,type ServerCapabilities,type Run,type Task,type ToolOperation,type CapabilityEvidence,type ProjectBinding,type Integration,type InputBatch,type UsageSample,type BudgetReservation,type ResourceLease,type Subscription } from '../../../packages/protocol/src/index.ts';
+import { VERSION,payloadSchemas, agentToolCallSchema, ProtocolError, type AgentDescriptor, type Artifact, type RoomEvent,type ServerCapabilities,type Run,type Task,type ToolOperation,type Discussion,type DiscussionRound,type CapabilityEvidence,type ProjectBinding,type Integration,type InputBatch,type UsageSample,type BudgetReservation,type ResourceLease,type Subscription } from '../../../packages/protocol/src/index.ts';
 import { Store, now, OWNER, uid } from './store.ts';
 import {agentCapabilityFingerprint,capabilityNames,probeConfiguredAgent,verifiedCapabilityState} from './adapter-capabilities.ts';
 import { aggregateUsage } from './usage.ts';
@@ -229,6 +229,11 @@ export async function createApp(options: AppOptions = {}) {
     const sourceIds=new Set(batch?.sourceEventIds??[]);
     const incremental=(batch?store.events(run.roomId).filter(event=>sourceIds.has(event.eventId)).map(event=>String((event.payload as any).message?.text??event.type)):[]).join('\n');
     return buildContextSegments(run,runContext(store,run),task,{...(incremental?{incrementalText:incremental}:{})});
+  });
+  app.get<{Params:{id:string;discussionId:string}}>('/api/rooms/:id/discussions/:discussionId/rounds',request=>{
+    const room=store.room(request.params.id);if(!room)throw new ProtocolError('not_found','房间不存在',404);
+    const discussion=store.get<Discussion>('discussions',request.params.discussionId);if(!discussion||discussion.roomId!==room.id)throw new ProtocolError('not_found','讨论不存在',404);
+    return store.list<DiscussionRound>('discussion_rounds',room.id).filter(round=>round.discussionId===discussion.id);
   });
   app.get<{Params:{id:string}}>('/api/runs/:id/operations',request=>{
     const run=store.get<Run>('runs',request.params.id);if(!run)throw new ProtocolError('not_found','运行不存在',404);

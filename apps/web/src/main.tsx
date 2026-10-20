@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RoomClient } from '../../../packages/client/src/index.ts';
-import { VERSION,agentSchema,executionSettingsSchema,classifyFailure,defaultDiscussionResponses, roomToolNames,type Integration,type InputBatch,type BudgetReservation,type ResourceLease,type Subscription,type AgentDescriptor, type Artifact, type Diagnostic, type Discussion, type Task, type ExecutionSettings,type Message, type Room, type RoomSnapshot, type Run, type ToolOperation, type ProjectBinding, terminalStates } from '../../../packages/protocol/src/index.ts';
+import { VERSION,agentSchema,executionSettingsSchema,classifyFailure,defaultDiscussionResponses, roomToolNames,type Integration,type InputBatch,type BudgetReservation,type ResourceLease,type Subscription,type AgentDescriptor, type Artifact, type Diagnostic, type Discussion, type DiscussionRound, type Task, type ExecutionSettings,type Message, type Room, type RoomSnapshot, type Run, type ToolOperation, type ProjectBinding, terminalStates } from '../../../packages/protocol/src/index.ts';
 import './style.css';
 import './settings.css';
 import './workbench.css';
@@ -230,10 +230,12 @@ function RoomSwitcher({rooms,selected,onSelect,onCreate,onAgents,onSettings,onCl
  return <Modal title="切换房间" subtitle="每个房间保留独立的讨论与成果" onClose={onClose}><div className="room-switcher"><label>查找房间<input type="search" name="switch-room" autoComplete="off" placeholder="输入房间名称…" value={query} onChange={event=>setQuery(event.target.value)}/></label><nav aria-label="选择房间">{filtered.map(room=><button key={room.id} className={`room-link ${room.id===selected?'selected':''}`} onClick={()=>onSelect(room.id)}><Icon name="hash" size={18}/><span>{room.name}</span>{room.id===selected&&<Icon name="check" size={16}/>}</button>)}{!filtered.length&&<p className="muted">没有匹配的房间</p>}</nav><div className="switcher-settings"><button className="button" onClick={onAgents}><Icon name="people" size={16}/>Agent 连接</button><button className="button" onClick={onSettings}><Icon name="settings" size={16}/>运行设置</button></div></div><div className="modal-actions"><button className="button primary" onClick={onCreate}><Icon name="plus" size={15}/>新建房间</button><button className="button" onClick={onClose}>关闭</button></div></Modal>;
 }
 function DiscussionDetailModal({discussion,agents,runs,messages,artifacts,onArtifact,onClose}:{discussion:Discussion;agents:AgentDescriptor[];runs:Run[];messages:Message[];artifacts:Artifact[];onArtifact:(artifact:Artifact)=>void;onClose:()=>void}){
- const relatedRuns=runs.filter(run=>run.discussionId===discussion.id),runIds=new Set(relatedRuns.map(run=>run.id)),relatedMessages=messages.filter(message=>message.runId&&runIds.has(message.runId));
+ const [rounds,setRounds]=useState<DiscussionRound[]>([]);
+ useEffect(()=>{let active=true;void client.request<DiscussionRound[]>('/api/rooms/'+encodeURIComponent(discussion.roomId)+'/discussions/'+encodeURIComponent(discussion.id)+'/rounds').then(items=>{if(active)setRounds(items);}).catch(()=>{});return()=>{active=false;};},[discussion.id,discussion.roomId]);
+ const relatedRuns=runs.filter(run=>run.discussionId===discussion.id),runIds=new Set(relatedRuns.map(run=>run.id)),relatedMessages=messages.filter(message=>message.runId&&runIds.has(message.runId)),currentRound=rounds.find(item=>item.round===discussion.round);
  return <Modal title="讨论详情" subtitle={`${discussionRounds(discussion)} · ${discussion.responses}/${discussion.maxResponses} 次响应`} onClose={onClose}>
   <div className="discussion-detail">
-   <p className="muted">发言额度 {discussion.activationsUsed??0}/{discussion.activationLimit??"—"} · 总结额度 {discussion.summaryActivationsUsed??0}/{discussion.summaryActivationLimit??"—"}</p>
+   <p className="muted">第 {discussion.round}/{discussion.rounds} 轮{currentRound?.windowDeadline?` · 截止 ${new Date(currentRound.windowDeadline).toLocaleTimeString('zh-CN')}`:''} · 发言额度 {discussion.activationsUsed??0}/{discussion.activationLimit??"—"} · 总结额度 {discussion.summaryActivationsUsed??0}/{discussion.summaryActivationLimit??"—"}</p>
    <div className="run-detail-block"><small>讨论目标</small><pre>{discussion.goal}</pre></div>
    <div className="run-detail-grid"><div><small>状态</small><span>{discussionStatus(discussion)}</span></div><div><small>缺席</small><span>{discussion.absent?.length?discussion.absent.map(id=>agents.find(agent=>agent.id===id)?.name??id).join("、"):'无'}</span></div></div>
    {discussion.endReason&&<div className="run-detail-block"><small>结束原因</small><p>{discussionEndLabels[discussion.endReason]}{discussion.stopOnConvergence&&discussion.endReason!=='converged'?'；未达成全体共识。':''}</p></div>}
