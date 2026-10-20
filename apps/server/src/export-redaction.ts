@@ -31,3 +31,14 @@ export function redactExport<T>(input: T): RedactionResult<T> {
   };
   return {value: walk(input), redactions};
 }
+
+export interface ArtifactRedaction { content: Buffer; redactions: number; scanned: boolean }
+
+/** Redact secret-looking text inside an artifact when it is safely decodable. */
+export function redactArtifactContent(bytes: Buffer, mediaType: string): ArtifactRedaction {
+  const textual = /^(text\/|application\/(json|xml))/.test(mediaType) || !bytes.includes(0);
+  if (!textual) return {content: bytes, redactions: 0, scanned: false};
+  let redactions = 0;
+  const text = bytes.toString('utf8').replace(secretValue, () => { redactions++; return '[REDACTED]'; });
+  return {content: redactions ? Buffer.from(text, 'utf8') : bytes, redactions, scanned: true};
+}

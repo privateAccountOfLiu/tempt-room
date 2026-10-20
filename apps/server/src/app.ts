@@ -13,7 +13,7 @@ import { z } from 'zod';
 import { VERSION,payloadSchemas, agentToolCallSchema, ProtocolError, type AgentDescriptor, type Artifact, type RoomEvent,type ServerCapabilities,type Run,type WakeIntent,type Task,type ToolOperation,type Discussion,type DiscussionRound,type CapabilityEvidence,type ProjectBinding,type Integration,type InputBatch,type UsageSample,type BudgetReservation,type ResourceLease,type Subscription } from '../../../packages/protocol/src/index.ts';
 import { Store, digest, now, OWNER, SYSTEM, uid } from './store.ts';
 import { planRoomImport } from './room-import.ts';
-import { redactExport } from './export-redaction.ts';
+import { redactArtifactContent, redactExport } from './export-redaction.ts';
 import { summarizeOutboundDeliveries } from './outbound-summary.ts';
 import {agentCapabilityFingerprint,agentInterceptionGaps,capabilityNames,probeConfiguredAgent,verifiedCapabilityState} from './adapter-capabilities.ts';
 import { aggregateUsage } from './usage.ts';
@@ -260,10 +260,12 @@ export async function createApp(options: AppOptions = {}) {
     const roomValue=applied.value.room as typeof room,events=applied.value.events;
     const base={version:VERSION,exportedAt:new Date().toISOString(),room:roomValue,events,redactions:applied.redactions,exportHash:digest({room:roomValue,events})};
     if(!['1','true'].includes(String(request.query.includeArtifacts??'')))return base;
-    let total=0;const artifacts=store.list<Artifact>('artifacts',room.id).slice(0,200).flatMap(artifact=>{
-      try{const bytes=readFileSync(join(root,'artifacts',artifact.id));if(bytes.length>8*1024*1024||total+bytes.length>32*1024*1024)return [];total+=bytes.length;return [{artifact,contentBase64:bytes.toString('base64'),contentHash:digest(bytes.toString('base64'))}];}catch{return [];}
+    let total=0,artifactRedactions=0;const artifacts=store.list<Artifact>('artifacts',room.id).slice(0,200).flatMap(artifact=>{
+      try{const bytes=readFileSync(join(root,'artifacts',artifact.id));if(bytes.length>8*1024*1024||total+bytes.length>32*1024*1024)return [];total+=bytes.length;
+        const processed=redacted?redactArtifactContent(bytes,artifact.mediaType):{content:bytes,redactions:0,scanned:false};artifactRedactions+=processed.redactions;
+        return [{artifact,contentBase64:processed.content.toString('base64'),contentHash:digest(processed.content.toString('base64')),...(redacted?{scanned:processed.scanned}:{})}];}catch{return [];}
     });
-    return {...base,artifacts,exportHash:digest({room:roomValue,events,artifactHashes:artifacts.map(item=>[item.artifact.id,item.contentHash])})};
+    return {...base,redactions:base.redactions+artifactRedactions,artifacts,exportHash:digest({room:roomValue,events,artifactHashes:artifacts.map(item=>[item.artifact.id,item.contentHash])})};
   });
   app.get<{Params:{id:string;discussionId:string}}>('/api/rooms/:id/discussions/:discussionId/rounds',request=>{
     const room=store.room(request.params.id);if(!room)throw new ProtocolError('not_found','房间不存在',404);

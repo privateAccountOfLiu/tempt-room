@@ -26,9 +26,16 @@ test('owner can export one room as events and metadata', async t => {
   assert.match(body.exportHash, /^[a-f0-9]{64}$/i);
   const repeated = await app.inject({url: `/api/rooms/${roomId}/export`, headers});
   assert.equal(repeated.json().exportHash, body.exportHash);
-  const packaged = await app.inject({url: `/api/rooms/${roomId}/export?includeArtifacts=1`, headers});
+  const secretArtifact = {id: 'artifact_secret1', roomId, name: 'secret.txt', kind: 'file' as const, mediaType: 'text/plain', size: 40, createdAt: new Date().toISOString()};
+  writeFileSync(join(root, 'artifacts', secretArtifact.id), 'key ' + ['s','k-','abcdefghijklmnopqrstuvwx'].join(''));
+  store.event(roomId, 'artifact.created', {id: 'owner', kind: 'human'}, {artifact: secretArtifact});
+  const packaged = await app.inject({url: `/api/rooms/${roomId}/export?includeArtifacts=1&redact=1`, headers});
   const item = packaged.json().artifacts[0];
   assert.equal(item.artifact.id, artifact.id);
+  const secretItem = packaged.json().artifacts.find((entry: any) => entry.artifact.id === secretArtifact.id);
+  assert.doesNotMatch(Buffer.from(secretItem.contentBase64, 'base64').toString('utf8'), /abcdefghijklmnopqrstuvwx/);
+  assert.match(Buffer.from(secretItem.contentBase64, 'base64').toString('utf8'), /\[REDACTED\]/);
+  assert.ok(packaged.json().redactions > 0);
   assert.equal(Buffer.from(item.contentBase64, 'base64').toString('utf8'), 'hello');
   assert.match(item.contentHash, /^[a-f0-9]{64}$/i);
   const redacted = await app.inject({url: `/api/rooms/${roomId}/export?redact=1`, headers});
