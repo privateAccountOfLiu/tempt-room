@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 28dc3445f1c2ee86b5f20a67b0cdd4dda780e63d (dirty)
+source HEAD: f96362a1c9e4cd3c62c116d6fe9875326eec569f (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T04-02-58-525Z-9fcfa781/report.json
+report: .state/collaboration-baseline/run-2026-10-20T04-11-49-918Z-f90b632d/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -161,21 +161,35 @@ report: .state/collaboration-baseline/run-2026-10-20T04-02-58-525Z-9fcfa781/repo
 
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
-- `npm test`：321/321
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-cm47Yj/report.json`，155.8s）
+- `npm test`：324/324
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-E9MYFK/report.json`，151.7s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-gCewfX/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-8LdYPO/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T04-02-58-525Z-9fcfa781/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T04-02-58-525Z-9fcfa781/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T04-02-58-525Z-9fcfa781/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T04-02-58-525Z-9fcfa781/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-11-49-918Z-f90b632d/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T04-11-49-918Z-f90b632d/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-11-49-918Z-f90b632d/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-11-49-918Z-f90b632d/replay.stdout.txt`
 
+## D01a — 项目绑定与独立工作区
+
+- 新增 packages/protocol/src/project-binding.ts：ProjectBinding 严格 schema（sourcePath、baseCommit、manifestHash、allowedExecutionModes、verificationRefs、version）
+- 新增 apps/server/src/project-manifest.ts：
+  - canonicalProjectPath 解析别名并拒绝符号链接/重解析点根目录
+  - buildProjectManifest 递归扫描实际文件内容，排除 .git/node_modules/dist/.state 等，生成排序文件清单与 manifestHash
+  - projectBaseCommit 读取 Git HEAD（可选）
+- 新增 project_bindings 投影表与 project.bound/project.updated 事件；DATABASE_VERSION 升至 11
+- project.bind owner 命令：冻结实际文件 manifest、允许执行模式与验证命令引用；版本递增；Agent 禁止绑定
+- Task 增加 projectBindingId/bindingVersion/baselineManifestHash；task.create 校验绑定与版本，projectPath 取自绑定源目录
+- Run 增加 projectBindingId/bindingVersion/sourceCommit/dirtyBaselineHash/workspacePath；Worker 在任务执行前记录绑定字段与当前文件基线，两 Run 使用不同独立 workspace
+- API GET /api/rooms/:id/project-bindings
+- 新增 tests/project-binding.test.ts 3 项：manifest 冻结/编辑变更/重解析拒绝；Task 版本绑定与 Agent 禁权；两 Run 独立工作区且源目录不变
+- 尚未完成：project.bindings 的 TaskForm/RoomForm UI、绑定编辑/撤销、host worktree 显式模式、集成阶段旧绑定版本拒绝
 ## M1 起点：Task 契约
 
 - 新增 packages/protocol/src/task-contract.ts：

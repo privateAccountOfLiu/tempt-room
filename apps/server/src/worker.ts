@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync } from 'no
 import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
-import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type Artifact, type Discussion, type ExecutionSettings, type Subscription, type InputBatch, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
+import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type Artifact, type Discussion, type ExecutionSettings, type Subscription, type InputBatch, type ProjectBinding, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { diagnose, ExecutionUnknown, RemoteCanceled, runAdapter } from './adapters.ts';
 import { SandboxHost } from './sandbox.ts';
 import { digest, now, Store, SYSTEM, uid } from './store.ts';
@@ -20,6 +20,7 @@ import { formatContextMessage, UNTRUSTED_CONTEXT_NOTICE } from './context-format
 import { dependencyInputs } from './dependencies.ts';
 import { InboxService } from './inbox.ts';
 import { prepareHostChatWorkspace, hostStatus, hostChangeReport } from './host-workspace.ts';
+import { buildProjectManifest } from './project-manifest.ts';
 import { codexThreadKey, reconcileAttachedRun } from './codex-attach.ts';
 import { assertRunFence,assertRunIdentity,executionFence } from './execution.ts';
 import { ToolOperations } from './tool-operations.ts';
@@ -268,6 +269,13 @@ export class Worker {
       const task = run.taskId ? this.store.get<Task>('tasks', run.taskId) : undefined;
       const attached = agent.connectionMode === 'attach';
       const hostMode = agent.executionMode === 'host';
+      const taskBinding = task?.projectBindingId ? this.store.get<ProjectBinding>('project_bindings',task.projectBindingId) : undefined;
+      if(taskBinding){
+        if(!taskBinding.allowedExecutionModes.includes(hostMode?'host':'sandbox'))throw new Error('项目绑定不允许当前执行模式');
+        if(!task?.projectPath||resolve(task.projectPath).toLowerCase()!==resolve(taskBinding.sourcePath).toLowerCase())throw new Error('任务项目目录与项目绑定不一致');
+        run.projectBindingId=taskBinding.id;run.bindingVersion=taskBinding.version;run.sourceCommit=taskBinding.baseCommit;
+        run.dirtyBaselineHash=buildProjectManifest(taskBinding.sourcePath).manifestHash;
+      }
       let workspace:string, baseline:Map<string,string>|undefined;
       if (attached) {
         workspace = agent.codexBinding!.expectedCwd;
@@ -289,6 +297,8 @@ export class Worker {
         }
       } else if (hostMode) { workspace = prepareHostChatWorkspace(this.root, run); baseline = hostStatus(workspace); }
       else workspace = prepareChatWorkspace(this.root, run);
+      run.workspacePath=workspace;
+      if(run.taskId||run.projectBindingId)this.store.atomic(()=>{this.store.event(run.roomId,'run.updated',SYSTEM,{run});});
       const home = join(this.root, 'homes', `${run.roomId}_${run.agentId}`); mkdirSync(home, { recursive: true });
       const scope = sessionKey(run,agent,workspace);
       let supplement='';

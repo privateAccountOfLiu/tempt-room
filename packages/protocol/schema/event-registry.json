@@ -817,6 +817,26 @@
     ]
   },
   {
+    "type": "project.bound",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "project-binding",
+    "schemaVersion": 1,
+    "kinds": [
+      "project.binding"
+    ]
+  },
+  {
+    "type": "project.updated",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "project-binding",
+    "schemaVersion": 1,
+    "kinds": [
+      "project.binding"
+    ]
+  },
+  {
     "type": "discussion.round.opened",
     "durability": "durable",
     "aggregate": "room",

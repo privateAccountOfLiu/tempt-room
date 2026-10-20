@@ -803,6 +803,83 @@
         },
         "type": {
           "type": "string",
+          "const": "project.bind"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "sourcePath": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "allowedExecutionModes": {
+              "default": [
+                "sandbox"
+              ],
+              "minItems": 1,
+              "maxItems": 2,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "sandbox",
+                  "host"
+                ]
+              }
+            },
+            "verificationRefs": {
+              "default": [],
+              "maxItems": 50,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
+            },
+            "baseCommit": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          "required": [
+            "sourcePath",
+            "allowedExecutionModes",
+            "verificationRefs"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "commandId",
+        "type",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "const": "0.1"
+        },
+        "commandId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "roomId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "type": {
+          "type": "string",
           "const": "task.create"
         },
         "payload": {
@@ -1065,6 +1142,17 @@
                 "dependencies"
               ],
               "additionalProperties": false
+            },
+            "projectBindingId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "bindingVersion": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
             }
           },
           "required": [

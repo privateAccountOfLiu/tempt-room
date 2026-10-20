@@ -6,18 +6,19 @@ import {runPartialSchema} from './run-state.ts';
 import {contextDeltaSchema} from './reconciliation.ts';
 import { toolOperationSchema,nativeReconciliationSchema } from './execution.ts';
 import { agentSessionSchema,capabilityEvidenceSchema,discussionRoundSchema,inboxDeliverySchema,inputBatchSchema,subscriptionSchema,wakeIntentSchema } from './collaboration.ts';
+import { projectBindingSchema } from './project-binding.ts';
 
 const id=z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/);
 const room=z.object({id,name:z.string(),description:z.string(),members:z.array(id),createdAt:z.string().datetime(),seq:z.number().int().nonnegative()}).passthrough();
 const decision=z.object({id,roomId:id.optional(),text:z.string(),accepted:z.boolean(),actor:actorSchema}).passthrough();
 const body=(fields:Record<string,z.ZodType>)=>z.object(fields).passthrough();
-export const projectionTableNames=['messages','tasks','runs','artifacts','discussions','decisions','contexts','operations','agent_sessions','subscriptions','inbox_deliveries','input_batches','wake_intents','capability_evidence','discussion_rounds'] as const;
+export const projectionTableNames=['messages','tasks','runs','artifacts','discussions','decisions','contexts','operations','agent_sessions','subscriptions','inbox_deliveries','input_batches','wake_intents','capability_evidence','discussion_rounds','project_bindings'] as const;
 export type ProjectionTable=typeof projectionTableNames[number];
 const checkpointRow=z.object({id}).passthrough();
 // Older checkpoint payloads predate the B02 tables; missing arrays decode as empty.
-export const projectionCheckpointSchema=z.object({room,rows:z.object({messages:z.array(checkpointRow),tasks:z.array(checkpointRow),runs:z.array(checkpointRow),artifacts:z.array(checkpointRow),discussions:z.array(checkpointRow),decisions:z.array(checkpointRow),contexts:z.array(checkpointRow),agent_sessions:z.array(checkpointRow).default([]),subscriptions:z.array(checkpointRow).default([]),inbox_deliveries:z.array(checkpointRow).default([]),input_batches:z.array(checkpointRow).default([]),wake_intents:z.array(checkpointRow).default([]),capability_evidence:z.array(checkpointRow).default([]),discussion_rounds:z.array(checkpointRow).default([]),operations:z.array(checkpointRow).default([])}).strict(),reason:z.enum(['legacy-migration','manual-snapshot'])}).strict();
+export const projectionCheckpointSchema=z.object({room,rows:z.object({messages:z.array(checkpointRow),tasks:z.array(checkpointRow),runs:z.array(checkpointRow),artifacts:z.array(checkpointRow),discussions:z.array(checkpointRow),decisions:z.array(checkpointRow),contexts:z.array(checkpointRow),agent_sessions:z.array(checkpointRow).default([]),subscriptions:z.array(checkpointRow).default([]),inbox_deliveries:z.array(checkpointRow).default([]),input_batches:z.array(checkpointRow).default([]),wake_intents:z.array(checkpointRow).default([]),capability_evidence:z.array(checkpointRow).default([]),discussion_rounds:z.array(checkpointRow).default([]),project_bindings:z.array(checkpointRow).default([]),operations:z.array(checkpointRow).default([])}).strict(),reason:z.enum(['legacy-migration','manual-snapshot'])}).strict();
 
-export type ProjectorName='room'|'message'|'task'|'run'|'artifact'|'discussion'|'decision'|'context'|'settings'|'audit'|'checkpoint'|'sandbox'|'operation'|'partial'|'final'|'context-confirmed'|'agent-session'|'subscription'|'inbox-delivery'|'input-batch'|'wake-intent'|'capability-evidence'|'discussion-round';
+export type ProjectorName='room'|'message'|'task'|'run'|'artifact'|'discussion'|'decision'|'context'|'settings'|'audit'|'checkpoint'|'sandbox'|'operation'|'partial'|'final'|'context-confirmed'|'agent-session'|'subscription'|'inbox-delivery'|'input-batch'|'wake-intent'|'capability-evidence'|'discussion-round'|'project-binding';
 export interface EventDefinition {
   durability:'durable'|'ephemeral'; aggregate:'room'|'task'|'run'|'artifact'; projector:ProjectorName|null;
   schemaVersion:1; kind:string|((payload:Record<string,any>)=>string); payload:z.ZodType;
@@ -69,6 +70,7 @@ register(['inbox.delivered'],'inbox.delivered','room','inbox-delivery',body({del
 register(['input.batch.created','input.batch.provided','input.batch.acknowledged','input.batch.expired'],'input.batch.state','run','input-batch',body({batch:inputBatchSchema.passthrough()}));
 register(['wake.requested','wake.assigned','wake.suppressed'],'wake.intent','room','wake-intent',body({wakeIntent:wakeIntentSchema.passthrough()}));
 register(['capability.verified'],'capability.verified','room','capability-evidence',body({capabilityEvidence:capabilityEvidenceSchema.passthrough()}));
+register(['project.bound','project.updated'],'project.binding','room','project-binding',body({projectBinding:projectBindingSchema.passthrough()}));
 register(['discussion.round.opened','discussion.round.closed','discussion.round.late.received'],'discussion.round','room','discussion-round',body({round:discussionRoundSchema.passthrough()}));
 register(['projection.checkpoint'],'projection.checkpoint','room','checkpoint',projectionCheckpointSchema);
 register(['context.captured'],'context.captured','room','context',body({context:runContextSchema.extend({id,roomId:id}).passthrough()}));

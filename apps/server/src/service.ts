@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {discussionPrompt,assessConvergence,discussionSummaryPrompt} from './discussions.ts';
-import { agentSchema,contextSeqOf,taskContractSchema, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type Task, type Decision, type AgentSession, type Subscription, type WakeIntent } from '../../../packages/protocol/src/index.ts';
+import { agentSchema,contextSeqOf,taskContractSchema, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type Task, type Decision, type AgentSession, type Subscription, type WakeIntent, type ProjectBinding } from '../../../packages/protocol/src/index.ts';
 import { digest, now, OWNER, Store, SYSTEM, uid } from './store.ts';
 import {assertContextCurrent} from './context-reconciliation.ts';
 import { assertRunFence } from './execution.ts';
@@ -10,6 +10,7 @@ import { trustForActor } from './trust.ts';
 import {provideTaskContext,assertExternalContextCurrent} from './external-context.ts';
 import {capabilityEvidenceId} from './adapter-capabilities.ts';
 import {InputDeliveryService} from './input-delivery.ts';
+import {canonicalProjectPath,buildProjectManifest,projectBaseCommit} from './project-manifest.ts';
 
 /** External (non-managed) claims must heartbeat within this window or the worker recycles the task. */
 const externalTaskLeaseMs = (store: Store) => store.settings().taskLeaseMs;
@@ -94,6 +95,17 @@ export class RoomService {
         }
         return { messageId: message.id };
       }
+      case 'project.bind': {
+        const roomId = this.requireRoom(command);
+        if (actor.kind !== 'human') throw new ProtocolError('forbidden', '只有 owner 可以绑定项目', 403);
+        const input = payloadSchemas['project.bind'].parse(p);
+        const sourcePath = canonicalProjectPath(input.sourcePath);
+        const manifest = buildProjectManifest(sourcePath);
+        const version = this.store.list<ProjectBinding>('project_bindings', roomId).reduce((max, binding) => Math.max(max, binding.version), 0) + 1;
+        const binding: ProjectBinding = {id: uid('binding'), roomId, sourcePath, ...(input.baseCommit ?? projectBaseCommit(sourcePath) ? {baseCommit: input.baseCommit ?? projectBaseCommit(sourcePath)!} : {}), manifestHash: manifest.manifestHash, manifestFileCount: manifest.fileCount, manifestBytes: manifest.bytes, allowedExecutionModes: input.allowedExecutionModes, verificationRefs: input.verificationRefs, version, createdAt: now(), updatedAt: now()};
+        this.store.event(roomId, 'project.bound', actor, {projectBinding: binding});
+        return {bindingId: binding.id, version, manifestHash: binding.manifestHash, fileCount: manifest.fileCount, bytes: manifest.bytes};
+      }
       case 'capability.verify': {
         const roomId = this.requireRoom(command);
         const input = payloadSchemas['capability.verify'].parse(p);
@@ -167,18 +179,20 @@ export class RoomService {
       }
       case 'task.create': {
         const roomId = this.requireRoom(command);
-        const input = z.object({ title: z.string().trim().min(1).max(5000), agentId: z.string().optional(), projectPath: z.string().max(1500).default(''), dependencies: z.array(z.string()).max(20).default([]), open: z.boolean().default(false), contract:taskContractSchema.optional() }).parse(p);
+        const input = z.object({ title: z.string().trim().min(1).max(5000), agentId: z.string().optional(), projectPath: z.string().max(1500).default(''), dependencies: z.array(z.string()).max(20).default([]), open: z.boolean().default(false), contract:taskContractSchema.optional(), projectBindingId:z.string().optional(), bindingVersion:z.number().int().positive().optional() }).parse(p);
+        let binding:ProjectBinding|undefined;
+        if(input.projectBindingId){binding=this.store.get<ProjectBinding>('project_bindings',input.projectBindingId);if(!binding||binding.roomId!==roomId)throw new ProtocolError('binding_not_found','项目绑定不存在',404);if(input.bindingVersion!==undefined&&input.bindingVersion!==binding.version)throw new ProtocolError('binding_version_mismatch','项目绑定版本不匹配',409);if(input.contract&&(input.contract.projectBinding.id!==binding.id||input.contract.projectBinding.version!==binding.version))throw new ProtocolError('binding_contract_mismatch','任务契约与项目绑定不一致',409);}
         if(input.contract){for(const dependency of input.contract.dependencies){const target=this.store.get<Task>('tasks',dependency.taskId);if(!target||target.roomId!==roomId)throw new ProtocolError('invalid_dependency','契约依赖任务不存在',400);if(dependency.taskVersion>target.version)throw new ProtocolError('invalid_dependency','契约依赖版本晚于当前任务版本',409);}}
         for (const id of input.dependencies) if (this.store.get<Task>('tasks', id)?.roomId !== roomId) throw new ProtocolError('invalid_dependency', '依赖任务不存在');
         if (input.open) {
           if (actor.kind !== 'human') throw new ProtocolError('forbidden', 'Agent 不能创建开放认领任务', 403);
           if (input.agentId) throw new ProtocolError('validation_error', '开放认领任务不需要指定成员', 400);
-          const task: Task = { id: uid('task'), roomId, title: input.title, agentId: 'unassigned', projectPath: input.projectPath, dependencies: input.dependencies, ...(input.contract?{contract:input.contract}:{}), open: true, generation:1,version: 1, status: 'proposed', createdAt: now() };
+          const task: Task = { id: uid('task'), roomId, title: input.title, agentId: 'unassigned', projectPath: binding?.sourcePath??input.projectPath, dependencies: input.dependencies, ...(input.contract?{contract:input.contract}:{}), ...(binding?{projectBindingId:binding.id,bindingVersion:binding.version,baselineManifestHash:binding.manifestHash}:{}), open: true, generation:1,version: 1, status: 'proposed', createdAt: now() };
            this.store.event(roomId, 'task.created', actor, { task },command.commandId,scope?.runId??null); return { taskId: task.id };
         }
         if (!input.agentId) throw new ProtocolError('validation_error', '请指定执行成员或选择开放认领', 400);
         this.checkAgent(roomId, input.agentId);
-        const task: Task = { id: uid('task'), roomId, title: input.title, agentId: input.agentId, projectPath: input.projectPath, dependencies: input.dependencies, ...(input.contract?{contract:input.contract}:{}), generation:1,version: 1, status: actor.kind === 'agent' ? 'proposed' : 'queued', createdAt: now() };
+        const task: Task = { id: uid('task'), roomId, title: input.title, agentId: input.agentId, projectPath: binding?.sourcePath??input.projectPath, dependencies: input.dependencies, ...(input.contract?{contract:input.contract}:{}), ...(binding?{projectBindingId:binding.id,bindingVersion:binding.version,baselineManifestHash:binding.manifestHash}:{}), generation:1,version: 1, status: actor.kind === 'agent' ? 'proposed' : 'queued', createdAt: now() };
          const event = this.store.event(roomId, 'task.created', actor, { task },command.commandId,scope?.runId??null);
         if (actor.kind === 'human'&&this.store.get<AgentDescriptor>('agents',task.agentId)?.connectionMode!=='external') this.enqueue(roomId, task.agentId, task.title, event.seq, { taskId: task.id, taskVersion: 1 });
         return { taskId: task.id };
