@@ -40,7 +40,7 @@ test('room import is deterministic per salt and distinct across imports', () => 
   assert.notDeepEqual(first.events, third.events);
 });
 test('owner can import an exported room twice without entity collisions', async t => {
-  const {mkdtempSync,rmSync,mkdirSync}=await import('node:fs');
+  const {mkdtempSync,rmSync,mkdirSync,writeFileSync}=await import('node:fs');
   const {join,resolve}=await import('node:path');
   const {createApp}=await import('../apps/server/src/app.ts');
   const {uid}=await import('../apps/server/src/store.ts');
@@ -50,14 +50,24 @@ test('owner can import an exported room twice without entity collisions', async 
   t.after(async()=>{await state.app.close();rmSync(root,{recursive:true,force:true});});
   const roomId=state.store.rooms()[0].id;
   state.service.execute({version:'0.1',commandId:uid(),roomId,type:'message.send',payload:{text:'portable history'}});
+  const artifact={id:'artifact_import1',roomId,name:'report.txt',kind:'file',mediaType:'text/plain',size:5,createdAt:new Date().toISOString()};
+  mkdirSync(join(root,'artifacts'),{recursive:true});writeFileSync(join(root,'artifacts',artifact.id),'hello');
+  state.store.event(roomId,'artifact.created',{id:'owner',kind:'human'}, {artifact});
   const headers={host:'127.0.0.1:4317',authorization:'Bearer import-owner','room-protocol-version':'0.1','content-type':'application/json'};
-  const exported=await state.app.inject({url:'/api/rooms/'+roomId+'/export',headers});
+  const exported=await state.app.inject({url:'/api/rooms/'+roomId+'/export?includeArtifacts=1',headers});
   assert.equal(exported.statusCode,200);
   const first=await state.app.inject({method:'POST',url:'/api/rooms/import',headers,payload:{export:exported.json(),name:'Imported A'}});
   assert.equal(first.statusCode,200,first.body);
   const second=await state.app.inject({method:'POST',url:'/api/rooms/import',headers,payload:{export:exported.json(),name:'Imported B'}});
   assert.equal(second.statusCode,200,second.body);
   assert.notEqual(first.json().roomId,second.json().roomId);
+  assert.equal(first.json().importedArtifacts,1);
+  const importedSnapshot=(await state.app.inject({url:'/api/rooms/'+first.json().roomId+'/snapshot',headers})).json();
+  const importedArtifact=importedSnapshot.snapshot.artifacts.find((item:{name:string})=>item.name==='report.txt');
+  assert.ok(importedArtifact);
+  const downloaded=await state.app.inject({url:'/api/artifacts/'+importedArtifact.id,headers});
+  assert.equal(downloaded.statusCode,200);
+  assert.equal(downloaded.body,'hello');
   const snapshot=await state.app.inject({url:'/api/rooms/'+first.json().roomId+'/snapshot',headers});
   assert.equal(snapshot.statusCode,200);
   assert.ok((snapshot.json().snapshot.messages as {text:string}[]).some(message=>message.text==='portable history'));

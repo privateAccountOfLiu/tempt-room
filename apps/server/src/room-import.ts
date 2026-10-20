@@ -18,6 +18,7 @@ export interface RoomImportPlan {
   room: Record<string, any>;
   events: ImportedEvent[];
   remappedIds: number;
+  idMap: Record<string,string>;
 }
 
 const idPattern = /^[a-z][a-z0-9]*_[a-z0-9]{6,}$/i;
@@ -65,5 +66,5 @@ export function planRoomImport(source: RoomExportLike, options: {newRoomId: stri
   const events = source.events
     .filter(event => event && typeof event.type === 'string' && !['room.created', 'room.updated', 'projection.checkpoint'].includes(event.type))
     .map(event => ({...event, payload: replace(event.payload ?? {})}));
-  return {room, events, remappedIds: ids.size};
+  return {room, events, remappedIds: ids.size, idMap: Object.fromEntries(ids)};
 }

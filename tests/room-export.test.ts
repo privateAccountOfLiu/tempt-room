@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createApp } from '../apps/server/src/app.ts';
 import { uid } from '../apps/server/src/store.ts';
@@ -13,6 +13,9 @@ test('owner can export one room as events and metadata', async t => {
   t.after(async () => { await app.close(); rmSync(root, {recursive: true, force: true}); });
   const roomId = store.rooms()[0].id;
   service.execute({version: '0.1', commandId: uid(), roomId, type: 'message.send', payload: {text: 'export me'}});
+  const artifact = {id: 'artifact_export1', roomId, name: 'report.txt', kind: 'file' as const, mediaType: 'text/plain', size: 5, createdAt: new Date().toISOString()};
+  mkdirSync(join(root, 'artifacts'), {recursive: true}); writeFileSync(join(root, 'artifacts', artifact.id), 'hello');
+  store.event(roomId, 'artifact.created', {id: 'owner', kind: 'human'}, {artifact});
   const headers = {host: '127.0.0.1:4317', authorization: 'Bearer export-owner', 'room-protocol-version': '0.1'};
   const exported = await app.inject({url: `/api/rooms/${roomId}/export`, headers});
   assert.equal(exported.statusCode, 200);
@@ -22,5 +25,10 @@ test('owner can export one room as events and metadata', async t => {
   assert.match(body.exportHash, /^[a-f0-9]{64}$/i);
   const repeated = await app.inject({url: `/api/rooms/${roomId}/export`, headers});
   assert.equal(repeated.json().exportHash, body.exportHash);
+  const packaged = await app.inject({url: `/api/rooms/${roomId}/export?includeArtifacts=1`, headers});
+  const item = packaged.json().artifacts[0];
+  assert.equal(item.artifact.id, artifact.id);
+  assert.equal(Buffer.from(item.contentBase64, 'base64').toString('utf8'), 'hello');
+  assert.match(item.contentHash, /^[a-f0-9]{64}$/i);
   assert.equal((await app.inject({url: `/api/rooms/${roomId}/export`, headers: {host: headers.host, 'room-protocol-version': '0.1'}})).statusCode, 401);
 });

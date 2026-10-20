@@ -238,12 +238,24 @@ export async function createApp(options: AppOptions = {}) {
       const newRoomId=uid('room'),plan=planRoomImport(source,{newRoomId,name:request.body?.name,salt:uid('import'),now:now()});
       store.putRoom(plan.room as any,SYSTEM);
       for(const event of plan.events)store.event(newRoomId,event.type,(event.actor??SYSTEM) as any,event.payload as any);
-      return {roomId:newRoomId,events:plan.events.length,remappedIds:plan.remappedIds,exportHash:digest({room:plan.room,events:plan.events})};
+      let importedArtifacts=0;
+      for(const item of (source.artifacts??[]).slice(0,200)){
+        if(!item?.artifact?.id||typeof item.contentBase64!=='string')continue;
+        const artifactId=plan.idMap[item.artifact.id];if(!artifactId)continue;
+        const bytes=Buffer.from(item.contentBase64,'base64');if(bytes.length>8*1024*1024)continue;
+        mkdirSync(join(root,'artifacts'),{recursive:true});writeFileSync(join(root,'artifacts',artifactId),bytes);importedArtifacts++;
+      }
+      return {roomId:newRoomId,events:plan.events.length,remappedIds:plan.remappedIds,importedArtifacts,exportHash:digest({room:plan.room,events:plan.events})};
     });
   });
-  app.get<{Params:{id:string}}>('/api/rooms/:id/export',request=>{
+  app.get<{Params:{id:string};Querystring:{includeArtifacts?:string}}>('/api/rooms/:id/export',request=>{
     const room=store.room(request.params.id);if(!room)throw new ProtocolError('not_found','房间不存在',404);
-    const events=store.events(room.id);return {version:VERSION,exportedAt:new Date().toISOString(),room,events,exportHash:digest({room,events})};
+    const events=store.events(room.id),base={version:VERSION,exportedAt:new Date().toISOString(),room,events,exportHash:digest({room,events})};
+    if(!['1','true'].includes(String(request.query.includeArtifacts??'')))return base;
+    let total=0;const artifacts=store.list<Artifact>('artifacts',room.id).slice(0,200).flatMap(artifact=>{
+      try{const bytes=readFileSync(join(root,'artifacts',artifact.id));if(bytes.length>8*1024*1024||total+bytes.length>32*1024*1024)return [];total+=bytes.length;return [{artifact,contentBase64:bytes.toString('base64'),contentHash:digest(bytes.toString('base64'))}];}catch{return [];}
+    });
+    return {...base,artifacts,exportHash:digest({room,events,artifactHashes:artifacts.map(item=>[item.artifact.id,item.contentHash])})};
   });
   app.get<{Params:{id:string;discussionId:string}}>('/api/rooms/:id/discussions/:discussionId/rounds',request=>{
     const room=store.room(request.params.id);if(!room)throw new ProtocolError('not_found','房间不存在',404);
