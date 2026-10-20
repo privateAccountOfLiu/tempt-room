@@ -790,6 +790,12 @@ export class Worker {
     if (!agent || !agent.enabled) throw new Error('Agent 未启用');
     if (!room || !room.members.includes(agentId)) throw new Error('Agent 不在该房间');
     assertRoomToolAllowed(agent.roomToolPolicy,String(name),agent.allowedRoomTools);
+    const externalAuthMode=this.store.settings().toolAuthorizationMode;
+    if(externalAuthMode!=='off'){
+      const fingerprint=agentCapabilityFingerprint(agent),decision=authorizeTool({actor:{id:agentId,kind:'agent'},transport:'external',fingerprint,capabilityEvidence:this.store.list('capability_evidence',roomId).filter((item:any)=>item.fingerprint===fingerprint) as any,tool:String(name),args});
+      this.store.event(roomId,'tool.authorization.recorded',{id:agentId,kind:'agent'},{runId:agentId,tool:String(name),authorizationDecision:decision.decision,...(decision.reason?{reason:decision.reason}:{}),argumentDigest:decision.argumentDigest,fingerprint,authorizationMode:externalAuthMode},null,null);
+      if(decision.decision==='deny'&&externalAuthMode==='enforce')throw new ProtocolError('tool_denied',`工具未获授权：${decision.reason}`,403);
+    }
     if(['room_read','room_status'].includes(name))z.object({}).strict().parse(args??{});
     const actor = { id: agentId, kind: 'agent' as const };
     this.store.event(roomId, 'agent.tool.called', actor, { agentId, name: String(name).slice(0, 100) }, null, null);

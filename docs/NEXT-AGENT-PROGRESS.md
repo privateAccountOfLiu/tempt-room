@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: f4d4cb1b9e5309827b67eb3e31540b5b4df4d9dd (dirty)
+source HEAD: abcaa72f3f9b503ef27bd2a12eb27f82c950041f (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T11-55-21-996Z-6e0e21b5/report.json
+report: .state/collaboration-baseline/run-2026-10-20T12-00-29-537Z-f79c2c28/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T11-55-21-996Z-6e0e21b5/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-i2UJpJ/report.json`，162.8s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-lS8TEg/report.json`，162.8s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-BYYu74/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-gmH81A/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T11-55-21-996Z-6e0e21b5/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T11-55-21-996Z-6e0e21b5/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T11-55-21-996Z-6e0e21b5/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T11-55-21-996Z-6e0e21b5/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T12-00-29-537Z-f79c2c28/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T12-00-29-537Z-f79c2c28/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T12-00-29-537Z-f79c2c28/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T12-00-29-537Z-f79c2c28/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -509,7 +509,10 @@ report: .state/collaboration-baseline/run-2026-10-20T11-55-21-996Z-6e0e21b5/repo
 - 新增 durable audit 事件 tool.authorization.recorded：runId/tool/decision/reason/argumentDigest/fingerprint/authorizationMode，不落命令全文
 - warn/enforce 模式均记录授权决定；enforce 拒绝时先记审计再抛 tool_denied
 - 新增 executeTool enforce 集成测试：无 preToolGate 证据时返回 tool_denied，并写 tool.authorization.recorded 审计（deny/enforce/runId/argumentDigest）
-- 尚未完成：MCP/ACP 宿主桥接、批准/取消竞态、CLI 不可拦截缺口标注
+- authorizeTool 支持 transport=external：外部 Agent 写工具不再要求 run fence，但仍要求 preToolGate 证据
+- Worker.agentTool 在 warn/enforce 模式下执行同一授权策略并写 tool.authorization.recorded 审计
+- 新增 external agent tools 测试：enforce 拒绝无证据 room_post、room_read 可读、写入证据后允许
+- 尚未完成：ACP 宿主桥接、批准/取消竞态、CLI 不可拦截缺口标注
 
 ## B09 起点 — 讨论窗口估算
 

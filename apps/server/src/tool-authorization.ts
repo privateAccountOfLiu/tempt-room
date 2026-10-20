@@ -16,6 +16,7 @@ export interface AuthorizeToolInput {
   tool: string;
   args: unknown;
   resourceScope?: string;
+  transport?: 'managed' | 'external';
 }
 
 const writeTools = new Set<string>(['room_post', 'task_propose', 'task_claim', 'task_context', 'task_complete', 'task_heartbeat', 'artifact_publish', 'room_input_ack']);
@@ -29,7 +30,7 @@ export function authorizeTool(input: AuthorizeToolInput): ToolAuthorizationResul
   const unsafe = unsafePathReason(input.args);
   if (unsafe) return {decision: 'deny', reason: unsafe, argumentDigest};
   if (input.actor.kind === 'agent') {
-    if (!input.runFence?.runId || !input.runFence.generation || !input.runFence.executionId) return {decision: 'deny', reason: 'run_fence_missing', argumentDigest};
+    if (input.transport !== 'external' && (!input.runFence?.runId || !input.runFence.generation || !input.runFence.executionId)) return {decision: 'deny', reason: 'run_fence_missing', argumentDigest};
     if (writeTools.has(input.tool)) {
       const state = verifiedCapabilityState(input.fingerprint ?? '', input.capabilityEvidence ?? [], 'preToolGate');
       if (state !== 'verified_supported') return {decision: 'deny', reason: 'capability_unverified', argumentDigest};

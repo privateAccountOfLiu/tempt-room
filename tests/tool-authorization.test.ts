@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import { Store, SYSTEM, uid } from '../apps/server/src/store.ts';
 import { RoomService } from '../apps/server/src/service.ts';
 import { Worker } from '../apps/server/src/worker.ts';
+import { agentCapabilityFingerprint } from '../apps/server/src/adapter-capabilities.ts';
 import type { Run } from '../packages/protocol/src/index.ts';
 
 const parent = resolve('.state/test-data');
@@ -58,4 +59,20 @@ test('executeTool enforces and audits tool authorization decisions', async t => 
   assert.equal(inbox.resetRequired, false);
   assert.ok(inbox.head <= store.room(roomId)!.seq);
   (worker as any).active.delete(queued.id);
+});
+
+test('external agent tools use the same authorization policy bridge', async t => {
+  mkdirSync(parent, {recursive: true});
+  const root = mkdtempSync(join(parent, 'tool-auth-external-')), store = new Store(join(root, 'room.sqlite')), service = new RoomService(store), roomId = store.rooms()[0].id;
+  const worker = new Worker(store, service, root, {adapter: async function* () { yield {type: 'text', text: 'unused'}; }});
+  t.after(async () => { await worker.close(); store.close(); rmSync(root, {recursive: true, force: true}); });
+  service.execute({version: '0.1', commandId: uid(), roomId, type: 'settings.update', payload: {...store.settings(), toolAuthorizationMode: 'enforce'}});
+  await assert.rejects(() => worker.agentTool('demo-planner', roomId, 'room_post', {text: 'blocked'}), /工具未获授权/);
+  const read = await worker.agentTool('demo-planner', roomId, 'room_read', {});
+  assert.ok(Array.isArray(read.messages));
+  const agent = store.get<any>('agents', 'demo-planner')!, fingerprint = agentCapabilityFingerprint(agent), testedAt = new Date().toISOString();
+  service.execute({version: '0.1', commandId: uid(), roomId, type: 'capability.verify', payload: {fingerprint, evidence: [{fingerprint, capability: 'preToolGate', state: 'verified_supported', mode: 'simulated-contract', testedAt, suiteVersion: 'sim-v1', evidenceHash: 'c'.repeat(64)}]}});
+  const posted = await worker.agentTool('demo-planner', roomId, 'room_post', {text: 'allowed by evidence'});
+  assert.equal(posted.result.messageId !== undefined, true);
+  assert.ok(store.events(roomId).some(event => event.type === 'tool.authorization.recorded' && (event.payload as any).authorizationDecision === 'deny'));
 });
