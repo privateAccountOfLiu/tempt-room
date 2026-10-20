@@ -28,3 +28,18 @@ test('per-room concurrency limit keeps a second run queued while the first owns 
   }
   assert.equal(store.list<Run>('runs', roomId).filter(run => run.status === 'completed').length, 2);
 });
+
+test('a persisted running run from another worker occupies the room slot', async t => {
+  mkdirSync(parent, {recursive: true});
+  const root = mkdtempSync(join(parent, 'room-concurrency-foreign-')), store = new Store(join(root, 'room.sqlite')), service = new RoomService(store), roomId = store.rooms()[0].id;
+  const worker = new Worker(store, service, root, {adapter: async function* () { yield {type: 'text', text: 'done'}; }});
+  t.after(async () => { await worker.close(); store.close(); rmSync(root, {recursive: true, force: true}); });
+  const command = (type: string, payload: unknown) => service.execute({version: '0.1', commandId: uid(), roomId, type, payload});
+  command('settings.update', {...store.settings(), maxConcurrentRunsPerRoom: 1});
+  const taskId = command('task.create', {title: 'Queued behind foreign worker', agentId: 'demo-planner'}).result.taskId as string;
+  const queued = store.list<Run>('runs', roomId).find(run => run.taskId === taskId)!;
+  const foreign = {...queued, id: 'run_foreign', status: 'running' as const};
+  store.event(roomId, 'run.started', {id: 'system', kind: 'system'}, {run: foreign});
+  worker.tick();
+  assert.equal(store.get<Run>('runs', queued.id)!.status, 'queued');
+});

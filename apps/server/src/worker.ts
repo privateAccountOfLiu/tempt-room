@@ -267,7 +267,7 @@ export class Worker {
     const runs=this.store.list<Run>('runs'),candidates:Run[]=[];
     const roomLimit=this.store.settings().maxConcurrentRunsPerRoom;
     const activeRoomCounts=new Map<string,number>();
-    for(const id of this.active.keys()){const active=this.store.get<Run>('runs',id);if(active)activeRoomCounts.set(active.roomId,(activeRoomCounts.get(active.roomId)??0)+1);}
+    for(const run of runs)if(['running','waiting_input'].includes(run.status))activeRoomCounts.set(run.roomId,(activeRoomCounts.get(run.roomId)??0)+1);
     const roomCount=(roomId:string)=>activeRoomCounts.get(roomId)??0;
     for(const run of runs){
       if(run.status!=='queued'||this.active.has(run.id))continue;
