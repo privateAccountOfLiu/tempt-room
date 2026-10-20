@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: edd55f56e873730fde1b52cb6bfca1c8d4880967 (dirty)
+source HEAD: b0a133ba3056999c19db3f15b37473547511d341 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T05-27-42-008Z-3f1b1db1/report.json
+report: .state/collaboration-baseline/run-2026-10-20T05-33-00-255Z-0ed79410/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -107,7 +107,12 @@ report: .state/collaboration-baseline/run-2026-10-20T05-27-42-008Z-3f1b1db1/repo
 - 新增 tests/session-scope.test.ts 2 项
 - 额外上下文输入计费：Worker 在 context reconciliation 推进 generation 前调用 recordDiscussionContinuation；计入 activationsUsed，超限时以 activation_limit 结束并取消当前 run
 - 新增 discussion-lifecycle 1 项测试
-- 尚未完成：总结独立授权额度与 UI、摘要额度
+- 总结独立激活额度：Discussion.summaryActivationLimit/summaryActivationsUsed
+  - 讨论结束时先检查总结额度；额度用尽则 summary=failed 且不 enqueue
+  - 总结 Run 的额外上下文输入计入 summaryActivationsUsed，超限时 summary=failed
+  - run.retry 重试总结同样受 summaryActivationLimit 限制
+- 新增 discussion-lifecycle 1 项测试：总结额度独立于讨论额度
+- 尚未完成：总结 UI 授权、额度展示、更多额度策略
 ### B02 — 可重放投影与 v10 迁移
 
 - 数据库版本 v9→v10；新增投影表：agent_sessions、subscriptions、inbox_deliveries、input_batches、wake_intents、capability_evidence、discussion_rounds
@@ -169,19 +174,19 @@ report: .state/collaboration-baseline/run-2026-10-20T05-27-42-008Z-3f1b1db1/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-SHI8GL/report.json`，154.0s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-JxiVFC/report.json`，152.8s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-tMqBEn/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-WeQRuB/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T05-27-42-008Z-3f1b1db1/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T05-27-42-008Z-3f1b1db1/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T05-27-42-008Z-3f1b1db1/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T05-27-42-008Z-3f1b1db1/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T05-33-00-255Z-0ed79410/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T05-33-00-255Z-0ed79410/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T05-33-00-255Z-0ed79410/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T05-33-00-255Z-0ed79410/replay.stdout.txt`
 
 ## M1 验收 — 并行任务确定性 fixture
 

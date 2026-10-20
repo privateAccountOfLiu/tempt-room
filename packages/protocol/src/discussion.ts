@@ -14,7 +14,7 @@ export const discussionSchema=z.object({
   id,roomId:id,goal:z.string(),participants:z.array(id),rounds:z.number().int().positive(),round:z.number().int().positive(),
   maxResponses:z.number().int().positive(),responses:z.number().int().nonnegative(),quorum:z.number().int().positive().optional(),
   absent:z.array(id).optional(),deadline:z.string().datetime(),status:z.enum(['active','paused','completed','stopped']),
-  triggerPolicy:z.enum(['all','explicit','assigned-task']).optional(),activationLimit:z.number().int().positive().optional(),activationsUsed:z.number().int().nonnegative().optional(),roundWindowMs:z.number().int().positive().optional(),activeRoundId:id.optional(),authorizationRef:z.string().max(300).optional(),lifecycleVersion:z.number().int().positive().optional(),
+  triggerPolicy:z.enum(['all','explicit','assigned-task']).optional(),activationLimit:z.number().int().positive().optional(),activationsUsed:z.number().int().nonnegative().optional(),summaryActivationLimit:z.number().int().positive().optional(),summaryActivationsUsed:z.number().int().nonnegative().optional(),roundWindowMs:z.number().int().positive().optional(),activeRoundId:id.optional(),authorizationRef:z.string().max(300).optional(),lifecycleVersion:z.number().int().positive().optional(),
   stopOnConvergence:z.boolean().optional(),summarizerId:id.optional(),startedSeq:z.number().int().nonnegative().optional(),
   endedSeq:z.number().int().nonnegative().optional(),endedAt:z.string().datetime().optional(),
   endReason:z.enum(['converged','round_limit','response_limit','time_limit','no_quorum','user_stop','restart','scheduling_failed','budget_exhausted','activation_limit']).optional(),

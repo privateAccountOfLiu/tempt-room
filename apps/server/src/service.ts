@@ -127,7 +127,7 @@ export class RoomService {
         const quorum = input.quorum ?? input.participants.length;
         if (input.maxResponses < quorum) throw new ProtocolError('quorum_unreachable', '最多响应次数小于 quorum，讨论无法推进', 400);
         const {maxDurationMs,activationLimit,...fields}=input;delete (fields as {quorum?:number}).quorum;
-        const discussion: Discussion = { id: uid('disc'), roomId, ...fields, participants: input.participants, quorum, round: 1, responses: 0, activationsUsed: 0, ...(activationLimit !== undefined ? {activationLimit} : {}), deadline: new Date(Date.now() + maxDurationMs).toISOString(), status: 'active' };
+        const discussion: Discussion = { id: uid('disc'), roomId, ...fields, participants: input.participants, quorum, round: 1, responses: 0, activationsUsed: 0, summaryActivationsUsed: 0, ...(activationLimit !== undefined ? {activationLimit} : {}), deadline: new Date(Date.now() + maxDurationMs).toISOString(), status: 'active' };
         for (const agentId of discussion.participants) {
           const agentSession = this.createAgentSession(roomId, agentId, discussion.id);
           this.store.event(roomId, 'agent_session.created', actor, {agentSession});
@@ -329,6 +329,7 @@ export class RoomService {
         if(previous.discussionId){
           const discussion=this.store.get<Discussion>('discussions',previous.discussionId);
           if(previous.discussionRole!=='summary')throw new ProtocolError('discussion_retry_unavailable','讨论响应由轮次调度；如需重新讨论，请新建一场讨论',409);
+          if(discussion?.summaryActivationLimit!==undefined&&(discussion.summaryActivationsUsed??0)>=discussion.summaryActivationLimit)throw new ProtocolError('summary_activation_limit','总结激活额度已用尽',429);
           if(!discussion||discussion.summary?.runId!==previous.id||discussion.summary.status==='completed')throw new ProtocolError('summary_not_retryable','此总结已完成或已由新运行替代',409);
           const next=this.enqueue(roomId,previous.agentId,previous.prompt,this.store.room(roomId)!.seq,{discussionId:discussion.id,discussionRole:'summary'});
           discussion.summary={runId:next.id,status:'queued'};this.store.event(roomId,'discussion.summary.updated',actor,{discussion},command.commandId);
@@ -531,7 +532,14 @@ export class RoomService {
   recordDiscussionContinuation(run:Run):boolean{
     if(!run.discussionId)return true;
     const discussion=this.store.get<Discussion>('discussions',run.discussionId);
-    if(!discussion||discussion.status!=='active')return true;
+    if(!discussion)return true;
+    if(run.discussionRole==='summary'){
+      discussion.summaryActivationsUsed=(discussion.summaryActivationsUsed??0)+1;
+      const summaryLimit=discussion.summaryActivationLimit;
+      if(summaryLimit&&discussion.summaryActivationsUsed>summaryLimit){discussion.summary={...discussion.summary,status:'failed',error:'总结激活额度已用尽'};this.store.event(discussion.roomId,'discussion.summary.updated',SYSTEM,{discussion});return false;}
+      this.store.event(discussion.roomId,'discussion.summary.updated',SYSTEM,{discussion});return true;
+    }
+    if(discussion.status!=='active')return true;
     discussion.activationsUsed=(discussion.activationsUsed??0)+1;
     const limit=discussion.activationLimit;
     if(limit&&discussion.activationsUsed>limit){this.endDiscussion(discussion,'activation_limit','stopped',`讨论激活额度已达上限（${limit}）`);return false;}
@@ -547,9 +555,9 @@ export class RoomService {
     this.transitionDiscussionSessions(discussion,'ended',SYSTEM);
     if(discussion.summarizerId){
       try{
-        const prompt=discussionSummaryPrompt(this.store,discussion);
-        const summary=this.enqueue(discussion.roomId,discussion.summarizerId,prompt,this.store.room(discussion.roomId)!.seq,{discussionId:discussion.id,discussionRole:'summary'});
-        discussion.summary={runId:summary.id,status:'queued'};
+        const limit=discussion.summaryActivationLimit;
+        if(limit!==undefined&&(discussion.summaryActivationsUsed??0)>=limit){discussion.summary={status:'failed',error:'总结激活额度已用尽'};}
+        else{const prompt=discussionSummaryPrompt(this.store,discussion);const summary=this.enqueue(discussion.roomId,discussion.summarizerId,prompt,this.store.room(discussion.roomId)!.seq,{discussionId:discussion.id,discussionRole:'summary'});discussion.summaryActivationsUsed=(discussion.summaryActivationsUsed??0)+1;discussion.summary={runId:summary.id,status:'queued'};}
       }catch(error){discussion.summary={status:'failed',error:(error as Error).message.slice(0,2000)};}
       this.store.event(discussion.roomId,'discussion.summary.updated',SYSTEM,{discussion});
     }

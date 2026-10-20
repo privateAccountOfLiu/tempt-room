@@ -83,3 +83,22 @@ test('additional context input consumes activation budget and stops the discussi
   assert.equal(stopped.status, 'stopped');
   assert.equal(stopped.endReason, 'activation_limit');
 });
+
+test('summary has an independent activation budget', t => {
+  const {store, service, roomId, start, command} = base(t);
+  const id = start({participants: ['demo-planner'], rounds: 1, maxResponses: 2, summarizerId: 'demo-reviewer', summaryActivationLimit: 1});
+  service.stopDiscussion(store.get<Discussion>('discussions', id)!, '用户停止');
+  const discussion = store.get<Discussion>('discussions', id)!;
+  assert.equal(discussion.summary?.status, 'queued');
+  assert.equal(discussion.summaryActivationsUsed, 1);
+  const summaryRun = store.list<Run>('runs', roomId).find(run => run.discussionId === id && run.discussionRole === 'summary')!;
+  assert.ok(summaryRun);
+  const continued = service.recordDiscussionContinuation({...summaryRun, discussionRole: 'summary'} as Run);
+  assert.equal(continued, false);
+  const exhausted = store.get<Discussion>('discussions', id)!;
+  assert.equal(exhausted.summary?.status, 'failed');
+  assert.match(exhausted.summary?.error ?? '', /总结激活额度/);
+  assert.equal(exhausted.summaryActivationsUsed, 2);
+  const another = start({participants: ['demo-planner'], rounds: 1, maxResponses: 2, summarizerId: 'demo-reviewer', summaryActivationLimit: 1});
+  assert.notEqual(another, id);
+});

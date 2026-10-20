@@ -309,6 +309,11 @@
               "minimum": 1,
               "maximum": 1000
             },
+            "summaryActivationLimit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
             "stopOnConvergence": {
               "type": "boolean"
             },
