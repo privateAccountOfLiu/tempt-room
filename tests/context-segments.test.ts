@@ -51,3 +51,10 @@ test('subscription increments become their own bounded segment when present', ()
   assert.match(segments.find(segment => segment.kind === 'subscription')!.text, /接口版本已冻结/);
   assert.throws(() => buildContextSegments(run, context(0), undefined, {incrementalText: 'x'.repeat(20_000), subscriptionBudgetBytes: 100}), (error: unknown) => error instanceof ContextSegmentTooLarge && error.segment === 'subscription');
 });
+
+test('related segment includes baseline ref and explicit unknown external version', () => {
+  const task = {id: 'task_ctx2', version: 1, roomId: 'room_ctx', title: 't', agentId: 'demo-planner', status: 'queued', dependencies: [], createdAt: new Date().toISOString(), contract: {objective: 'goal', acceptance: [], expectedArtifacts: [], dependencies: [], projectBinding: {id: 'binding_1', version: 1, baselineRef: 'baseline_abc', manifestHash: 'a'.repeat(64), allowedPaths: ['src']}}};
+  const related = buildContextSegments({...run, taskId: 'task_ctx2'}, context(0), task as any).find(segment => segment.kind === 'related')!;
+  assert.match(related.text, /baselineRef=baseline_abc/);
+  assert.match(related.text, /externalReadVersion=unknown/);
+});

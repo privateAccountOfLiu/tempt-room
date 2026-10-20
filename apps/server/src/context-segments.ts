@@ -84,9 +84,12 @@ function relatedText(run: Run, task?: Task): string {
   if (run.dirtyBaselineHash) parts.push(`dirtyBaselineHash=${run.dirtyBaselineHash}`);
   if (run.projectBindingId) parts.push(`projectBinding=${run.projectBindingId} bindingVersion=${run.bindingVersion ?? '?'}`);
   if (task?.contract) {
+    const binding=task.contract.projectBinding;
     parts.push(`objective=${task.contract.objective}`);
     parts.push(`acceptance=${task.contract.acceptance.map(check => check.description).join(' | ')}`);
-    if (task.contract.projectBinding.allowedPaths.length) parts.push(`allowedPaths=${task.contract.projectBinding.allowedPaths.join(',')}`);
+    parts.push(`baselineRef=${binding.baselineRef} manifestHash=${binding.manifestHash}`);
+    if (binding.allowedPaths.length) parts.push(`allowedPaths=${binding.allowedPaths.join(',')}`);
+    parts.push('externalReadVersion=unknown');
   }
   return parts.join('\n');
 }

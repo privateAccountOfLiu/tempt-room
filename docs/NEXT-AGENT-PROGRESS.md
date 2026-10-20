@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: b918d75f9b6f79ace8dcfce5422d01e6220416e7 (dirty)
+source HEAD: 34f2c55636e3981eb7909a9d5209239105402db1 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T11-22-12-685Z-cce8b370/report.json
+report: .state/collaboration-baseline/run-2026-10-20T11-29-19-003Z-f492b164/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T11-22-12-685Z-cce8b370/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-5A9c4O/report.json`，163.9s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-O4e688/report.json`，162.3s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-UqQfUD/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-ktuCba/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T11-22-12-685Z-cce8b370/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T11-22-12-685Z-cce8b370/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T11-22-12-685Z-cce8b370/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T11-22-12-685Z-cce8b370/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T11-29-19-003Z-f492b164/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T11-29-19-003Z-f492b164/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T11-29-19-003Z-f492b164/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T11-29-19-003Z-f492b164/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -564,4 +564,6 @@ report: .state/collaboration-baseline/run-2026-10-20T11-22-12-685Z-cce8b370/repo
 - GET /api/runs/:id/context-segments 读取 run.inputBatchId，返回 objective/constraints/related/subscription/history
 - 新增 context-segments 测试：订阅段存在与超限
 - Worker prompt 新增「关联任务与基线」「订阅增量」两个渲染段；订阅文本来自 run.inputBatchId 的 sourceEventIds
-- 尚未完成：外部读取版本采集、逐次订阅 refresh
+- related 段新增 task contract baselineRef/manifestHash；受控 workspace 路径未采集逐文件外部读版本时明确写 externalReadVersion=unknown
+- 新增 context-segments 测试覆盖 baseline ref 与 unknown 标记
+- 尚未完成：逐文件读取版本证据、网络 ETag/DB 行版本采集
