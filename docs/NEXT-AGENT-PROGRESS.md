@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: c5541873ac567c98217a6e2d3c7ec1527ebaedda (dirty)
+source HEAD: 55cfd8e9e7b03cb18884acea17cf4bd5108b3cef (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T09-30-11-943Z-2d1af39f/report.json
+report: .state/collaboration-baseline/run-2026-10-20T09-35-58-269Z-eb82099f/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T09-30-11-943Z-2d1af39f/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-1GMJpA/report.json`，170.5s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-mKoPZi/report.json`，169.7s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-W7OUMP/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-09dAB1/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T09-30-11-943Z-2d1af39f/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T09-30-11-943Z-2d1af39f/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T09-30-11-943Z-2d1af39f/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T09-30-11-943Z-2d1af39f/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-35-58-269Z-eb82099f/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T09-35-58-269Z-eb82099f/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-35-58-269Z-eb82099f/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-35-58-269Z-eb82099f/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -504,3 +504,13 @@ report: .state/collaboration-baseline/run-2026-10-20T09-30-11-943Z-2d1af39f/repo
   - 返回结构化 decision/reason/argumentDigest
 - 新增 tests/tool-authorization.test.ts 2 项
 - 尚未完成：接入真实 MCP/ACP/host 工具入口、授权记录持久化、批准/取消竞态处理和 CLI 不可拦截缺口标注
+
+## B09 起点 — 讨论窗口估算
+
+- 新增 apps/server/src/discussion-windows.ts：
+  - 按 provider + adapterFingerprint + model + taskClass 分桶
+  - 使用真实执行时长样本计算经验分位数（P95），样本上限 50
+  - 冷启动默认 90s，clamp 15s–10min
+  - EWMA 仅作为独立平滑值暴露，不冒充 P95
+- 新增 tests/discussion-windows.test.ts 2 项：冷启动/P95/clamp、桶隔离与 EWMA
+- 尚未完成：DiscussionRound 持久窗口/截止/迟到结果事件、Worker 接入与关闭轮次冻结
