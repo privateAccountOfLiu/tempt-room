@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 17bbc3f9c84860554557aab9c7ee6e59e9ca6f9d (dirty)
+source HEAD: f5e564a5a853eef439798b88b22dc6e8a645c855 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T10-06-55-584Z-d511f5f3/report.json
+report: .state/collaboration-baseline/run-2026-10-20T10-14-04-255Z-ec11b00b/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T10-06-55-584Z-d511f5f3/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-0sf6Bs/report.json`，164.0s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-FrMFY8/report.json`，162.3s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-W7Kg83/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-3MiRX1/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T10-06-55-584Z-d511f5f3/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T10-06-55-584Z-d511f5f3/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T10-06-55-584Z-d511f5f3/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T10-06-55-584Z-d511f5f3/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T10-14-04-255Z-ec11b00b/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T10-14-04-255Z-ec11b00b/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T10-14-04-255Z-ec11b00b/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T10-14-04-255Z-ec11b00b/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -536,4 +536,6 @@ report: .state/collaboration-baseline/run-2026-10-20T10-06-55-584Z-d511f5f3/repo
 - Worker.context 使用 buildContextSegments 计算 history 段实际字节/省略条数，替换写死的「最近 40 条」说明；仍保留原有消息渲染与决策约束
 - related 段记录 sourceCommit、dirtyBaselineHash、projectBindingId/bindingVersion；未采集版本的外部读取不伪造版本
 - 新增 context-segments 测试覆盖 baseline 证据字段
-- 尚未完成：prompt 直接渲染四段内容、订阅增量段
+- Worker prompt 直接渲染：objective（run.prompt）、已接受决策、关联任务与 baseline（related 段）、按 20KiB 预算选择的历史消息尾部
+- history 选择使用实际格式化字节数，超出预算的旧消息不再进入 prompt；上下文快照说明使用 history 段实际 omitted/bytes
+- 尚未完成：订阅增量段、外部读取版本采集
