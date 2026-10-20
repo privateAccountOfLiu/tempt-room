@@ -638,11 +638,12 @@ export class RoomService {
     const round:DiscussionRound={id,discussionId:discussion.id,round:discussion.round,status:'open',openedSeq,openedAt:now(),windowDeadline:new Date(Date.now()+(discussion.roundWindowMs??90_000)).toISOString(),slotIds:discussion.participants.slice(),quorum:discussion.quorum};
     this.store.event(discussion.roomId,'discussion.round.opened',SYSTEM,{round});
   }
-  private closeDiscussionRound(discussion:Discussion,reason:string){
+  private closeDiscussionRound(discussion:Discussion,reason:string,settledRunIds?:string[]){
+    const settled=settledRunIds??this.store.list<Run>('runs',discussion.roomId).filter(run=>run.discussionId===discussion.id&&run.discussionRole!=='summary'&&run.round===discussion.round&&run.status==='completed').map(run=>run.id);
     const current=this.store.list<DiscussionRound>('discussion_rounds',discussion.roomId).find(item=>item.discussionId===discussion.id&&item.round===discussion.round&&item.status==='open');
     if(!current)return;
     const closedSeq=this.store.room(discussion.roomId)!.seq;
-    this.store.event(discussion.roomId,'discussion.round.closed',SYSTEM,{round:{...current,status:'closed',closedSeq,closedAt:now(),closeReason:reason}});
+    this.store.event(discussion.roomId,'discussion.round.closed',SYSTEM,{round:{...current,status:'closed',closedSeq,closedAt:now(),closeReason:reason,settledRunIds:settled}});
   }
   private endDiscussion(discussion:Discussion,reason:NonNullable<Discussion['endReason']>,status:'completed'|'stopped',detail?:string){
     if(discussion.status!=='active'&&discussion.status!=='paused')return;

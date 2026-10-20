@@ -25,6 +25,7 @@ test('discussion rounds persist opened and closed lifecycle facts', t => {
   assert.equal(closed.status, 'closed');
   assert.equal(closed.closeReason, 'user_stop');
   assert.ok(closed.closedSeq !== undefined && closed.closedAt);
+  assert.ok(Array.isArray(closed.settledRunIds));
 });
 
 test('late discussion results are recorded against the original round without reopening it', t => {
@@ -70,5 +71,7 @@ test('expired round windows trigger settlement without cancelling slow runs', t 
   store.event(roomId, 'discussion.round.opened', SYSTEM, {round: {...round, windowDeadline: new Date(Date.now() - 60_000).toISOString()}});
   service.expireDiscussionWindows();
   assert.equal(store.get<Discussion>('discussions', discussion.id)!.status, 'completed');
-  assert.equal(store.list<DiscussionRound>('discussion_rounds', roomId).find(item => item.id === round.id)!.status, 'closed');
+  const closedRound = store.list<DiscussionRound>('discussion_rounds', roomId).find(item => item.id === round.id)!;
+  assert.equal(closedRound.status, 'closed');
+  assert.equal(closedRound.settledRunIds?.length, 2);
 });

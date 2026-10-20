@@ -83,7 +83,8 @@ export const discussionRoundSchema = z.object({
   closedAt: time.optional(),
   closeReason: z.string().max(200).optional(),
   slotIds: z.array(id).max(100).default([]),
-  quorum: z.number().int().positive().optional()
+  quorum: z.number().int().positive().optional(),
+  settledRunIds: z.array(id).max(500).optional()
 }).strict();
 export type DiscussionRound = z.infer<typeof discussionRoundSchema>;
 
