@@ -31,6 +31,8 @@ const tools = [
   { name: 'artifact_publish', description: 'Publish a text report as an artifact in this room.', inputSchema: { type: 'object', properties: { name: { type: 'string' }, text: { type: 'string' } }, required: ['name', 'text'], additionalProperties: false } },
   { name: 'room_status', description: 'Read room metadata and task statuses.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'room_wait', description: 'Wait up to 25s for new public messages after a sequence number. Returns timeout=true when nothing arrived.', inputSchema: { type: 'object', properties: { afterSeq: { type: 'number', description: 'Wait for messages after this room sequence; defaults to the current latest sequence.' }, timeoutMs: { type: 'number', description: 'Wait budget in milliseconds (500-25000, default 15000).' } }, additionalProperties: false } }
+  { name:'session_inbox', description:'Page durable inbox deliveries for your explicit AgentSession without acknowledging them.', inputSchema:{ type:'object', properties:{ agentSessionId:{type:'string'}, afterSeq:{type:'integer',minimum:0}, limit:{type:'integer',minimum:1,maximum:200} }, required:['agentSessionId'], additionalProperties:false } },
+  { name:'session_ack', description:'Acknowledge specific pending inbox deliveries for your explicit AgentSession. Repeating the same acknowledgement is idempotent.', inputSchema:{ type:'object', properties:{ agentSessionId:{type:'string'}, deliveryIds:{type:'array',items:{type:'string'},minItems:1,maxItems:500} }, required:['agentSessionId','deliveryIds'], additionalProperties:false } },
 ];
 
 async function call(name, args, requestId) {

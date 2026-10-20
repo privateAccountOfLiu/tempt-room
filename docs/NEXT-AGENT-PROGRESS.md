@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: ccd184af05108932ee40ae71dd7b6d794d6cca7d (dirty)
+source HEAD: f4d4cb1b9e5309827b67eb3e31540b5b4df4d9dd (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T11-48-58-947Z-2d2a15e5/report.json
+report: .state/collaboration-baseline/run-2026-10-20T11-55-21-996Z-6e0e21b5/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T11-48-58-947Z-2d2a15e5/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-e400op/report.json`，163.0s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-i2UJpJ/report.json`，162.8s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-Muz76I/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-BYYu74/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T11-48-58-947Z-2d2a15e5/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T11-48-58-947Z-2d2a15e5/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T11-48-58-947Z-2d2a15e5/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T11-48-58-947Z-2d2a15e5/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T11-55-21-996Z-6e0e21b5/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T11-55-21-996Z-6e0e21b5/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T11-55-21-996Z-6e0e21b5/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T11-55-21-996Z-6e0e21b5/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -579,4 +579,5 @@ report: .state/collaboration-baseline/run-2026-10-20T11-48-58-947Z-2d2a15e5/repo
 - session_inbox 返回 deliveryId/eventId/seq/status/batchId、nextSeq/head/historyFloor/resetRequired/hasMore
 - session_ack 仅允许会话所属 Agent 确认 pending/batched delivery，写 inbox.delivered(status=provided)，重复确认幂等跳过
 - 新增 session-inbox 测试覆盖分页、确认、重复确认与跨会话拒绝
-- 尚未完成：runner 恢复未完成 delivery、旧 cursor 重置流程、客户端 MCP schema 暴露
+- scripts/room-agent-mcp.mjs 与 Claude 插件同步暴露 session_inbox / session_ack 工具 schema（显式 agentSessionId、分页/限流参数）
+- 尚未完成：runner 恢复未完成 delivery、旧 cursor 重置流程
