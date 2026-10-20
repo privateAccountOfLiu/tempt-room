@@ -70,6 +70,7 @@ test('two bound task runs receive distinct independent workspaces and leave the 
   assert.ok(runs.every(run => run.status === 'completed'), runs.map(run => `${run.id}:${run.status}:${run.error}`).join(' '));
   assert.ok(runs.every(run => run.projectBindingId === bind.result.bindingId && run.bindingVersion === bind.result.version));
   assert.ok(runs.every(run => run.dirtyBaselineHash === bind.result.manifestHash));
+  assert.ok(runs.every(run => (run.externalReads ?? []).some(read => read.kind === 'file' && read.source === project && read.hash === bind.result.manifestHash)));
   assert.ok(runs.every(run => run.workspacePath));
   assert.notEqual(runs[0].workspacePath, runs[1].workspacePath);
   assert.equal(readFileSync(join(project, 'src', 'fixed.ts'), 'utf8'), before);

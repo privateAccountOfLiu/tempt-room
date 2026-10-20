@@ -471,7 +471,8 @@ export class Worker {
         if(!taskBinding.allowedExecutionModes.includes(hostMode?'host':'sandbox'))throw new Error('项目绑定不允许当前执行模式');
         if(!task?.projectPath||resolve(task.projectPath).toLowerCase()!==resolve(taskBinding.sourcePath).toLowerCase())throw new Error('任务项目目录与项目绑定不一致');
         run.projectBindingId=taskBinding.id;run.bindingVersion=taskBinding.version;run.sourceCommit=taskBinding.baseCommit;
-        run.dirtyBaselineHash=buildProjectManifest(taskBinding.sourcePath).manifestHash;
+        const baselineManifest=buildProjectManifest(taskBinding.sourcePath).manifestHash;run.dirtyBaselineHash=baselineManifest;
+        if(!(run.externalReads??[]).some(read=>read.kind==='file'&&read.source===taskBinding.sourcePath&&read.hash===baselineManifest))run.externalReads=[...(run.externalReads??[]),{kind:'file',source:taskBinding.sourcePath,...(taskBinding.baseCommit?{version:taskBinding.baseCommit}:{}),hash:baselineManifest,fetchedAt:now()}];
       }
       let workspace:string, baseline:Map<string,string>|undefined;
       if (attached) {

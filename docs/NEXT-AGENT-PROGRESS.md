@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: b24eda2eb86423da6ad66931e450c6719d7611cc (dirty)
+source HEAD: bdd3f6893fd3c68b9fc9a648aea4b483f853b3a6 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T12-54-30-765Z-8aadcf6c/report.json
+report: .state/collaboration-baseline/run-2026-10-20T13-02-12-335Z-784ea020/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T12-54-30-765Z-8aadcf6c/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-OmojKz/report.json`，163.6s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-HymdOZ/report.json`，164.3s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-aqbyqf/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-MwxeUf/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T12-54-30-765Z-8aadcf6c/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T12-54-30-765Z-8aadcf6c/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T12-54-30-765Z-8aadcf6c/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T12-54-30-765Z-8aadcf6c/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T13-02-12-335Z-784ea020/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T13-02-12-335Z-784ea020/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T13-02-12-335Z-784ea020/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T13-02-12-335Z-784ea020/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -588,7 +588,9 @@ report: .state/collaboration-baseline/run-2026-10-20T12-54-30-765Z-8aadcf6c/repo
 - Run 新增 externalReads；新增 run.evidence.record owner 命令：file/database/network + source/version/hash/fetchedAt
 - related 段加入 externalRead:kind:source:version#hash；有证据时不再写 externalReadVersion=unknown
 - 新增 external-reads 测试：命令持久化、context 证据、Agent 越权拒绝
-- 尚未完成：自动采集文件/网络/DB 版本（当前由 owner/受控工具显式上报）
+- Worker 在绑定项目任务启动时自动写入 externalReads(file, sourcePath, baseCommit/manifestHash)，与 dirtyBaselineHash 一致
+- project-binding 测试断言 Run.externalReads 包含 binding manifest 证据
+- 尚未完成：自动采集网络/DB 版本，非绑定任务文件读取
 
 ## B07 起点 — 外部 inbox 游标/重置契约
 
