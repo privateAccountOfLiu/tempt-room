@@ -30,7 +30,8 @@ export const executionSettingsSchema=z.object({
   maxAutoRetries:z.number().int().min(0).max(3).default(1),
   adaptiveTimeouts:z.boolean().default(false),
   roomTokenBudget:z.number().int().min(0).max(1000000000).default(0),
-  roomCostBudgetUsd:z.number().min(0).max(1000000).default(0)
+  roomCostBudgetUsd:z.number().min(0).max(1000000).default(0),
+  unknownCostPolicy:z.enum(['block','allow']).default('block')
 }).strict();
 export type ExecutionSettings=z.infer<typeof executionSettingsSchema>;
 export const defaultExecutionSettings:ExecutionSettings=executionSettingsSchema.parse({});

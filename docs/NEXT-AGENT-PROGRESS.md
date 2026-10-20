@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 439d479aeae615abd063816701f1fff5dd03deb4 (dirty)
+source HEAD: 046b3b458667d95c69072c4e0409cc1bac02ce34 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T06-20-41-360Z-296a7346/report.json
+report: .state/collaboration-baseline/run-2026-10-20T06-27-19-269Z-bb457d84/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -185,19 +185,19 @@ report: .state/collaboration-baseline/run-2026-10-20T06-20-41-360Z-296a7346/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-GKHrxN/report.json`，156.7s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-z0aY5L/report.json`，156.6s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-kvQBah/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-KaXAaD/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T06-20-41-360Z-296a7346/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T06-20-41-360Z-296a7346/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T06-20-41-360Z-296a7346/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T06-20-41-360Z-296a7346/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T06-27-19-269Z-bb457d84/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T06-27-19-269Z-bb457d84/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T06-27-19-269Z-bb457d84/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T06-27-19-269Z-bb457d84/replay.stdout.txt`
 
 ## D04a — 用量样本去重与统一聚合
 
@@ -226,7 +226,14 @@ report: .state/collaboration-baseline/run-2026-10-20T06-20-41-360Z-296a7346/repo
   - budget reservations 列表：状态、预留/实际、来源、释放操作
   - 3 秒轮询刷新
 - 浏览器 E2E 用量面板断言新增「服务端用量账本」
-- 尚未完成：未知费用 policy 自动执行、按请求级预留估算、预算账本导出
+- ExecutionSettings 新增 unknownCostPolicy(block/allow，默认 block)
+- Service.enqueue 对带 costBudgetUsd 的 Run 检查能力证据：
+  - demo/api 视为已知路径；
+  - 其他 provider 必须有 fingerprint 匹配的 usageScope verified_supported，否则 409 cost_unknown
+  - owner 可切换 allow 显式允许未知成本执行
+- 运行设置 UI 新增「未知成本策略」选择；浏览器 E2E 断言可见
+- 新增 tests/unknown-cost-policy.test.ts：未验证阻止、能力验证后允许、policy allow 后允许
+- 尚未完成：按请求级预留估算、预算账本导出、未知费用自动停止策略细化
 ## M1 验收 — 并行任务确定性 fixture
 
 - 新增 scripts/acceptance-parallel-tasks.ts：

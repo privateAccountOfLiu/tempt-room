@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {discussionPrompt,assessConvergence,discussionSummaryPrompt} from './discussions.ts';
-import { agentSchema,contextSeqOf,taskContractSchema, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type Task, type Decision, type AgentSession, type Subscription, type WakeIntent, type ProjectBinding, type Integration, type BudgetReservation } from '../../../packages/protocol/src/index.ts';
+import { agentSchema,contextSeqOf,taskContractSchema, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type Task, type Decision, type AgentSession, type Subscription, type WakeIntent, type ProjectBinding, type Integration, type BudgetReservation, type CapabilityEvidence } from '../../../packages/protocol/src/index.ts';
 import { digest, now, OWNER, Store, SYSTEM, uid } from './store.ts';
 import {assertContextCurrent} from './context-reconciliation.ts';
 import { assertRunFence } from './execution.ts';
@@ -8,7 +8,7 @@ import { captureContext } from './context.ts';
 import { adaptiveTimeoutMs } from './adaptive.ts';
 import { trustForActor } from './trust.ts';
 import {provideTaskContext,assertExternalContextCurrent} from './external-context.ts';
-import {capabilityEvidenceId} from './adapter-capabilities.ts';
+import {agentCapabilityFingerprint,capabilityEvidenceId,verifiedCapabilityState} from './adapter-capabilities.ts';
 import {InputDeliveryService} from './input-delivery.ts';
 import {canonicalProjectPath,buildProjectManifest,projectBaseCommit} from './project-manifest.ts';
 import {taskVerificationRecordSchema} from '../../../packages/protocol/src/index.ts';
@@ -484,6 +484,7 @@ export class RoomService {
     if (!agent.enabled) throw new ProtocolError('agent_disabled', `${agent.name} 尚未启用，请先配置并诊断`, 409);
     return agent;
   }
+  private assertCostPolicy(roomId:string,agent:AgentDescriptor,limits:Partial<Run['limits']>|undefined){if(!(limits?.costBudgetUsd&&limits.costBudgetUsd>0))return;if(['demo','api'].includes(agent.provider))return;const settings=this.store.settings();if(settings.unknownCostPolicy!=='block')return;const fingerprint=agentCapabilityFingerprint(agent);const evidence=this.store.list<CapabilityEvidence>('capability_evidence',roomId).filter(item=>item.fingerprint===fingerprint);if(verifiedCapabilityState(fingerprint,evidence,'usageScope')!=='verified_supported')throw new ProtocolError('cost_unknown','该成员没有已验证的用量/费用回执能力；请先验证能力或允许未知成本策略',409);}
   private reserveBudgetForRun(run:Run){
     const settings=this.store.settings();if(!settings.roomCostBudgetUsd)return;
     const reservedUsd=run.limits?.costBudgetUsd??0;if(!reservedUsd)return;
@@ -503,6 +504,8 @@ export class RoomService {
   }
   enqueue(roomId: string, agentId: string, prompt: string, basedOnSeq: number, extra: Partial<Run> & { causationId?: string } = {}): Run {
     const executionAgent=this.checkAgent(roomId,agentId);
+    // Cost-budgeted runs from providers without verified usage are blocked by default.
+    {const provisionalLimits={costBudgetUsd:extra.limits?.costBudgetUsd??this.store.settings().costBudgetUsd};this.assertCostPolicy(roomId,executionAgent,provisionalLimits);}
     if(executionAgent.connectionMode==='external')throw new ProtocolError('external_agent','外部会话不创建托管运行',409);
     const { causationId, ...fields } = extra;
     const settings=this.store.settings();

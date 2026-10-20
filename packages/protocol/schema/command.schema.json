@@ -2315,6 +2315,14 @@
               "type": "number",
               "minimum": 0,
               "maximum": 1000000
+            },
+            "unknownCostPolicy": {
+              "default": "block",
+              "type": "string",
+              "enum": [
+                "block",
+                "allow"
+              ]
             }
           },
           "required": [
@@ -2342,7 +2350,8 @@
             "maxAutoRetries",
             "adaptiveTimeouts",
             "roomTokenBudget",
-            "roomCostBudgetUsd"
+            "roomCostBudgetUsd",
+            "unknownCostPolicy"
           ],
           "additionalProperties": false
         }
