@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 6e9ce3388f0de82a7bb8213c3c1b4852d7e8a10f (dirty)
+source HEAD: bee5d46337c33be494ceced3f6aa516f88d2d363 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T04-42-30-868Z-db577138/report.json
+report: .state/collaboration-baseline/run-2026-10-20T04-47-38-454Z-555fcf44/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -161,21 +161,35 @@ report: .state/collaboration-baseline/run-2026-10-20T04-42-30-868Z-db577138/repo
 
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
-- `npm test`：330/330
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-08zo4k/report.json`，153.1s）
+- `npm test`：331/331
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-RuXAon/report.json`，154.3s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-ZupOU0/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-fDLnc1/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T04-42-30-868Z-db577138/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T04-42-30-868Z-db577138/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T04-42-30-868Z-db577138/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T04-42-30-868Z-db577138/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-47-38-454Z-555fcf44/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T04-47-38-454Z-555fcf44/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-47-38-454Z-555fcf44/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-47-38-454Z-555fcf44/replay.stdout.txt`
 
+## M1 验收 — 并行任务确定性 fixture
+
+- 新增 scripts/acceptance-parallel-tasks.ts：
+  - `--check` 不启动任何模型，modelRequests=0
+  - 绑定真实 fixture 项目并冻结 manifest
+  - 两个不同 Agent 创建严格契约任务，各自在独立 workspace 写出不同交付文件
+  - 发布两个可复核 patch artifact
+  - owner 分别记录验收 accepted
+  - 两个 artifact 通过持久 integration 队列依次 verification/staging/apply
+  - 最终源项目同时包含两个 Agent 的成果，README 基线保持不变
+  - 每一步检查写入 .state/acceptance-parallel-tasks/run-*/report.json
+- package.json 新增 acceptance:parallel 脚本
+- 新增 tests/parallel-task-acceptance.test.ts 1 项：断言两 Agent、独立 workspace、双验收、双集成 applied、组合结果可用、modelRequests=0
+- 真实模型模式未启用；--real 明确报错，需沿用 E02 显式成本/授权
 ## D02b — 集成 staging 验证与重启对账切片
 
 - Worker 集成处理扩展：

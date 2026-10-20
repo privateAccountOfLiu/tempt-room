@@ -8,7 +8,9 @@
     "url": "git+https://github.com/privateAccountOfLiu/tempt-room.git"
   },
   "homepage": "https://github.com/privateAccountOfLiu/tempt-room#readme",
-  "bugs": { "url": "https://github.com/privateAccountOfLiu/tempt-room/issues" },
+  "bugs": {
+    "url": "https://github.com/privateAccountOfLiu/tempt-room/issues"
+  },
   "private": true,
   "type": "module",
   "engines": {
@@ -64,7 +66,8 @@
     "test:faults": "tsx --test tests/fault-injection.test.ts",
     "test:concurrency": "tsx --test tests/concurrency-conflict.test.ts",
     "verify:collaboration": "tsx scripts/verify-collaboration-baseline.ts",
-    "verify:capabilities": "tsx scripts/verify-adapter-capabilities.ts"
+    "verify:capabilities": "tsx scripts/verify-adapter-capabilities.ts",
+    "acceptance:parallel": "tsx scripts/acceptance-parallel-tasks.ts --check"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
