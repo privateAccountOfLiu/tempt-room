@@ -198,6 +198,15 @@ export class RoomService {
         this.store.event(roomId,'outbound.enqueued',OWNER,{deliveryId:delivery.deliveryId,url:delivery.url,throughSeq:delivery.throughSeq,redacted:delivery.redacted,createdAt:now()});
         return {deliveryId:delivery.deliveryId,status:'pending'};
       }
+      case 'outbound.clear': {
+        const roomId=this.requireRoom(command);
+        if(actor.kind!=='human')throw new ProtocolError('forbidden','只有 owner 可以清理外发',403);
+        const input=payloadSchemas['outbound.clear'].parse(p),summaries=summarizeOutboundDeliveries(this.store.events(roomId),this.store.settings().outboundMaxAttempts);
+        const targets=input.deliveryId?[summaries.find(item=>item.deliveryId===input.deliveryId)]:summaries.filter(item=>item.status==='failed');
+        if(input.deliveryId&&(!targets[0]||targets[0].status!=='failed'))throw new ProtocolError('invalid_state','只有 failed 的外发可清理',409);
+        let cleared=0;for(const target of targets){if(!target||target.status!=='failed')continue;this.store.event(roomId,'audit.recorded',SYSTEM,{action:'outbound.cleared:'+target.deliveryId});cleared++;}
+        return {cleared};
+      }
       case 'run.evidence.record': {
         const roomId=this.requireRoom(command);
         if(actor.kind!=='human')throw new ProtocolError('forbidden','只有 owner 可以记录外部读取证据',403);

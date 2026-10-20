@@ -86,3 +86,17 @@ test('failed outbound attempts are recorded without being marked delivered', asy
   assert.equal((attempted[0]!.payload as any).ok, false);
   assert.equal(store.events(roomId).filter(event => event.type === 'outbound.delivered').length, 0);
 });
+
+test('owner clears failed outbound deliveries and they can no longer be retried', async t => {
+  const {store, worker, roomId, port, command} = await fixture(t);
+  command('settings.update', {...store.settings(), outboundMaxAttempts: 1});
+  const failed = command('outbound.enqueue', {url: `http://127.0.0.1:1/hook`, throughSeq: store.room(roomId)!.seq});
+  await worker.deliverOutbound();
+  const cleared = command('outbound.clear', {deliveryId: failed.result.deliveryId});
+  assert.equal(cleared.result.cleared, 1);
+  const summary = summarizeOutboundDeliveries(store.events(roomId), 1);
+  assert.equal(summary.find(item => item.deliveryId === failed.result.deliveryId)!.status, 'cleared');
+  assert.throws(() => command('outbound.retry', {deliveryId: failed.result.deliveryId}), /只有 failed/);
+  assert.equal(command('outbound.clear', {}).result.cleared, 0);
+  assert.ok(port > 0);
+});

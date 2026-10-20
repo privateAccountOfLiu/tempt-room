@@ -23,11 +23,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: a09acb72a6683d4aba4cfc71c18f710e80b51da2 (dirty)
+source HEAD: 46a492f681233b84d271582b16aea7dc398e3dba (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T16-29-13-759Z-976b2742/report.json
+report: .state/collaboration-baseline/run-2026-10-20T16-40-19-424Z-a93bc6f3/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -222,19 +222,19 @@ report: .state/collaboration-baseline/run-2026-10-20T16-29-13-759Z-976b2742/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-mI8Odz/report.json`，233.7s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-CF4Do0/report.json`，235.9s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-x6Pfjn/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-HRvuu0/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T16-29-13-759Z-976b2742/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T16-29-13-759Z-976b2742/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T16-29-13-759Z-976b2742/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T16-29-13-759Z-976b2742/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T16-40-19-424Z-a93bc6f3/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T16-40-19-424Z-a93bc6f3/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T16-40-19-424Z-a93bc6f3/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T16-40-19-424Z-a93bc6f3/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -677,7 +677,9 @@ report: .state/collaboration-baseline/run-2026-10-20T16-29-13-759Z-976b2742/repo
 - 测试覆盖 retry 后状态回到 pending
 - export?redact=1&includeArtifacts=1 现在扫描文本 artifact 内容并替换 secret，redactions 计入总数；二进制标记 scanned=false 不改动
 - 新增 artifact content redaction 单测 + room-export 集成断言（秘密不出现、[REDACTED] 出现）
-- 尚未完成：死信批量清理、导入产物内容完整性策略
+- outbound.clear owner 命令：按 deliveryId 或批量清理 failed 投递，写 audit.recorded 标记；摘要返回 cleared 状态且 retry 拒绝
+- RoomForm 外发面板当存在 failed 时显示「清理失败」；新增 outbound clear 测试
+- 尚未完成：导入产物内容完整性策略、跨房间外发审计报表
 
 ## E04 能力完成定义（第 109 轮）
 
