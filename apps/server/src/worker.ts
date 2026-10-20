@@ -305,7 +305,7 @@ export class Worker {
     // model turns on upgrade, but old-context success is still rejected.
     run.contextPolicy??={...settings.contextPolicy,maxRounds:0};run.lifecycleVersion??=1;
     run.limits??={memoryMb:settings.memoryMb,maxProcesses:settings.maxProcesses,timeoutMs:run.taskId?settings.taskTimeoutMs:settings.chatTimeoutMs,tokenBudget:settings.tokenBudget,costBudgetUsd:settings.costBudgetUsd};
-    run.generation??=1;run.executionId=uid('execution');run.leaseUntil=new Date(Date.now()+settings.taskLeaseMs).toISOString();
+    run.generation??=1;run.executionId=uid('execution');run.startedAt??=now();run.leaseUntil=new Date(Date.now()+settings.taskLeaseMs).toISOString();
     if(run.agentSessionId&&(run.inputDeliveryMode??'next-turn')==='next-turn'){
       try{const batch=this.service.inputDelivery.createBatch({roomId:run.roomId,agentSessionId:run.agentSessionId,runId:run.id,generation:run.generation??1,executionId:run.executionId});if(batch)run.inputBatchId=batch.id;}catch{/* A failed batch reservation must not hide the run from operators. */}
     }
@@ -550,7 +550,7 @@ export class Worker {
       if(status==='completed'&&run.discussionRole==='summary'&&!this.store.list<Artifact>('artifacts',run.roomId).some(a=>a.runId===run.id&&a.discussionId===run.discussionId)){status='failed';error='总结运行未生成交付物';}
       if(current.stopReason==='superseded'&&['completed','failed','canceled','superseded'].includes(status))status='superseded';
       Object.assign(run,current);delete run.leaseUntil;
-      Object.assign(run, { sandbox:current.sandbox,status, error: error?.slice(0,2000), updatedAt: now() });  this.store.event(run.roomId, reconciliation?'run.reconciled':'run.updated', SYSTEM, { run }, null, run.id);
+      Object.assign(run, { sandbox:current.sandbox,status, error: error?.slice(0,2000), finishedAt: now(), updatedAt: now() });  this.store.event(run.roomId, reconciliation?'run.reconciled':'run.updated', SYSTEM, { run }, null, run.id);
       if (run.taskId) {
         const task = this.store.get<Task>('tasks', run.taskId);
         if (task && task.version === run.taskVersion) { task.status = status; if(task.strict||task.requiresAcceptance){task.acceptanceStatus=status==='completed'?'pending':'rejected';}  this.store.event(run.roomId, 'task.updated', SYSTEM, { task }); }

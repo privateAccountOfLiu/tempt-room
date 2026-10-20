@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 1b2bd8490616563900316acc203c3ca0da293e9b (dirty)
+source HEAD: 869730aa7a4ebc1fdcdf6e35056c18a6be58fe2d (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T07-11-39-264Z-917a0853/report.json
+report: .state/collaboration-baseline/run-2026-10-20T07-17-47-113Z-0d09e941/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -185,19 +185,19 @@ report: .state/collaboration-baseline/run-2026-10-20T07-11-39-264Z-917a0853/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-wLB2tW/report.json`，158.5s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-yvNiOL/report.json`，158.5s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-jJwODp/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-SSnbhx/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T07-11-39-264Z-917a0853/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T07-11-39-264Z-917a0853/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T07-11-39-264Z-917a0853/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T07-11-39-264Z-917a0853/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T07-17-47-113Z-0d09e941/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T07-17-47-113Z-0d09e941/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T07-17-47-113Z-0d09e941/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T07-17-47-113Z-0d09e941/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -239,7 +239,10 @@ report: .state/collaboration-baseline/run-2026-10-20T07-11-39-264Z-917a0853/repo
 - wake 派发的 Run 继承 source event traceId；artifact 继承 run traceId；integration 继承 artifact traceId
 - 新增 GET /api/rooms/:id/traces/:traceId：返回共享 traceId 的 durable 事件
 - 新增 tests/trace.test.ts：task.create→task.created/run.created 同 trace、未认证 401
-- 尚未完成：延迟直方图、指标图表化、trace UI## D04a — 用量样本去重与统一聚合
+- Worker 在 startRun/finish 记录 startedAt/finishedAt
+- metrics 新增 enqueueToStartAvgMs / enqueueToStartP95Ms / runDurationAvgMs
+- UsagePanel 指标卡展示平均排队→启动、P95 排队、平均运行时长；浏览器 E2E 断言可见
+- 尚未完成：完整延迟直方图、指标图表化、trace UI## D04a — 用量样本去重与统一聚合
 
 - 新增 packages/protocol/src/usage.ts：UsageSample（provider/session/turn/request/scope/counterEpoch/tokens/cost/source）
 - 新增 apps/server/src/usage.ts 纯聚合器：
