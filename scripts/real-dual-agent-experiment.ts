@@ -26,11 +26,11 @@ if (!args.has('--execute')) { console.log('dry-run 完成；传 --execute 且设
 if (process.env.ROOM_EXPERIMENT_AUTHORIZED !== '1') { console.error('真实模型实验需要显式授权：ROOM_EXPERIMENT_AUTHORIZED=1，并确认成本。'); process.exit(3); }
 
 const agentA = plan.agentA!, agentB = plan.agentB!;
-const command = async (type: string, payload: unknown) => call<{result: any}>('/api/commands', {method: 'POST', body: JSON.stringify({version: '0.1', commandId: `exp_${Date.now()}_${Math.random().toString(36).slice(2)}`, roomId: payload && (payload as any).roomId, type, payload})});
+const command = async (type: string, payload: unknown, roomId?: string) => call<{result: any}>('/api/commands', {method: 'POST', body: JSON.stringify({version: '0.1', commandId: `exp_${Date.now()}_${Math.random().toString(36).slice(2)}`, roomId, type, payload})});
 const created = await command('room.create', {name: `真实双 Agent 实验 ${new Date().toISOString()}`, description: 'E02 真实模型实验', members: [agentA.id, agentB.id]});
 const roomId = created.result?.roomId ?? created.result?.room?.id;
 if (!roomId) throw new Error('room.create 未返回 roomId');
-const taskA = await command('task.create', {roomId, title: '实验 A：完成基线实现并提交交付物', agentId: agentA.id, ...(projectPath ? {projectPath} : {})});
+const taskA = await command('task.create', {title: '实验 A：完成基线实现并提交交付物', agentId: agentA.id, ...(projectPath ? {projectPath} : {})}, roomId);
 const roomSnapshot = async () => call<any>(`/api/rooms/${roomId}/snapshot`);
 const wait = async (taskId: string) => {
   const deadline = Date.now() + timeoutMs;
@@ -42,7 +42,7 @@ const wait = async (taskId: string) => {
   throw new Error(`等待任务 ${taskId} 超时`);
 };
 const runA = await wait(taskA.result.taskId);
-const taskB = await command('task.create', {roomId, title: '实验 B：复核 A 的交付物并给出验收结论', agentId: agentB.id, dependencies: [taskA.result.taskId]});
+const taskB = await command('task.create', {title: '实验 B：复核 A 的交付物并给出验收结论', agentId: agentB.id, dependencies: [taskA.result.taskId]}, roomId);
 const runB = await wait(taskB.result.taskId);
 const snapshot = await roomSnapshot();
 const report = {
@@ -55,4 +55,10 @@ const report = {
 mkdirSync(resolve('.state/real-experiment'), {recursive: true});
 const path = resolve(`.state/real-experiment/report-${report.createdAt.replaceAll(':', '-')}.json`);
 writeFileSync(path, JSON.stringify(report, null, 2));
-console.log(`真实双 Agent 实验完成：${path}`);
+console.log(`真实双 Agent 实验报告：${path}`);
+console.log(`A=${runA.agentId}:${runA.status} B=${runB.agentId}:${runB.status}`);
+if (runA.status !== 'completed' || runB.status !== 'completed') {
+  console.error(`实验未成功：A=${runA.status}${runA.error ? ' (' + runA.error.slice(0, 300) + ')' : ''}；B=${runB.status}${runB.error ? ' (' + runB.error.slice(0, 300) + ')' : ''}`);
+  process.exit(4);
+}
+console.log('真实双 Agent 实验完成');

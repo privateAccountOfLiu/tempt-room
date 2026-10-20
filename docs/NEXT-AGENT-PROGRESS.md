@@ -105,7 +105,7 @@ report: .state/collaboration-baseline/run-2026-10-20T15-28-57-112Z-13755603/repo
 - 自动路由仍待接入：当前调度继续使用兼容能力提示，不会把未验证证据当成支持
 ### 运行环境状态（2026-10-20）
 
-- 按用户明确授权启动本地服务验证；服务运行于 http://127.0.0.1:4317（PID 5392；2026-10-20 23:25 重启到 native process tree proof 构建
+- 按用户明确授权启动本地服务验证；服务运行于 http://127.0.0.1:4317（PID 18160；2026-10-21 00:06 运行 E02 真实实验构建（已注入 DEEPSEEK_API_KEY）
 - 实测 /api/rooms/:id/outbound 200，/api/settings 含 outboundSigningSecretEnv
 - 实测 /api/settings 返回 outboundAllowPrivate/outboundMaxAttempts/outboundTimeoutMs
 - 实测 capabilities API 返回 interceptionGaps
@@ -285,7 +285,11 @@ report: .state/collaboration-baseline/run-2026-10-20T15-28-57-112Z-13755603/repo
 - dry-run 只读 /api/agents 与规划，不调用模型；--execute 需要 ROOM_EXPERIMENT_AUTHORIZED=1，且拒绝 demo/disabled/external Agent
 - 规划器排除 demo、disabled、external；roomIsIdle 判定终态；新增 real-experiment 测试 2 项
 - dry-run 实测：当前 live 配置识别 Codex + DeepSeek 两个真实 Agent，等待显式成本授权后执行 --execute
-- 尚未完成：Job Object 级硬保证；真实 CLI host 端到端实验（需授权）## E01 起点 — 有界可观测指标
+- **E02 完成**：用户授权后真实运行 DeepSeek + Claude 双 Agent 协作，两 Run 均 completed；报告 docs/E02-REAL-EXPERIMENT.md，原始 JSON docs/evidence/e02-real-dual-agent-report.json
+- 真实证据：DeepSeek 463.2s、Claude 469.0s；Claude usage $2.708936 / 100435 in / 89041 out；27 个 artifacts；两 Run cleanupProof=taskkill-tree-scan remaining=0
+- 修复 Claude executable 指向不存在版本目录的问题，改为 C:\Users\35151\.local\bin\claude.exe（数据库配置，不入库）
+- 实验脚本修复：command roomId 放入外层命令而非 payload；失败状态退出码非 0
+- 尚未完成：Job Object 级硬保证、C02 MCP 宿主桥接、B06 真实 steer## E01 起点 — 有界可观测指标
 
 - 新增 apps/server/src/metrics.ts：collectMetrics/metricsText
 - 指标覆盖：

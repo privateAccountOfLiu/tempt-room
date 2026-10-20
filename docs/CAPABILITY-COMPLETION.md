@@ -50,7 +50,7 @@
 
 | 能力 | 原因 | 下一步 |
 | --- | --- | --- |
-| E02 真实模型双 Agent 实验 | 需要显式成本与运行授权 | 授权后按实验脚本执行并保存报告 |
+| E02 真实模型双 Agent 实验 | 已完成（2026-10-20，DeepSeek+Claude，见 docs/E02-REAL-EXPERIMENT.md） | — |
 | F02 可靠外发 | 需要持久化 outbox、重试、SSRF 边界 | 设计 durable outbound 后再实现 |
 | native host 清理证明 | 需要 Windows Job Object 或原生 helper | 原生 helper 获取 job 进程计数 |
 
