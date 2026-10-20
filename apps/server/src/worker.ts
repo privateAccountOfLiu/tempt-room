@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync } from 'no
 import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
-import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type Artifact, type Discussion, type ExecutionSettings, type Subscription, type InputBatch, type ProjectBinding, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
+import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type Artifact, type Discussion, type ExecutionSettings, type Subscription, type InputBatch, type ProjectBinding, type Integration, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { diagnose, ExecutionUnknown, RemoteCanceled, runAdapter } from './adapters.ts';
 import { SandboxHost } from './sandbox.ts';
 import { digest, now, Store, SYSTEM, uid } from './store.ts';
@@ -126,7 +126,23 @@ export class Worker {
       if(!next)break;
       if(this.startRun(next,settings))this.scheduler.recordServed(next);
     }
+    this.processIntegrations();
     this.scanSubscriptions();
+  }
+  private processIntegrations(){
+    if(this.active.size>0)return;
+    const integration=this.store.list<Integration>('integrations').filter(item=>item.status==='queued').sort((a,b)=>a.createdAt.localeCompare(b.createdAt))[0];
+    if(!integration)return;
+    const update=(status:Integration['status'],extra:Partial<Integration>={})=>{const next:Integration={...integration,...extra,status,updatedAt:now()};this.store.atomic(()=>{this.store.event(integration.roomId,'integration.updated',SYSTEM,{integration:next});});return next;};
+    update('validating');
+    try{
+      const result=this.apply(integration.artifactId);
+      update('applied',{journalId:result.journalId});
+    }catch(error){
+      const code=(error as any)?.code as string|undefined;
+      const status:Integration['status']=code==='already_applied'?'applied':['apply_conflict','source_changed','stale_generation','stale_artifact','stale_dependency','artifact_binding_invalid','run_not_completed'].includes(code??'')?'conflict':code==='recovery_required'?'blocked':'unknown';
+      update(status,{...(code?{errorCode:code}:{})});
+    }
   }
   private scanSubscriptions(){
     for(const subscription of this.store.list<Subscription>('subscriptions')){

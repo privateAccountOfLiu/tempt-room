@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: a2feb7e5907f34fa4af3213cde481a96326dcf2b (dirty)
+source HEAD: 1debad2d3ba1f04057dfa9e36aabaee8e924e8c0 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T04-29-17-792Z-117ac461/report.json
+report: .state/collaboration-baseline/run-2026-10-20T04-36-38-222Z-146f9e36/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -161,21 +161,38 @@ report: .state/collaboration-baseline/run-2026-10-20T04-29-17-792Z-117ac461/repo
 
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
-- `npm test`：326/326
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-BB71zT/report.json`，152.8s）
+- `npm test`：328/328
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-MD2rp0/report.json`，153.2s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-DWBcbE/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-tnrVsZ/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T04-29-17-792Z-117ac461/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T04-29-17-792Z-117ac461/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T04-29-17-792Z-117ac461/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T04-29-17-792Z-117ac461/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-36-38-222Z-146f9e36/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T04-36-38-222Z-146f9e36/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-36-38-222Z-146f9e36/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-36-38-222Z-146f9e36/replay.stdout.txt`
 
+## D02a — 持久集成队列主体
+
+- 新增 packages/protocol/src/integration.ts：Integration schema 与状态机（queued/validating/staging/testing/ready_to_apply/applying/applied/conflict/verification_failed/unknown/blocked）
+- 新增 integrations 投影表、integration.queued/integration.updated 事件；DATABASE_VERSION 升至 12
+- 新增 artifact.integrate owner 命令：
+  - 只做鉴权、交付物绑定和幂等预检
+  - 返回 integrationId + queued/applied 状态，不在命令事务里执行 Git/文件操作
+  - 同一 artifact 已有进行中/已应用集成时返回原集成，不重复入队
+- Worker 新增持久集成队列处理：
+  - 单 Worker 按 createdAt 串行处理一条
+  - 有活动 Run 时暂停应用
+  - validating → 调用现有带 journal/备份的 workspaces.apply → applied
+  - apply_conflict/source_changed/stale_* 归为 conflict；recovery_required 为 blocked；rollback_incomplete/其他为 unknown
+  - 应用失败保留原 artifact 与源文件
+- API GET /api/rooms/:id/integrations；交付物预览新增「入队异步集成」入口（保留旧同步路径兼容）
+- 新增 tests/integration-queue.test.ts 2 项：异步入队幂等应用、源文件并发修改归为 conflict 且不改源
+- 尚未完成：staging 项目/验证命令执行与 verificationId、ready_to_apply 授权门、journal 对账恢复、旧同步 artifact.apply 的 SDK/UI 移除
 ## D03b — 验收状态 UI
 
 - 任务卡片显示严格任务的「执行完成/进行中」与「验收待验收/已通过/已拒绝」双状态

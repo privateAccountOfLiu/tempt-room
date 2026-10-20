@@ -847,6 +847,26 @@
     ]
   },
   {
+    "type": "integration.queued",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "integration",
+    "schemaVersion": 1,
+    "kinds": [
+      "integration.updated"
+    ]
+  },
+  {
+    "type": "integration.updated",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "integration",
+    "schemaVersion": 1,
+    "kinds": [
+      "integration.updated"
+    ]
+  },
+  {
     "type": "discussion.round.opened",
     "durability": "durable",
     "aggregate": "room",

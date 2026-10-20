@@ -163,6 +163,7 @@ export function projectEvent(sink:ProjectionSink,event:RoomEvent){
     case 'capability-evidence':put('capability_evidence',payload.capabilityEvidence);break;
     case 'discussion-round':put('discussion_rounds',payload.round);break;
     case 'project-binding':put('project_bindings',payload.projectBinding);break;
+    case 'integration':put('integrations',payload.integration);break;
     case 'settings':case 'audit':break;
   }
 }

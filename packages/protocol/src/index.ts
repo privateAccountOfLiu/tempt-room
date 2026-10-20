@@ -18,6 +18,7 @@ export {discussionSchema,discussionBallotSchema,parseDiscussionReply,defaultDisc
 export {taskContractSchema,taskAcceptanceSchema,taskDependencyConditionSchema,type TaskContract,type TaskAcceptance,type TaskDependencyCondition} from './task-contract.ts';
 export {projectBindingSchema,projectManifestEntrySchema,projectExecutionModeSchema,type ProjectBinding,type ProjectManifestEntry} from './project-binding.ts';
 export {taskAcceptanceStatusSchema,taskAcceptanceCheckSchema,dependencyRequirementSchema,taskVerificationRecordSchema,type TaskAcceptanceStatus,type DependencyRequirement,type TaskVerificationRecord,type DependencyRequirementKind} from './task-acceptance.ts';
+export {integrationSchema,integrationStatusSchema,type Integration,type IntegrationStatus} from './integration.ts';
 import type {DiscussionBallot} from './discussion.ts';
 import {taskContractSchema} from './task-contract.ts';
 import {projectBindingSchema} from './project-binding.ts';
@@ -109,7 +110,8 @@ export const payloadSchemas={
   'decision.propose':z.object({text:title}).strict(),
   'decision.accept':z.object({decisionId:idSchema}).strict(),
   'agent.save':agentSchema.strict(),
-  'artifact.apply':z.object({artifactId:idSchema}).strict()
+  'artifact.apply':z.object({artifactId:idSchema}).strict(),
+  'artifact.integrate':z.object({artifactId:idSchema}).strict()
 };
 export interface Command { version:typeof VERSION;commandId:string;roomId?:string;type:keyof typeof payloadSchemas;payload:Record<string,unknown> }
 export const commandSchema:z.ZodType<Command>=z.discriminatedUnion('type',Object.entries(payloadSchemas).map(([type,payload])=>commandEnvelope.extend({type:z.literal(type),payload})) as [z.ZodObject<any>,z.ZodObject<any>,...z.ZodObject<any>[]]) as unknown as z.ZodType<Command>;

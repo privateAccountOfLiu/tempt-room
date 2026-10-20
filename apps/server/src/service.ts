@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {discussionPrompt,assessConvergence,discussionSummaryPrompt} from './discussions.ts';
-import { agentSchema,contextSeqOf,taskContractSchema, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type Task, type Decision, type AgentSession, type Subscription, type WakeIntent, type ProjectBinding } from '../../../packages/protocol/src/index.ts';
+import { agentSchema,contextSeqOf,taskContractSchema, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type Task, type Decision, type AgentSession, type Subscription, type WakeIntent, type ProjectBinding, type Integration } from '../../../packages/protocol/src/index.ts';
 import { digest, now, OWNER, Store, SYSTEM, uid } from './store.ts';
 import {assertContextCurrent} from './context-reconciliation.ts';
 import { assertRunFence } from './execution.ts';
@@ -358,6 +358,18 @@ export class RoomService {
         const roomId = this.requireRoom(command), decision = this.store.get<Decision & { roomId: string }>('decisions', z.string().parse(p.decisionId));
         if (!decision || decision.roomId !== roomId) throw new ProtocolError('not_found', '决策不存在', 404);
         decision.accepted = true;  this.store.event(roomId, 'decision.accepted', actor, { decision }); return {};
+      }
+      case 'artifact.integrate': {
+        const roomId = this.requireRoom(command);
+        const artifact = this.store.get<Artifact>('artifacts', z.string().parse(p.artifactId));
+        if (!artifact || artifact.roomId !== roomId) throw new ProtocolError('not_found', '交付物不存在', 404);
+        if (artifact.kind !== 'patch') throw new ProtocolError('not_applicable', '这份交付物不是可应用的文件差异', 409);
+        const existing = this.store.list<Integration>('integrations', roomId).find(item => item.artifactId === artifact.id && ['queued', 'validating', 'applying', 'applied'].includes(item.status));
+        if (existing) return {integrationId: existing.id, status: existing.status};
+        if (artifact.applied) throw new ProtocolError('already_applied', '这份交付物已经应用', 409);
+        const integration: Integration = {id: uid('integration'), roomId, artifactId: artifact.id, ...(artifact.runId ? {runId: artifact.runId} : {}), ...(artifact.taskId ? {taskId: artifact.taskId} : {}), status: 'queued', requestActor: actor.id, createdAt: now(), updatedAt: now()};
+        this.store.event(roomId, 'integration.queued', actor, {integration});
+        return {integrationId: integration.id, status: integration.status};
       }
       case 'artifact.apply': {
         const roomId = this.requireRoom(command), id = z.string().parse(p.artifactId), artifact = this.store.get<Artifact>('artifacts', id);
