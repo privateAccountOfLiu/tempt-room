@@ -47,7 +47,8 @@ export const inboxDeliverySchema = z.object({
 export type InboxDelivery = z.infer<typeof inboxDeliverySchema>;
 
 export const inputDeliveryModeSchema = z.enum(['next-turn', 'tool-boundary', 'steer']);
-export const inputBatchStatusSchema = z.enum(['created', 'provided', 'unknown', 'expired']);
+export type InputDeliveryMode = z.infer<typeof inputDeliveryModeSchema>;
+export const inputBatchStatusSchema = z.enum(['created', 'provided', 'acknowledged', 'unknown', 'expired']);
 export const inputBatchSchema = z.object({
   id,
   agentSessionId: id,

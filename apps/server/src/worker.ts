@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync } from 'no
 import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
-import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type Artifact, type Discussion, type ExecutionSettings, type Subscription, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
+import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type Artifact, type Discussion, type ExecutionSettings, type Subscription, type InputBatch, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { diagnose, ExecutionUnknown, RemoteCanceled, runAdapter } from './adapters.ts';
 import { SandboxHost } from './sandbox.ts';
 import { digest, now, Store, SYSTEM, uid } from './store.ts';
@@ -165,6 +165,9 @@ export class Worker {
     run.contextPolicy??={...settings.contextPolicy,maxRounds:0};run.lifecycleVersion??=1;
     run.limits??={memoryMb:settings.memoryMb,maxProcesses:settings.maxProcesses,timeoutMs:run.taskId?settings.taskTimeoutMs:settings.chatTimeoutMs,tokenBudget:settings.tokenBudget,costBudgetUsd:settings.costBudgetUsd};
     run.generation??=1;run.executionId=uid('execution');run.leaseUntil=new Date(Date.now()+settings.taskLeaseMs).toISOString();
+    if(run.agentSessionId){
+      try{const batch=this.service.inputDelivery.createBatch({roomId:run.roomId,agentSessionId:run.agentSessionId,runId:run.id,generation:run.generation??1,executionId:run.executionId});if(batch)run.inputBatchId=batch.id;}catch{/* A failed batch reservation must not hide the run from operators. */}
+    }
     const fence=executionFence(run);this.executions.set(fence.executionId,fence);
     run.status = 'running'; run.updatedAt = now();
     this.store.atomic(() => {  this.store.event(run.roomId, 'run.started', SYSTEM, { run }, null, run.id); });
@@ -292,6 +295,7 @@ export class Worker {
       while(true){
       const attachments=this.attachmentContext(run,home);
       const prompt=attached?`[已有 Codex 会话附着；房间 ${run.roomId}；本轮 ${run.id}]\n本轮最终正文会自动回传房间。本应用没有新增或更改 MCP；已有工具可能绑定其他房间，请勿用它们向错误房间发言。需审批或补充输入时由原客户端处理。\n\n${this.context(run,attachments)}`:this.context(run,attachments);
+      if(run.inputBatchId){const batch=this.store.get<InputBatch>('input_batches',run.inputBatchId);if(batch&&batch.status==='created'){try{this.service.inputDelivery.provideBatch(run.roomId,batch.id,'worker-next-turn');}catch{/* The run may still proceed from its frozen prompt. */}}}
       const candidate=await this.consumeAttempt(run,controller,{agent,workspace,home,scope,prompt:prompt+(supplement?'\n\n'+supplement:''),hostMode,attached});
       const {text,messageId}=candidate;
       assertRunIdentity(this.store,run);

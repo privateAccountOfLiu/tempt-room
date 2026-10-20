@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: c0e357edd5869410ed7daaaff9ceae9319176cd3 (dirty)
+source HEAD: ea15b6081d837066f546ba5021445bbcd840916b (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-19T16-43-29-093Z-84efdca2/report.json
+report: .state/collaboration-baseline/run-2026-10-20T03-56-44-374Z-23c99490/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -54,6 +54,20 @@ report: .state/collaboration-baseline/run-2026-10-19T16-43-29-093Z-84efdca2/repo
 - host 任务仍使用真实项目目录（D01a 尚未接入），报告只做内容变化清单，不改写用户工作树
 - 新增 `tests/host-workspace-isolation.test.ts` 3 项；`npm test` **295/295**
 
+### B06 — InputBatch 交付主体
+
+- 新增 apps/server/src/input-delivery.ts：
+  - createBatch 在一个事务内把 pending InboxDelivery 变成 InputBatch，写 input.batch.created，并把 delivery 标为 batched
+  - provideBatch 在把冻结 prompt 交给适配器前记录 provided/receiptEvidence；不会二次提供
+  - acknowledgeBatch 只允许对应 AgentSession 确认已提供的批次；写 input.batch.acknowledged
+  - 批次带 runId/generation/executionId/payloadHash/fromSeq..throughSeq
+- service.inputDelivery 接入 RoomService；input.ack owner 命令实现
+- Worker 对带 agentSessionId 的 Run：
+  - startRun 先创建批次并附着 run.inputBatchId
+  - prompt 提交前标记 provided（worker-next-turn）
+  - 批次创建失败不隐藏运行，run 仍按冻结 prompt 执行
+- 新增 tests/input-delivery.test.ts 2 项：批次创建/提供/确认与错误会话拒绝；Worker 唤醒运行自动创建并提供批次
+- 尚未完成：tool-boundary/steer 模式、外部 Agent 回执、unknown/expired 对账、UI 输入批次视图
 ### B05b — 能力证据持久化与 UI
 
 - 新增 agentCapabilityFingerprint：绑定 provider、adapter 版本、executable 版本、运行布局、connectionMode、executionMode、模型与行为配置摘要
@@ -145,20 +159,20 @@ report: .state/collaboration-baseline/run-2026-10-19T16-43-29-093Z-84efdca2/repo
 
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
-- `npm test`：314/314
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-dnsfHF/report.json`，213.1s）
+- `npm test`：316/316
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-2e2lay/report.json`，152.7s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-rtAXzz/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-QudG8s/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-19T16-43-29-093Z-84efdca2/report.json`
-- `.state/collaboration-baseline/run-2026-10-19T16-43-29-093Z-84efdca2/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-19T16-43-29-093Z-84efdca2/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-19T16-43-29-093Z-84efdca2/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T03-56-44-374Z-23c99490/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T03-56-44-374Z-23c99490/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T03-56-44-374Z-23c99490/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T03-56-44-374Z-23c99490/replay.stdout.txt`
 
 ## 未完成 / 下一波
 

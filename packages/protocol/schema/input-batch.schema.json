@@ -95,6 +95,7 @@
       "enum": [
         "created",
         "provided",
+        "acknowledged",
         "unknown",
         "expired"
       ]

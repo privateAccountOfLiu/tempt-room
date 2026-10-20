@@ -9,6 +9,7 @@ import { adaptiveTimeoutMs } from './adaptive.ts';
 import { trustForActor } from './trust.ts';
 import {provideTaskContext,assertExternalContextCurrent} from './external-context.ts';
 import {capabilityEvidenceId} from './adapter-capabilities.ts';
+import {InputDeliveryService} from './input-delivery.ts';
 
 /** External (non-managed) claims must heartbeat within this window or the worker recycles the task. */
 const externalTaskLeaseMs = (store: Store) => store.settings().taskLeaseMs;
@@ -17,7 +18,8 @@ export class RoomService {
   onCancel: (runId: string) => void = () => {};
   onApply: (artifactId: string) => Record<string, unknown> = () => { throw new ProtocolError('not_available', '成果应用服务不可用', 503); };
   onInput: (runId: string, text: string) => void = () => {};
-  constructor(public store: Store) {}
+  readonly inputDelivery: InputDeliveryService;
+  constructor(public store: Store) { this.inputDelivery = new InputDeliveryService(store); }
   execute(raw: unknown, actor: Actor = OWNER,scope?:{runId:string;generation?:number;executionId?:string}): Receipt {
     const parsed = commandSchema.safeParse(raw); if (!parsed.success) throw new ProtocolError('invalid_command', parsed.error.message);
     const command = parsed.data, hash = digest({ command, actor,...(scope?{scope}:{}) });
@@ -157,8 +159,12 @@ export class RoomService {
         this.store.event(roomId, 'subscription.updated', actor, {subscription});
         return {subscriptionId: subscription.id, scanSeq: subscription.scanSeq};
       }
-      case 'input.ack':
-        throw new ProtocolError('not_implemented', '输入回执将随 B06 接入', 501);
+      case 'input.ack': {
+        const roomId = this.requireRoom(command);
+        const input = payloadSchemas['input.ack'].parse(p);
+        const batch = this.inputDelivery.acknowledgeBatch(roomId, input.batchId, input.agentSessionId, input.receiptEvidence ?? 'owner-ack');
+        return {batchId: batch.id, status: batch.status};
+      }
       case 'task.create': {
         const roomId = this.requireRoom(command);
         const input = z.object({ title: z.string().trim().min(1).max(5000), agentId: z.string().optional(), projectPath: z.string().max(1500).default(''), dependencies: z.array(z.string()).max(20).default([]), open: z.boolean().default(false) }).parse(p);
