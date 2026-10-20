@@ -738,6 +738,11 @@ export class Worker {
     const result=fence?await this.executeTool(fence.runId,frame.request,fence):{error:'执行通道已经失效',code:'stale_generation'};
     await this.host.request('toolResponse', { runId: frame.runId, requestId: frame.requestId, result }).catch(() => {});
   }
+  private recordExternalRead(run:Run,read:{kind:'file'|'database'|'network';source:string;version?:string;hash?:string;fetchedAt:string}){
+    const current=this.store.get<Run>('runs',run.id);if(!current||terminalStates.has(current.status))return;
+    if((current.externalReads??[]).some(item=>item.kind===read.kind&&item.source===read.source&&item.version===read.version&&item.hash===read.hash))return;
+    current.externalReads=[...(current.externalReads??[]),read];current.updatedAt=now();this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);
+  }
   /** Room tool call from either the sandbox host pipe or a host-mode named pipe. */
   async executeTool(runId: string, request: any, fence?:RunFence): Promise<any> {
     const run = this.store.get<Run>('runs', runId);
@@ -773,7 +778,9 @@ export class Worker {
         const input=z.object({name:z.string().min(1).max(160),text:z.string().max(2**20)}).strict().parse(args);
         action=()=>this.publishArtifact(run,input.name,input.text);
       }else throw new ProtocolError('unsupported_tool','不支持的群聊工具');
-      const commit=()=>{const result=action();this.store.event(run.roomId,'run.tool.completed',actor,{runId:run.id,generation:run.generation??1,executionId:run.executionId,name,success:true},null,run.id);return this.attachToolBoundaryInput(run,result);};
+      const commit=()=>{const result=action();
+        if(name==='room_read'||name==='task_context'||name==='room_inbox')this.recordExternalRead(run,{kind:'database',source:`room:${run.roomId}:${name}`,version:`head:${this.store.room(run.roomId)!.seq}`,hash:digest(result),fetchedAt:now()});
+        this.store.event(run.roomId,'run.tool.completed',actor,{runId:run.id,generation:run.generation??1,executionId:run.executionId,name,success:true},null,run.id);return this.attachToolBoundaryInput(run,result);};
       if(fence&&name!=='room_read'){
         if(typeof request?.operationId!=='string')throw new ProtocolError('operation_id_required','写工具需要稳定 operationId',400);
         return this.operations.execute(fence,request.operationId,name,args,commit);

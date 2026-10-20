@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 1e9f8305cb4939b48a55e41a937286c05fbcd083 (dirty)
+source HEAD: 313460169e9ff6eda3e09781df6262242a62dca0 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T13-09-09-497Z-670dba94/report.json
+report: .state/collaboration-baseline/run-2026-10-20T13-15-09-619Z-64af7ae6/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T13-09-09-497Z-670dba94/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-bY9SbU/report.json`，163.6s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-2hz16c/report.json`，163.9s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-jp0g5X/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-oXKwkA/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T13-09-09-497Z-670dba94/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T13-09-09-497Z-670dba94/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T13-09-09-497Z-670dba94/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T13-09-09-497Z-670dba94/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T13-15-09-619Z-64af7ae6/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T13-15-09-619Z-64af7ae6/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T13-15-09-619Z-64af7ae6/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T13-15-09-619Z-64af7ae6/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -593,7 +593,9 @@ report: .state/collaboration-baseline/run-2026-10-20T13-09-09-497Z-670dba94/repo
 - apiRun/a2aRun 在 HTTP 响应后上报 network externalRead：source URL、ETag/Last-Modified（若有）、fetchedAt
 - Worker 的 onExternalRead 回调将证据去重后追加到 Run.externalReads 并写 run.updated（仅活动 Run）
 - api-output 测试覆盖 ETag 版本与无版本响应
-- 尚未完成：DB 行版本自动采集、非绑定任务文件读取
+- Worker 对 room_read/task_context/room_inbox 工具读取自动记录 externalReads(database, source, version=head:seq, hash=digest(result), fetchedAt)
+- executeTool 授权测试扩展断言数据库读取证据
+- 尚未完成：非绑定任务文件读取自动采集
 
 ## B07 起点 — 外部 inbox 游标/重置契约
 
