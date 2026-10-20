@@ -302,7 +302,7 @@ try {
 
     const goal = `浏览器讨论 ${Date.now()}`;
     if (await clickByText('button', '开启讨论') !== 'ok') fail('找不到「开启讨论」入口');
-    await waitFor('讨论表单', async () => { const text = await bodyText(); return text.includes('这场讨论要解决什么') && text.includes('讨论边界'); }, 10000);
+    await waitFor('讨论表单', async () => { const text = await bodyText(); return text.includes('这场讨论要解决什么') && text.includes('总结激活上限') && text.includes('讨论边界'); }, 10000);
     if (await setTextareaValue('dialog.modal textarea', goal) !== 'ok') fail('无法填写讨论目标');
     const setNumberInput = async (label: string, value: number) => evaluate(`(() => { const input = [...document.querySelectorAll('dialog.modal input[type="number"]')].find(item => (item.closest('label')?.textContent ?? '').includes(${JSON.stringify(label)})); if (!input) return 'missing'; const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; setter.call(input, ${JSON.stringify(String(value))}); input.dispatchEvent(new Event('input', {bubbles: true})); return 'ok'; })()`);
     await evaluate("document.querySelector('dialog.modal .form-advanced')?.setAttribute('open','')");
