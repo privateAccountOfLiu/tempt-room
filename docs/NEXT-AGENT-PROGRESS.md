@@ -105,7 +105,8 @@ report: .state/collaboration-baseline/run-2026-10-20T14-51-14-811Z-898a9256/repo
 - 自动路由仍待接入：当前调度继续使用兼容能力提示，不会把未验证证据当成支持
 ### 运行环境状态（2026-10-20）
 
-- 按用户明确授权启动本地服务验证；服务运行于 http://127.0.0.1:4317（PID 20380；2026-10-20 22:42 重启到 room import UI 构建
+- 按用户明确授权启动本地服务验证；服务运行于 http://127.0.0.1:4317（PID 788；2026-10-20 22:54 重启到 outbound delivery 构建
+- 实测 /api/settings 返回 outboundAllowPrivate/outboundMaxAttempts/outboundTimeoutMs
 - 实测 capabilities API 返回 interceptionGaps
 - 实测 export?redact=1 200，返回 redactions 与 exportHash
 - 实测 export?includeArtifacts=1 200，包含 artifacts 数组
