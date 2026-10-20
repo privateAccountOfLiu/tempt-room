@@ -78,6 +78,16 @@
                     "minLength": 1,
                     "maxLength": 4000
                   },
+                  "argv": {
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
                   "verifierVersion": {
                     "type": "string",
                     "minLength": 1,
@@ -274,6 +284,16 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 4000
+              },
+              "argv": {
+                "minItems": 1,
+                "maxItems": 50,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                }
               },
               "verifierVersion": {
                 "type": "string",

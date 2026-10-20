@@ -8,6 +8,7 @@ export const taskAcceptanceSchema = z.object({
   id: z.string().min(1).max(100),
   description: z.string().min(1).max(2000),
   command: z.string().min(1).max(4000),
+  argv: z.array(z.string().min(1).max(2000)).min(1).max(50).optional(),
   verifierVersion: z.string().min(1).max(100),
   verifierHash: hash
 }).strict();

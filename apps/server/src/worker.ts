@@ -1,6 +1,6 @@
-import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync, unlinkSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync, statSync, unlinkSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type Artifact, type Discussion, type ExecutionSettings, type Subscription, type InputBatch, type ProjectBinding, type Integration, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { diagnose, ExecutionUnknown, RemoteCanceled, runAdapter } from './adapters.ts';
@@ -86,9 +86,28 @@ export class Worker {
   }
   private recoverIntegrations(){
     for(const integration of this.store.list<Integration>('integrations').filter(item=>['validating','staging','testing','ready_to_apply','applying'].includes(item.status))){
-      const next:Integration={...integration,status:'unknown',errorCode:'restart_unknown',updatedAt:now()};
+      const next:Integration={...integration,status:'unknown',errorCode:this.integrationRecoveryEvidence(integration),updatedAt:now()};
       this.store.atomic(()=>{this.store.event(integration.roomId,'integration.updated',SYSTEM,{integration:next});});
     }
+  }
+  private integrationRecoveryEvidence(integration:Integration):string{
+    try{
+      const changes=JSON.parse(readFileSync(join(this.root,'artifacts',integration.artifactId+'.changes.json'),'utf8'));
+      const source=String(changes.manifest?.source??'').toLowerCase();
+      const applyRoot=join(this.root,'apply');
+      if(!source||!existsSync(applyRoot))return 'restart_unknown';
+      for(const entry of readdirSync(applyRoot,{withFileTypes:true})){
+        if(!entry.isDirectory())continue;
+        const journalPath=join(applyRoot,entry.name,'journal.json');
+        if(!existsSync(journalPath))continue;
+        const journal=JSON.parse(readFileSync(journalPath,'utf8'));
+        if(String(journal.source??'').toLowerCase()!==source)continue;
+        const completed=join(applyRoot,entry.name,'complete');
+        if(existsSync(completed))return readFileSync(completed,'utf8').trim()==='applied'?'journal_applied':'journal_rolled_back';
+        return 'journal_incomplete';
+      }
+    }catch{/* Unknown evidence must stay unknown. */}
+    return 'restart_unknown';
   }
   start() { this.timer = setInterval(() => this.tick(), 250); this.timer.unref(); this.tick(); queueMicrotask(() => this.recoverInterrupted()); }
   tick() {
@@ -163,12 +182,20 @@ export class Worker {
             mkdirSync(dirname(target),{recursive:true});writeFileSync(target,Buffer.from(change.after,'base64'));
           }
           let failed:number|undefined,outputs='';
+          const allowedVerificationExecutables=new Set(['node','npm','npx','git','python','python3','dotnet']);
           for(const check of checks){
-            const result=spawnSync(check.command,{shell:true,cwd:staging,encoding:'utf8',timeout:60000,windowsHide:true});
+            let result;
+            if(check.argv?.length){
+              const executable=basename(check.argv[0]).replace(/\.(exe|cmd|bat)$/i,'').toLowerCase();
+              if(!allowedVerificationExecutables.has(executable)){verificationId='verification_'+integration.id;update('verification_failed',{artifactHash,verificationId,errorCode:'verification_command_rejected'});return;}
+              result=spawnSync(check.argv[0],check.argv.slice(1),{cwd:staging,encoding:'utf8',timeout:60000,windowsHide:true});
+            } else {
+              result=spawnSync(check.command,{shell:true,cwd:staging,encoding:'utf8',timeout:60000,windowsHide:true});
+            }
             outputs+=(result.stdout??'')+(result.stderr??'');
             if(result.status!==0){failed=result.status??1;break;}
           }
-          const environment={node:process.version,platform:process.platform,arch:process.arch},outputHash=digest(outputs);
+          const environment={node:process.version,platform:process.platform,arch:process.arch,npm:spawnSync('npm',['--version'],{shell:true,encoding:'utf8',windowsHide:true,timeout:15000}).stdout?.trim()??undefined,git:spawnSync('git',['--version'],{encoding:'utf8',windowsHide:true,timeout:15000}).stdout?.trim()??undefined},outputHash=digest(outputs);
           verificationEnvironment=environment;verificationOutputHash=outputHash;
           if(failed!==undefined){verificationExitCode=failed;verificationId='verification_'+integration.id;update('verification_failed',{...verificationFields(),errorCode:'verification_exit_'+failed});return;}
           verificationExitCode=0;verificationId='verification_'+integration.id;
@@ -179,6 +206,7 @@ export class Worker {
       update('applying',verificationFields());
       const result=this.apply(integration.artifactId);
       update('applied',{...verificationFields(),journalId:result.journalId});
+      try{rmSync(join(this.root,'staging',integration.id),{recursive:true,force:true});}catch{/* Keep artifacts if cleanup is denied. */}
     }catch(error){
       const code=(error as any)?.code as string|undefined;
       const status:Integration['status']=code==='already_applied'?'applied':['apply_conflict','source_changed','stale_generation','stale_artifact','stale_dependency','artifact_binding_invalid','run_not_completed'].includes(code??'')?'conflict':code==='recovery_required'?'blocked':'unknown';

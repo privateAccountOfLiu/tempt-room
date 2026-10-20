@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: f102d23a4dfdb3f360ae4a691896093f31915a68 (dirty)
+source HEAD: 32099e2e050255044aea10897f15359360982fe8 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T04-52-45-726Z-4e0e4931/report.json
+report: .state/collaboration-baseline/run-2026-10-20T04-59-48-053Z-23d7cd01/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -162,19 +162,19 @@ report: .state/collaboration-baseline/run-2026-10-20T04-52-45-726Z-4e0e4931/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-BOCBOm/report.json`，154.7s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-ozb29C/report.json`，153.0s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-1FdaNU/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-lmTxuw/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T04-52-45-726Z-4e0e4931/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T04-52-45-726Z-4e0e4931/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T04-52-45-726Z-4e0e4931/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T04-52-45-726Z-4e0e4931/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-59-48-053Z-23d7cd01/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T04-59-48-053Z-23d7cd01/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-59-48-053Z-23d7cd01/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-59-48-053Z-23d7cd01/replay.stdout.txt`
 
 ## M1 验收 — 并行任务确定性 fixture
 
@@ -209,7 +209,14 @@ report: .state/collaboration-baseline/run-2026-10-20T04-52-45-726Z-4e0e4931/repo
   - owner 授权后下一 tick 才 applying/applied
 - 集成记录 verificationExitCode、verificationOutputHash、verificationEnvironment(node/platform/arch)
 - 新增集成测试：ready_to_apply 等待授权、验证元数据、授权后应用
-- 尚未完成：验证命令 argv 白名单/环境完整版本、staging 清理、journal 对账恢复、旧同步 apply 移除
+- 验证命令 argv 模式：
+  - acceptance check 支持 argv 数组；argv[0] 必须在 node/npm/npx/git/python/python3/dotnet 白名单内
+  - argv 模式不经 shell；非法可执行文件立即 verification_failed(errorCode=verification_command_rejected)
+  - 旧 command 字符串保留 shell 兼容路径
+- 验证环境记录 node/platform/arch/npm/git；staging 在成功应用后清理，失败保留供审查
+- 重启集成恢复按 apply journal 分类 unknown errorCode：journal_applied / journal_incomplete / journal_rolled_back / restart_unknown，仍不自动重放
+- 新增 3 项集成测试：argv 验证成功与 staging 清理、argv 白名单拒绝、journal 证据分类
+- 尚未完成：journal 自动对账/回滚、staging 保留策略与 UI、旧 command shell 路径移除
 ## D02a — 持久集成队列主体
 
 - 新增 packages/protocol/src/integration.ts：Integration schema 与状态机（queued/validating/staging/testing/ready_to_apply/applying/applied/conflict/verification_failed/unknown/blocked）

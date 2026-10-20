@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createApp } from '../apps/server/src/app.ts';
 import { uid } from '../apps/server/src/store.ts';
@@ -8,14 +8,16 @@ import { Worker } from '../apps/server/src/worker.ts';
 import type { Artifact, Integration, Run, Task } from '../packages/protocol/src/index.ts';
 
 const parent = resolve('.state/test-data'), hash = 'a'.repeat(64);
-async function fixture(t: import('node:test').TestContext, acceptanceCommand?: string) {
+type AcceptanceSpec = string | {command: string; argv?: string[]};
+async function fixture(t: import('node:test').TestContext, acceptance?: AcceptanceSpec) {
   mkdirSync(parent, {recursive: true});
   const root = mkdtempSync(join(parent, 'integration-queue-')), {app, store, service, worker} = await createApp({root, startWorker: false, token: 'integration-owner'});
   t.after(async () => { await app.close(); rmSync(root, {recursive: true, force: true}); });
   const project = join(root, 'project'); mkdirSync(project); writeFileSync(join(project, 'answer.txt'), 'original\n');
   const roomId = store.rooms()[0].id;
   const command = (type: string, payload: unknown) => service.execute({version: '0.1', commandId: uid(), roomId, type, payload});
-  const contract = acceptanceCommand ? {objective: 'verify integration', projectBinding: {id: 'binding_integration', version: 1, baselineRef: 'baseline_1', manifestHash: hash, allowedPaths: ['answer.txt']}, acceptance: [{id: 'verify', description: 'verification command', command: acceptanceCommand, verifierVersion: '1.0.0', verifierHash: hash}], expectedArtifacts: [], dependencies: []} : undefined;
+  const check = acceptance ? (typeof acceptance === 'string' ? {id: 'verify', description: 'verification command', command: acceptance, verifierVersion: '1.0.0', verifierHash: hash} : {id: 'verify', description: 'verification command', command: acceptance.command, ...(acceptance.argv ? {argv: acceptance.argv} : {}), verifierVersion: '1.0.0', verifierHash: hash}) : undefined;
+  const contract = check ? {objective: 'verify integration', projectBinding: {id: 'binding_integration', version: 1, baselineRef: 'baseline_1', manifestHash: hash, allowedPaths: ['answer.txt']}, acceptance: [check], expectedArtifacts: [], dependencies: []} : undefined;
   const taskId = command('task.create', {title: 'integration fixture', agentId: 'demo-planner', projectPath: project, ...(contract ? {contract} : {})}).result.taskId as string;
   const run = store.list<Run>('runs', roomId).find(item => item.taskId === taskId)!;
   run.status = 'running'; store.event(roomId, 'run.started', {id: 'system', kind: 'system'}, {run});
@@ -107,4 +109,41 @@ test('ready_to_apply waits for explicit owner authorization and records verifica
   worker.tick();
   assert.equal(store.get<Integration>('integrations', waiting.id)!.status, 'applied');
   assert.equal(readFileSync(join(project, 'answer.txt'), 'utf8'), 'candidate\n');
+});
+
+test('argc-argv verification passes without a shell and removes staging after apply', async t => {
+  const {root, store, worker, command, artifact} = await fixture(t, {command: 'argv verification', argv: ['node', '-e', 'process.exit(0)']});
+  const queued = command('artifact.integrate', {artifactId: artifact.id});
+  worker.tick();
+  const integration = store.get<Integration>('integrations', queued.result.integrationId as string)!;
+  assert.equal(integration.status, 'applied');
+  assert.equal(integration.verificationExitCode, 0);
+  assert.ok(integration.verificationEnvironment?.npm);
+  assert.ok(integration.verificationEnvironment?.git);
+  assert.ok(!existsSync(join(root, 'staging', integration.id)));
+});
+
+test('verification argv allowlist rejects an unapproved executable before staging', async t => {
+  const {project, store, worker, command, artifact} = await fixture(t, {command: 'rejected verification', argv: ['unapproved-tool', '--version']});
+  const queued = command('artifact.integrate', {artifactId: artifact.id});
+  worker.tick();
+  const integration = store.get<Integration>('integrations', queued.result.integrationId as string)!;
+  assert.equal(integration.status, 'verification_failed');
+  assert.equal(integration.errorCode, 'verification_command_rejected');
+  assert.equal(readFileSync(join(project, 'answer.txt'), 'utf8'), 'original\n');
+});
+
+test('restart recovery classifies an applying integration from its apply journal', async t => {
+  const {root, project, store, service, worker, roomId, command, artifact} = await fixture(t);
+  const queued = command('artifact.integrate', {artifactId: artifact.id});
+  const journalDir = join(root, 'apply', 'apply_fixture'); mkdirSync(journalDir, {recursive: true});
+  writeFileSync(join(journalDir, 'journal.json'), JSON.stringify({state: 'prepared', source: project, changes: []}));
+  writeFileSync(join(journalDir, 'complete'), 'applied');
+  const integration = {...store.get<Integration>('integrations', queued.result.integrationId as string)!, status: 'applying' as const, updatedAt: new Date().toISOString()};
+  store.event(roomId, 'integration.updated', {id: 'system', kind: 'system'}, {integration});
+  const restarted = new Worker(store, service, root, {});
+  t.after(async () => { await restarted.close(); await worker.close(); });
+  const recovered = store.get<Integration>('integrations', integration.id)!;
+  assert.equal(recovered.status, 'unknown');
+  assert.equal(recovered.errorCode, 'journal_applied');
 });

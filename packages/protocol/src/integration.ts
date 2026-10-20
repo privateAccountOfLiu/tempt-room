@@ -20,7 +20,7 @@ export const integrationSchema = z.object({
   authorization: z.enum(['auto', 'waiting', 'authorized']).default('auto'),
   verificationExitCode: z.number().int().optional(),
   verificationOutputHash: hash.optional(),
-  verificationEnvironment: z.object({node: z.string().min(1).max(100), platform: z.string().min(1).max(50), arch: z.string().min(1).max(50)}).strict().optional(),
+  verificationEnvironment: z.object({node: z.string().min(1).max(100), platform: z.string().min(1).max(50), arch: z.string().min(1).max(50), npm: z.string().min(1).max(100).optional(), git: z.string().min(1).max(200).optional()}).strict().optional(),
   verificationId: z.string().min(1).max(200).optional(),
   journalId: z.string().min(1).max(200).optional(),
   requestActor: z.string().min(1).max(200),

@@ -110,6 +110,16 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 50
+            },
+            "npm": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "git": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
             }
           },
           "required": [
