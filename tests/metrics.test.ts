@@ -28,6 +28,8 @@ test('metrics expose bounded queue/integration/budget counters and Prometheus te
   assert.equal(metrics.pendingWakes, 1);
   assert.equal(metrics.budgetReservedUsd, 0.25);
   assert.match(metricsText(metrics), /tempt_room_queueDepth \d+/);
+  assert.match(metricsText(metrics), /tempt_room_enqueueToStart_bucket\{le="100"\}/);
+  assert.match(metricsText(metrics), /tempt_room_runDuration_count \d+/);
   const headers = {host: '127.0.0.1:4317', authorization: 'Bearer metrics-owner', 'room-protocol-version': '0.1', accept: 'text/plain'};
   const response = await app.inject({url: '/api/metrics', headers});
   assert.equal(response.statusCode, 200);

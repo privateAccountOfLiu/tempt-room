@@ -18,6 +18,8 @@ export interface RoomMetrics {
   enqueueToStartAvgMs: number;
   enqueueToStartP95Ms: number;
   runDurationAvgMs: number;
+  enqueueToStartHistogram: Record<string, number>;
+  runDurationHistogram: Record<string, number>;
 }
 
 const isPending = (run: Run) => run.status === 'queued';
@@ -55,14 +57,27 @@ export function collectMetrics(store: Store): RoomMetrics {
     subscriptions: store.list('subscriptions').length,
     enqueueToStartAvgMs: average(startLatencies),
     enqueueToStartP95Ms: percentile(startLatencies, 0.95),
-    runDurationAvgMs: average(durations)
+    runDurationAvgMs: average(durations),
+    enqueueToStartHistogram: histogram(startLatencies),
+    runDurationHistogram: histogram(durations)
   };
 }
 
 /** Prometheus text exposition with no unbounded labels. */
 export function metricsText(metrics: RoomMetrics): string {
-  return Object.entries(metrics).map(([name, value]) => `tempt_room_${name} ${value}`).join('\n') + '\n';
+  const lines: string[] = [];
+  for (const [name, value] of Object.entries(metrics)) {
+    if (name === 'enqueueToStartHistogram' || name === 'runDurationHistogram') continue;
+    lines.push(`tempt_room_${name} ${value}`);
+  }
+  for (const [metric, buckets] of [['enqueueToStart', metrics.enqueueToStartHistogram], ['runDuration', metrics.runDurationHistogram]] as const) {
+    for (const [le, count] of Object.entries(buckets)) lines.push(`tempt_room_${metric}_bucket{le="${le}"} ${count}`);
+    lines.push(`tempt_room_${metric}_count ${Object.values(buckets).at(-1) ?? 0}`);
+  }
+  return lines.join('\n') + '\n';
 }
 
 function average(values: number[]): number { return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : 0; }
 function percentile(values: number[], ratio: number): number { if (!values.length) return 0; const sorted=[...values].sort((a,b)=>a-b); return Math.round(sorted[Math.min(sorted.length-1, Math.floor((sorted.length-1)*ratio))]); }
+
+function histogram(values: number[]): Record<string, number> { const bounds=[100,500,1000,5000,30000]; const result: Record<string, number>={}; for(const bound of bounds)result[String(bound)]=values.filter(value=>value<=bound).length;result['+Inf']=values.length;return result; }
