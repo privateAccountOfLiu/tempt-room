@@ -1,13 +1,13 @@
-import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync, unlinkSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type Artifact, type Discussion, type ExecutionSettings, type Subscription, type InputBatch, type ProjectBinding, type Integration, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { diagnose, ExecutionUnknown, RemoteCanceled, runAdapter } from './adapters.ts';
 import { SandboxHost } from './sandbox.ts';
 import { digest, now, Store, SYSTEM, uid } from './store.ts';
 import { RoomService } from './service.ts';
-import { Workspaces } from './workspaces.ts';
+import { Workspaces, safePath } from './workspaces.ts';
 import { chatWorkspace,sessionKey } from './sessions.ts';
 import { redactDiagnostic } from './diagnostics.ts';
 import { runContext } from './context.ts';
@@ -82,6 +82,13 @@ export class Worker {
         try { const run=assertRunFence(this.store,fence);if(frame.limits){run.sandbox={...defaultSandbox,...frame.limits,verifiedAt:now()};this.store.event(run.roomId,'sandbox.verified',SYSTEM,{runId:run.id,generation:fence.generation,executionId:fence.executionId,sandbox:run.sandbox},null,run.id);} } catch { /* An old process cannot refresh a newer run's sandbox proof. */ }
       }
     });
+    this.recoverIntegrations();
+  }
+  private recoverIntegrations(){
+    for(const integration of this.store.list<Integration>('integrations').filter(item=>['validating','staging','testing','ready_to_apply','applying'].includes(item.status))){
+      const next:Integration={...integration,status:'unknown',errorCode:'restart_unknown',updatedAt:now()};
+      this.store.atomic(()=>{this.store.event(integration.roomId,'integration.updated',SYSTEM,{integration:next});});
+    }
   }
   start() { this.timer = setInterval(() => this.tick(), 250); this.timer.unref(); this.tick(); queueMicrotask(() => this.recoverInterrupted()); }
   tick() {
@@ -135,13 +142,43 @@ export class Worker {
     if(!integration)return;
     const update=(status:Integration['status'],extra:Partial<Integration>={})=>{const next:Integration={...integration,...extra,status,updatedAt:now()};this.store.atomic(()=>{this.store.event(integration.roomId,'integration.updated',SYSTEM,{integration:next});});return next;};
     update('validating');
+    let verificationId:string|undefined,artifactHash:string|undefined;
     try{
+      const artifact=this.store.get<Artifact>('artifacts',integration.artifactId);
+      const task=artifact?.taskId?this.store.get<Task>('tasks',artifact.taskId):undefined;
+      const changes=JSON.parse(readFileSync(join(this.root,'artifacts',integration.artifactId+'.changes.json'),'utf8'));
+      artifactHash=digest(changes);
+      const checks=task?.contract?.acceptance??[];
+      if(checks.length){
+        update('testing',{artifactHash});
+        const staging=join(this.root,'staging',integration.id);mkdirSync(staging,{recursive:true});
+        for(const [filePath,file] of Object.entries<any>(changes.manifest.files??{})){
+          const target=safePath(staging,filePath);mkdirSync(dirname(target),{recursive:true});writeFileSync(target,Buffer.from(file.content,'base64'));
+        }
+        for(const change of changes.changes as any[]){
+          const target=safePath(staging,change.path);
+          if(change.after===null){if(existsSync(target))unlinkSync(target);continue;}
+          mkdirSync(dirname(target),{recursive:true});writeFileSync(target,Buffer.from(change.after,'base64'));
+        }
+        let failed:number|undefined,outputs='';
+        for(const check of checks){
+          const result=spawnSync(check.command,{shell:true,cwd:staging,encoding:'utf8',timeout:60000,windowsHide:true});
+          outputs+=(result.stdout??'')+(result.stderr??'');
+          if(result.status!==0){failed=result.status??1;break;}
+        }
+        if(failed!==undefined){update('verification_failed',{artifactHash,verificationId:'verification_'+integration.id,errorCode:'verification_exit_'+failed});return;}
+        verificationId='verification_'+integration.id;
+        update('ready_to_apply',{artifactHash,verificationId});
+      } else {
+        update('ready_to_apply',{artifactHash});
+      }
+      update('applying',{artifactHash,...(verificationId?{verificationId}:{})});
       const result=this.apply(integration.artifactId);
-      update('applied',{journalId:result.journalId});
+      update('applied',{artifactHash,...(verificationId?{verificationId}:{}),journalId:result.journalId});
     }catch(error){
       const code=(error as any)?.code as string|undefined;
       const status:Integration['status']=code==='already_applied'?'applied':['apply_conflict','source_changed','stale_generation','stale_artifact','stale_dependency','artifact_binding_invalid','run_not_completed'].includes(code??'')?'conflict':code==='recovery_required'?'blocked':'unknown';
-      update(status,{...(code?{errorCode:code}:{})});
+      update(status,{...(artifactHash?{artifactHash}:{}),...(code?{errorCode:code}:{})});
     }
   }
   private scanSubscriptions(){
@@ -166,7 +203,7 @@ export class Worker {
         const dependencies=task.dependencies.map(id=>this.store.get<Task>('tasks',id));
         if(dependencies.some(t=>!t||['failed','canceled','superseded','interrupted','unknown'].includes(t.status)))continue;
         if(dependencies.some(t=>t?.status!=='completed'))continue;
-        if(task.dependencyRequirements?.length&&!dependencyRequirementsReady(task,this.store.list<Task>('tasks',run.roomId)).ready)continue;
+        if(task.dependencyRequirements?.length&&!dependencyRequirementsReady(task,this.store.list<Task>('tasks',run.roomId),this.store.list<Integration>('integrations',run.roomId)).ready)continue;
       }
       candidates.push(run);
     }

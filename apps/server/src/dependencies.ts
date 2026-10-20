@@ -1,4 +1,4 @@
-import type { Artifact,Run,Task } from '../../../packages/protocol/src/index.ts';
+import type { Artifact,Integration,Run,Task } from '../../../packages/protocol/src/index.ts';
 import type { Store } from './store.ts';
 export function dependencyInputs(store:Store,task:Task){
   const versions:Record<string,number>={};
@@ -13,7 +13,7 @@ export function dependencyInputs(store:Store,task:Task){
 
 export interface DependencyReadiness { ready:boolean; blockedBy:string[]; unmet:string[] }
 /** Pure readiness check shared by scheduling and production dispatch. */
-export function dependencyRequirementsReady(task:Task,tasks:Task[]):DependencyReadiness {
+export function dependencyRequirementsReady(task:Task,tasks:Task[],integrations:Integration[]=[]):DependencyReadiness {
   const blockedBy:string[]=[],unmet:string[]=[];const byId=new Map(tasks.map(item=>[item.id,item]));
   for(const requirement of task.dependencyRequirements??[]){
     const target=byId.get(requirement.taskId);
@@ -24,7 +24,8 @@ export function dependencyRequirementsReady(task:Task,tasks:Task[]):DependencyRe
       const artifactMatch=!requirement.artifactId||Boolean(target.acceptedArtifactIds?.includes(requirement.artifactId));
       if(target.acceptanceStatus!=='accepted'||target.version!==requirement.taskVersion||!artifactMatch){blockedBy.push(requirement.taskId);unmet.push(requirement.taskId+':accepted_artifact');}
     } else {
-      blockedBy.push(requirement.taskId);unmet.push(requirement.taskId+':integrated');
+      const integrated=integrations.some(integration=>integration.taskId===requirement.taskId&&integration.status==='applied');
+      if(!integrated){blockedBy.push(requirement.taskId);unmet.push(requirement.taskId+':integrated');}
     }
   }
   return {ready:blockedBy.length===0,blockedBy:[...new Set(blockedBy)],unmet};

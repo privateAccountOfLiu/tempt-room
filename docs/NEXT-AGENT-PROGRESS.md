@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 1debad2d3ba1f04057dfa9e36aabaee8e924e8c0 (dirty)
+source HEAD: 6e9ce3388f0de82a7bb8213c3c1b4852d7e8a10f (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T04-36-38-222Z-146f9e36/report.json
+report: .state/collaboration-baseline/run-2026-10-20T04-42-30-868Z-db577138/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -161,21 +161,36 @@ report: .state/collaboration-baseline/run-2026-10-20T04-36-38-222Z-146f9e36/repo
 
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
-- `npm test`：328/328
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-MD2rp0/report.json`，153.2s）
+- `npm test`：330/330
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-08zo4k/report.json`，153.1s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-tnrVsZ/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-ZupOU0/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T04-36-38-222Z-146f9e36/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T04-36-38-222Z-146f9e36/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T04-36-38-222Z-146f9e36/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T04-36-38-222Z-146f9e36/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-42-30-868Z-db577138/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T04-42-30-868Z-db577138/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-42-30-868Z-db577138/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-42-30-868Z-db577138/replay.stdout.txt`
 
+## D02b — 集成 staging 验证与重启对账切片
+
+- Worker 集成处理扩展：
+  - 从 artifact changes manifest 物化 staging 目录
+  - 将 patch 应用到 staging，不触碰业务源目录
+  - 如果任务契约带 acceptance，执行 owner 已批准的验证命令；保存 exitCode 结果摘要
+  - 验证失败 → verification_failed，源文件与 artifact 均不变
+  - 验证通过 → verificationId + ready_to_apply → applying → applied
+  - 无验收命令时仍走 ready_to_apply → applying → applied
+- Worker 启动恢复：
+  - 上次进程遗留的 validating/staging/testing/ready_to_apply/applying 集成统一标记 unknown(errorCode=restart_unknown)
+  - 不自动重放未知集成；artifact.integrate 对 unknown/blocked 记录返回 409，要求 owner 先审查
+- integrated 依赖条件接入真实 integration：只有该任务存在 applied 集成才解锁下游；Worker 派发同时传入集成列表
+- 新增 tests/integration-queue.test.ts 2 项：staging 验证成功/失败、重启 unknown 阻断
+- 尚未完成：验证环境版本/argv 白名单、ready_to_apply 独立授权门、staging 清理与 journal 对账恢复、旧同步 apply 移除
 ## D02a — 持久集成队列主体
 
 - 新增 packages/protocol/src/integration.ts：Integration schema 与状态机（queued/validating/staging/testing/ready_to_apply/applying/applied/conflict/verification_failed/unknown/blocked）

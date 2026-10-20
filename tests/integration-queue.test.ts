@@ -4,23 +4,25 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { join, resolve } from 'node:path';
 import { createApp } from '../apps/server/src/app.ts';
 import { uid } from '../apps/server/src/store.ts';
+import { Worker } from '../apps/server/src/worker.ts';
 import type { Artifact, Integration, Run, Task } from '../packages/protocol/src/index.ts';
 
-const parent = resolve('.state/test-data');
-async function fixture(t: import('node:test').TestContext) {
+const parent = resolve('.state/test-data'), hash = 'a'.repeat(64);
+async function fixture(t: import('node:test').TestContext, acceptanceCommand?: string) {
   mkdirSync(parent, {recursive: true});
   const root = mkdtempSync(join(parent, 'integration-queue-')), {app, store, service, worker} = await createApp({root, startWorker: false, token: 'integration-owner'});
   t.after(async () => { await app.close(); rmSync(root, {recursive: true, force: true}); });
   const project = join(root, 'project'); mkdirSync(project); writeFileSync(join(project, 'answer.txt'), 'original\n');
   const roomId = store.rooms()[0].id;
   const command = (type: string, payload: unknown) => service.execute({version: '0.1', commandId: uid(), roomId, type, payload});
-  const taskId = command('task.create', {title: 'integration fixture', agentId: 'demo-planner', projectPath: project}).result.taskId as string;
+  const contract = acceptanceCommand ? {objective: 'verify integration', projectBinding: {id: 'binding_integration', version: 1, baselineRef: 'baseline_1', manifestHash: hash, allowedPaths: ['answer.txt']}, acceptance: [{id: 'verify', description: 'verification command', command: acceptanceCommand, verifierVersion: '1.0.0', verifierHash: hash}], expectedArtifacts: [], dependencies: []} : undefined;
+  const taskId = command('task.create', {title: 'integration fixture', agentId: 'demo-planner', projectPath: project, ...(contract ? {contract} : {})}).result.taskId as string;
   const run = store.list<Run>('runs', roomId).find(item => item.taskId === taskId)!;
   run.status = 'running'; store.event(roomId, 'run.started', {id: 'system', kind: 'system'}, {run});
   const snapshot = worker.workspaces.snapshot(project, run.id); writeFileSync(join(snapshot.workspace, 'answer.txt'), 'candidate\n');
   const changes = worker.workspaces.changes(run.id), artifact = worker.publishArtifact(run, 'fixture.patch', changes.patch, 'text/x-diff', 'patch');
   writeFileSync(join(root, 'artifacts', artifact.id + '.changes.json'), JSON.stringify(changes)); worker.finish(run, 'completed');
-  return {root, project, app, store, service, worker, roomId, command, artifact, run};
+  return {root, project, app, store, service, worker, roomId, command, artifact, run, taskId};
 }
 
 test('artifact.integrate enqueues one durable integration and applies it asynchronously once', async t => {
@@ -55,4 +57,36 @@ test('stale source changes move an integration to conflict without touching the 
   assert.equal(readFileSync(join(project, 'answer.txt'), 'utf8'), 'user edit\n');
   assert.ok(!store.get<Artifact>('artifacts', artifact.id)!.applied);
   assert.equal(store.get<Task>('tasks', artifact.taskId!)!.status, 'completed');
+});
+
+test('owner-approved acceptance commands run in staging; failure leaves the source untouched', async t => {
+  const failedFixture = await fixture(t, 'node -e "process.exit(1)"');
+  const failed = failedFixture.command('artifact.integrate', {artifactId: failedFixture.artifact.id});
+  failedFixture.worker.tick();
+  const failedIntegration = failedFixture.store.get<Integration>('integrations', failed.result.integrationId as string)!;
+  assert.equal(failedIntegration.status, 'verification_failed');
+  assert.equal(failedIntegration.errorCode, 'verification_exit_1');
+  assert.equal(readFileSync(join(failedFixture.project, 'answer.txt'), 'utf8'), 'original\n');
+  assert.ok(!failedFixture.store.get<Artifact>('artifacts', failedFixture.artifact.id)!.applied);
+
+  const passedFixture = await fixture(t, 'node -e "process.exit(0)"');
+  const passed = passedFixture.command('artifact.integrate', {artifactId: passedFixture.artifact.id});
+  passedFixture.worker.tick();
+  const passedIntegration = passedFixture.store.get<Integration>('integrations', passed.result.integrationId as string)!;
+  assert.equal(passedIntegration.status, 'applied');
+  assert.match(passedIntegration.verificationId ?? '', /^verification_/);
+  assert.equal(readFileSync(join(passedFixture.project, 'answer.txt'), 'utf8'), 'candidate\n');
+});
+
+test('restart marks in-flight integrations unknown and blocks blind re-enqueue', async t => {
+  const {store, service, worker, root, command, artifact, roomId} = await fixture(t);
+  const queued = command('artifact.integrate', {artifactId: artifact.id});
+  const running = {...store.get<Integration>('integrations', queued.result.integrationId as string)!, status: 'applying' as const, updatedAt: new Date().toISOString()};
+  store.event(roomId, 'integration.updated', {id: 'system', kind: 'system'}, {integration: running});
+  const restarted = new Worker(store, service, root, {});
+  t.after(async () => { await restarted.close(); });
+  const recovered = store.get<Integration>('integrations', running.id)!;
+  assert.equal(recovered.status, 'unknown');
+  assert.equal(recovered.errorCode, 'restart_unknown');
+  assert.throws(() => command('artifact.integrate', {artifactId: artifact.id}), /未知\/阻塞/);
 });

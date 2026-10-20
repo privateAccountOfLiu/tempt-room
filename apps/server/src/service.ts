@@ -366,6 +366,8 @@ export class RoomService {
         if (artifact.kind !== 'patch') throw new ProtocolError('not_applicable', '这份交付物不是可应用的文件差异', 409);
         const existing = this.store.list<Integration>('integrations', roomId).find(item => item.artifactId === artifact.id && ['queued', 'validating', 'applying', 'applied'].includes(item.status));
         if (existing) return {integrationId: existing.id, status: existing.status};
+        const unsafe = this.store.list<Integration>('integrations', roomId).find(item => item.artifactId === artifact.id && ['unknown', 'blocked'].includes(item.status));
+        if (unsafe) throw new ProtocolError('integration_unknown', '该交付物存在未知/阻塞的集成记录，请先审查后再入队', 409);
         if (artifact.applied) throw new ProtocolError('already_applied', '这份交付物已经应用', 409);
         const integration: Integration = {id: uid('integration'), roomId, artifactId: artifact.id, ...(artifact.runId ? {runId: artifact.runId} : {}), ...(artifact.taskId ? {taskId: artifact.taskId} : {}), status: 'queued', requestActor: actor.id, createdAt: now(), updatedAt: now()};
         this.store.event(roomId, 'integration.queued', actor, {integration});
