@@ -6,6 +6,7 @@ import { Store, SYSTEM, uid } from '../apps/server/src/store.ts';
 import { RoomService } from '../apps/server/src/service.ts';
 import { InboxService } from '../apps/server/src/inbox.ts';
 import { Worker } from '../apps/server/src/worker.ts';
+import { agentCapabilityFingerprint } from '../apps/server/src/adapter-capabilities.ts';
 import type { AgentSession, InboxDelivery, InputBatch, Run, Subscription, WakeIntent } from '../packages/protocol/src/index.ts';
 
 const parent = resolve('.state/test-data');
@@ -87,4 +88,20 @@ test('owner can reconcile an uncertain input batch to unknown and expire it', t 
   assert.equal(expired.result.status, 'expired');
   assert.ok(store.list<InboxDelivery>('inbox_deliveries', roomId).every(delivery => delivery.status === 'expired'));
   assert.throws(() => service.execute({version: '0.1', commandId: uid(), roomId, type: 'input.reconcile', payload: {batchId: batch.id, decision: 'expire'}}, {id: 'demo-planner', kind: 'agent'}), /owner|Agent 无权/);
+});
+
+test('steer delivery is suppressed until steerDuringRun is verified', async t => {
+  const {store, service, roomId, session} = fixture(t, false, 'steer');
+  const firstWake = store.list<WakeIntent>('wake_intents', roomId)[0];
+  assert.equal(firstWake.status, 'suppressed');
+  assert.equal(firstWake.suppressionReason, 'steer_unverified');
+  assert.equal(store.list<Run>('runs', roomId).filter(run => run.agentSessionId === session.id).length, 0);
+  const agent = store.get<any>('agents', 'demo-planner')!;
+  const fingerprint = agentCapabilityFingerprint(agent);
+  service.execute({version: '0.1', commandId: uid(), roomId, type: 'capability.verify', payload: {fingerprint, evidence: [{fingerprint, capability: 'steerDuringRun', state: 'verified_supported', mode: 'simulated-contract', testedAt: new Date().toISOString(), suiteVersion: 'sim-v1', evidenceHash: 'a'.repeat(64)}]}});
+  service.execute({version: '0.1', commandId: uid(), roomId, type: 'message.send', payload: {text: 'steer after verification', mentions: ['demo-planner']}});
+  new InboxService(store).scan(roomId, session.id);
+  service.dispatchPendingWakes();
+  const assigned = store.list<Run>('runs', roomId).find(run => run.agentSessionId === session.id)!;
+  assert.equal(assigned.inputDeliveryMode, 'steer');
 });
