@@ -58,6 +58,16 @@ export function recoverResourceLeases(store: Store): number {
   return recovered;
 }
 
+export function expireResourceLeases(store: Store): number {
+  let expired = 0;
+  for (const lease of store.list<ResourceLease>('resource_leases').filter(item => item.status === 'active' && item.leaseUntil && Date.parse(item.leaseUntil) <= Date.now())) {
+    const next: ResourceLease = {...lease, status: 'revoked', updatedAt: now()};
+    store.event(lease.roomId, 'resource.released', SYSTEM, {lease: next});
+    expired++;
+  }
+  return expired;
+}
+
 export function normalizeResourceKey(key: string): string {
   const normalized = key.replaceAll('\\', '/').replace(/\/+$/, '');
   return process.platform === 'win32' ? normalized.toLowerCase() : normalized;

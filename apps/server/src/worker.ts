@@ -22,7 +22,7 @@ import { dependencyInputs, dependencyRequirementsReady } from './dependencies.ts
 import { InboxService } from './inbox.ts';
 import { prepareHostChatWorkspace, hostStatus, hostChangeReport } from './host-workspace.ts';
 import { buildProjectManifest } from './project-manifest.ts';
-import { acquireResource, quarantineResource, recoverResourceLeases, releaseResource } from './resource-manager.ts';
+import { acquireResource, expireResourceLeases, quarantineResource, recoverResourceLeases, releaseResource } from './resource-manager.ts';
 import { codexThreadKey, reconcileAttachedRun } from './codex-attach.ts';
 import { assertRunFence,assertRunIdentity,executionFence } from './execution.ts';
 import { ToolOperations } from './tool-operations.ts';
@@ -206,6 +206,7 @@ export class Worker {
     this.processIntegrations();
     this.scanSubscriptions();
     this.cleanupStaging();
+    expireResourceLeases(this.store);
   }
   private cleanupStaging(){
     const stagingRoot=join(this.root,'staging');if(!existsSync(stagingRoot))return;

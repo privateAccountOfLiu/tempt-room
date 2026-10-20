@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Store, now, uid } from '../apps/server/src/store.ts';
 import { RoomService } from '../apps/server/src/service.ts';
-import { acquireResource, quarantineResource, recoverResourceLeases, releaseResource } from '../apps/server/src/resource-manager.ts';
+import { acquireResource, expireResourceLeases, quarantineResource, recoverResourceLeases, releaseResource } from '../apps/server/src/resource-manager.ts';
 import type { ResourceLease, Run } from '../packages/protocol/src/index.ts';
 
 const parent = resolve('.state/test-data');
@@ -65,4 +65,17 @@ test('owner can reserve port and database capacities through the command surface
   assert.throws(() => service.execute({version: '0.1', commandId: uid(), roomId, type: 'resource.reserve', payload: {kind: 'port', canonicalKey: '127.0.0.1:4319', capacity: 1}}, {id: 'demo-planner', kind: 'agent'}), /无权执行此命令/);
   command('resource.release', {leaseId: port.result.leaseId, remainingProcesses: 0, evidence: 'owner verified'});
   command('resource.reserve', {kind: 'port', canonicalKey: '127.0.0.1:4318', capacity: 1});
+});
+
+test('leases with a TTL are revoked and become reusable', async t => {
+  const {store, roomId, run} = fixture(t);
+  const lease = acquireResource(store, {roomId, kind: 'port', key: '127.0.0.1:4399', run, leaseMs: 5});
+  assert.equal(lease.status, 'active');
+  await new Promise(done => setTimeout(done, 15));
+  assert.equal(expireResourceLeases(store), 1);
+  const revoked = store.list<ResourceLease>('resource_leases', roomId).find(item => item.id === lease.id)!;
+  assert.equal(revoked.status, 'revoked');
+  assert.throws(() => releaseResource(store, roomId, lease.id, {checkedAt: now(), remainingProcesses: 0, evidence: 'late'}), /只有 active\/quarantined/);
+  const next = acquireResource(store, {roomId, kind: 'port', key: '127.0.0.1:4399', run: {...run, id: 'run_next'}});
+  assert.equal(next.status, 'active');
 });
