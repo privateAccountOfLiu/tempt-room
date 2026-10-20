@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
+import { createHmac } from 'node:crypto';
+import { summarizeOutboundDeliveries } from '../apps/server/src/outbound-summary.ts';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Store, uid } from '../apps/server/src/store.ts';
@@ -11,18 +13,19 @@ const parent = resolve('.state/test-data');
 async function fixture(t: any) {
   mkdirSync(parent, {recursive: true});
   const root = mkdtempSync(join(parent, 'outbound-')), store = new Store(join(root, 'room.sqlite')), service = new RoomService(store), worker = new Worker(store, service, root, {adapter: async function* () {}}), roomId = store.rooms()[0].id;
-  const headers: any[] = [];
+  const headers: any[] = [], bodies: string[] = [];
   const server: Server = createServer((request, response) => {
     headers.push({...request.headers});
-    request.resume();
-    request.on('end', () => { response.writeHead(200, {'content-type': 'application/json'}); response.end('{"ok":true}'); });
+    let raw = '';
+    request.on('data', chunk => { raw += chunk.toString(); });
+    request.on('end', () => { bodies.push(raw); response.writeHead(200, {'content-type': 'application/json'}); response.end('{"ok":true}'); });
   });
   await new Promise<void>(done => server.listen(0, '127.0.0.1', () => done()));
   const port = (server.address() as {port: number}).port;
   const command = (type: string, payload: unknown, actor?: any): any => service.execute({version: '0.1', commandId: uid(), roomId, type, payload}, actor);
   command('settings.update', {...store.settings(), outboundAllowPrivate: true, outboundMaxAttempts: 3, outboundTimeoutMs: 2000});
   t.after(async () => { await worker.close(); store.close(); await new Promise<void>(done => server.close(() => done())); rmSync(root, {recursive: true, force: true}); });
-  return {store, service, worker, roomId, port, headers, command};
+  return {store, service, worker, roomId, port, headers, bodies, command};
 }
 
 test('owner enqueues an outbound delivery and the worker posts the redacted export', async t => {
@@ -37,6 +40,29 @@ test('owner enqueues an outbound delivery and the worker posts the redacted expo
   assert.equal(delivered.length, 1);
   await worker.deliverOutbound();
   assert.equal(headers.length, 1);
+});
+
+test('outbound signing uses an env-named secret without persisting it', async t => {
+  const {store, worker, roomId, port, headers, bodies, command} = await fixture(t);
+  process.env.OUTBOUND_TEST_SECRET = 'test-signing-secret';
+  t.after(() => { delete process.env.OUTBOUND_TEST_SECRET; });
+  command('settings.update', {...store.settings(), outboundSigningSecretEnv: 'OUTBOUND_TEST_SECRET'});
+  command('outbound.enqueue', {url: `http://127.0.0.1:${port}/hook`, throughSeq: store.room(roomId)!.seq});
+  await worker.deliverOutbound();
+  const timestamp = String(headers[0]['x-tempt-room-timestamp']);
+  const expected = 'sha256=' + createHmac('sha256', 'test-signing-secret').update(timestamp + '.' + bodies[0]).digest('hex');
+  assert.equal(headers[0]['x-tempt-room-signature'], expected);
+  assert.equal(store.settings().outboundSigningSecretEnv, 'OUTBOUND_TEST_SECRET');
+});
+
+test('outbound summaries expose delivered and failed deliveries', async t => {
+  const {store, worker, roomId, command} = await fixture(t);
+  command('settings.update', {...store.settings(), outboundMaxAttempts: 1});
+  const failed = command('outbound.enqueue', {url: 'http://127.0.0.1:1/hook', throughSeq: store.room(roomId)!.seq});
+  await worker.deliverOutbound();
+  const summary = summarizeOutboundDeliveries(store.events(roomId), 1);
+  assert.equal(summary.find(item => item.deliveryId === failed.result.deliveryId)!.status, 'failed');
+  assert.ok(summary.find(item => item.deliveryId === failed.result.deliveryId)!.lastError);
 });
 
 test('outbound URL policy blocks metadata and private hosts by default', async t => {

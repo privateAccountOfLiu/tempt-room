@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync, statSync, unlinkSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import { basename, dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type AgentSession, type Artifact, type Discussion, type UsageSample, type ExecutionSettings, type Subscription, type InputBatch, type InboxDelivery, type ProjectBinding, type Integration, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
@@ -662,8 +662,10 @@ export class Worker {
             const url=validateOutboundUrl(item.url,settings.outboundAllowPrivate).toString();
             const snapshot=this.store.snapshotAt(room.id,item.throughSeq);
             const exported={version:VERSION,exportedAt:now(),room:snapshot.room,events:events.filter(event=>event.seq<=item.throughSeq)};
-            const body=item.redacted?redactExport(exported).value:exported;
-            const response=await fetch(url,{method:'POST',headers:{'content-type':'application/json','x-tempt-room-delivery':deliveryId},body:JSON.stringify(body),signal:AbortSignal.timeout(settings.outboundTimeoutMs)});
+            const body=item.redacted?redactExport(exported).value:exported,bodyText=JSON.stringify(body),headers:Record<string,string>={'content-type':'application/json','x-tempt-room-delivery':deliveryId};
+            const secretEnv=settings.outboundSigningSecretEnv,secret=secretEnv?process.env[secretEnv]:undefined;
+            if(secret){const timestamp=String(Date.now());headers['x-tempt-room-timestamp']=timestamp;headers['x-tempt-room-signature']='sha256='+createHmac('sha256',secret).update(timestamp+'.'+bodyText).digest('hex');}
+            const response=await fetch(url,{method:'POST',headers,body:bodyText,signal:AbortSignal.timeout(settings.outboundTimeoutMs)});
             status=response.status;ok=response.ok;if(!ok)error='HTTP '+response.status;
           }catch(caught){error=(caught as Error).message.slice(0,500);}
           this.store.event(room.id,'outbound.attempted',SYSTEM,{deliveryId,attempt:count+1,ok,...(status===undefined?{}:{status}),...(error?{error}:{}),at:now()},null,deliveryId);

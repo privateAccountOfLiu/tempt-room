@@ -228,6 +228,11 @@
       "type": "integer",
       "minimum": 1000,
       "maximum": 60000
+    },
+    "outboundSigningSecretEnv": {
+      "default": "",
+      "type": "string",
+      "maxLength": 100
     }
   },
   "required": [
@@ -264,7 +269,8 @@
     "resourceQuarantineTtlMs",
     "outboundAllowPrivate",
     "outboundMaxAttempts",
-    "outboundTimeoutMs"
+    "outboundTimeoutMs",
+    "outboundSigningSecretEnv"
   ],
   "additionalProperties": false
 }

@@ -23,11 +23,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: febeb114dd929e97b1dab2ed6a707564f7f28e80 (dirty)
+source HEAD: 43364624c8e965996401757d4a8db385b71615b7 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T14-51-14-811Z-898a9256/report.json
+report: .state/collaboration-baseline/run-2026-10-20T14-59-22-720Z-b0f63ccb/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -219,19 +219,19 @@ report: .state/collaboration-baseline/run-2026-10-20T14-51-14-811Z-898a9256/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-4a2dRt/report.json`，163.9s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-hLRApJ/report.json`，211.7s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-ttoeM7/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-CHJIkR/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T14-51-14-811Z-898a9256/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T14-51-14-811Z-898a9256/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T14-51-14-811Z-898a9256/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T14-51-14-811Z-898a9256/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T14-59-22-720Z-b0f63ccb/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T14-59-22-720Z-b0f63ccb/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T14-59-22-720Z-b0f63ccb/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T14-59-22-720Z-b0f63ccb/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -655,7 +655,10 @@ report: .state/collaboration-baseline/run-2026-10-20T14-51-14-811Z-898a9256/repo
 - Worker.deliverOutbound：从事件日志派生 pending，按 throughSeq 生成导出（默认脱敏），HTTP POST 带 delivery header，失败记录 attempted 并按指数退避重试；成功写 delivered 防重
 - URL 策略 validateOutboundUrl：拒绝非 http/https、凭据、云元数据；loopback/私网需 outboundAllowPrivate（默认关闭）
 - Settings 新增 outboundAllowPrivate/outboundMaxAttempts/outboundTimeoutMs；运行设置 UI 可配置；测试 3 项（成功投递、URL 策略、失败记录）
-- 尚未完成：导入的 seq/throughSeq 引用近似；artifact contentBase64 不做内容扫描；外发 HMAC 签名/死信 UI
+- outboundSigningSecretEnv：仅存环境变量名，Worker 读取对应 env 计算 HMAC-SHA256(timestamp.body) 并发送 x-tempt-room-signature / x-tempt-room-timestamp；密钥不入库
+- 新增 GET /api/rooms/:id/outbound 与 summarizeOutboundDeliveries：从事件日志派生 pending/delivered/failed、尝试次数、最后错误
+- 测试新增 HMAC 校验、delivered/failed 摘要；运行设置 UI 可配置签名环境变量名，浏览器断言可见
+- 尚未完成：死信重放 UI；导入 seq 引用近似；artifact 内容不扫描
 
 ## E04 能力完成定义（第 109 轮）
 

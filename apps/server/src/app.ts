@@ -14,6 +14,7 @@ import { VERSION,payloadSchemas, agentToolCallSchema, ProtocolError, type AgentD
 import { Store, digest, now, OWNER, SYSTEM, uid } from './store.ts';
 import { planRoomImport } from './room-import.ts';
 import { redactExport } from './export-redaction.ts';
+import { summarizeOutboundDeliveries } from './outbound-summary.ts';
 import {agentCapabilityFingerprint,agentInterceptionGaps,capabilityNames,probeConfiguredAgent,verifiedCapabilityState} from './adapter-capabilities.ts';
 import { aggregateUsage } from './usage.ts';
 import { collectMetrics, metricsText } from './metrics.ts';
@@ -231,6 +232,10 @@ export async function createApp(options: AppOptions = {}) {
     const sourceIds=new Set(batch?.sourceEventIds??[]);
     const incremental=(batch?store.events(run.roomId).filter(event=>sourceIds.has(event.eventId)).map(event=>String((event.payload as any).message?.text??event.type)):[]).join('\n');
     return buildContextSegments(run,runContext(store,run),task,{...(incremental?{incrementalText:incremental}:{})});
+  });
+  app.get<{Params:{id:string}}>('/api/rooms/:id/outbound',request=>{
+    const room=store.room(request.params.id);if(!room)throw new ProtocolError('not_found','房间不存在',404);
+    return summarizeOutboundDeliveries(store.events(room.id),store.settings().outboundMaxAttempts);
   });
   app.post<{Body:{export?:any;name?:string}}>('/api/rooms/import',request=>{
     const source=request.body?.export;
