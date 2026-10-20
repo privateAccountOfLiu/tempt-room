@@ -32,7 +32,7 @@ export async function runAcp(options:{channel:AcpChannel;workspace:string;model:
       const params=frame.params,choice=params?.options?.find((item:any)=>item.kind==='allow_once');
       const cancel=()=>channel.reply(frame.id,{outcome:{outcome:'cancelled'}});
       if(signal.aborted||!choice||!ownedSession||params?.sessionId!==ownedSession){void cancel().catch(options.onError);return;}
-      if(options.authorizePermission){void Promise.resolve(options.authorizePermission(params)).then(allowed=>channel.reply(frame.id,allowed?{outcome:{outcome:'selected',optionId:choice.optionId}}:{outcome:{outcome:'cancelled'}})).catch(options.onError);return;}
+      if(options.authorizePermission){void Promise.resolve(options.authorizePermission(params)).then(allowed=>{const revoked=signal.aborted||!ownedSession||params?.sessionId!==ownedSession;return channel.reply(frame.id,allowed&&!revoked?{outcome:{outcome:'selected',optionId:choice.optionId}}:{outcome:{outcome:'cancelled'}});}).catch(options.onError);return;}
       void channel.reply(frame.id,{outcome:{outcome:'selected',optionId:choice.optionId}}).catch(options.onError);
     }
   };

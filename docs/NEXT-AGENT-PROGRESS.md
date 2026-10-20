@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 0493e27e0458030768be54bb564363c94ba46249 (dirty)
+source HEAD: a4ab853a5323ea9d9584614239fa46c94aa8e912 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T12-27-36-398Z-6741f8fc/report.json
+report: .state/collaboration-baseline/run-2026-10-20T12-33-36-160Z-4fad006b/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T12-27-36-398Z-6741f8fc/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-Z6zJZQ/report.json`，163.0s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-uaMLGG/report.json`，164.2s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-uVEgql/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-7cr9F4/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T12-27-36-398Z-6741f8fc/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T12-27-36-398Z-6741f8fc/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T12-27-36-398Z-6741f8fc/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T12-27-36-398Z-6741f8fc/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T12-33-36-160Z-4fad006b/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T12-33-36-160Z-4fad006b/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T12-33-36-160Z-4fad006b/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T12-33-36-160Z-4fad006b/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -518,7 +518,9 @@ report: .state/collaboration-baseline/run-2026-10-20T12-27-36-398Z-6741f8fc/repo
 - runAcp 新增 authorizePermission 回调：session/request_permission 不再无条件允许 allow_once
 - Worker 在 warn/enforce 模式下按 preToolGate 证据决定 ACP 权限选择，并写 tool.authorization.recorded 审计
 - 新增 acp-permission 测试：拒绝→cancelled，允许→selected allow_once
-- 尚未完成：批准/取消竞态、CLI 不可拦截缺口标注、MCP 权限桥接
+- ACP 权限异步批准完成时重新检查 signal/session 所有权，取消后的迟到批准返回 cancelled
+- 新增 acp-permission 竞态测试：异步批准途中 abort，最终回执 cancelled
+- 尚未完成：CLI 不可拦截缺口标注、MCP 权限桥接
 
 ## B09 起点 — 讨论窗口估算
 

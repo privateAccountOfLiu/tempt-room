@@ -33,3 +33,10 @@ test('ACP permission requests are selected only when the authorization callback 
     else assert.deepEqual(replies[0], {outcome: {outcome: 'cancelled'}});
   }
 });
+
+test('cancellation after an async permission approval wins the race', async () => {
+  const replies: any[] = [], controller = new AbortController();
+  await assert.rejects(() => runAcp({channel: channel(replies) as any, workspace: '.', model: '', prompt: 'hello', mcpServers: [], signal: controller.signal, emit: () => {}, setCancel: () => {}, onError: error => { throw error; }, authorizePermission: () => { setTimeout(() => controller.abort(), 5); return new Promise<boolean>(resolve => setTimeout(() => resolve(true), 25)); }}), /abort/i);
+  await new Promise(done => setTimeout(done, 40));
+  assert.deepEqual(replies[0], {outcome: {outcome: 'cancelled'}});
+});
