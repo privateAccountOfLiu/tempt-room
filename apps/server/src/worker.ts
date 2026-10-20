@@ -208,6 +208,7 @@ export class Worker {
     this.scanSubscriptions();
     this.cleanupStaging();
     expireResourceLeases(this.store);
+    this.service.expireDiscussionWindows();
   }
   private cleanupStaging(){
     const stagingRoot=join(this.root,'staging');if(!existsSync(stagingRoot))return;

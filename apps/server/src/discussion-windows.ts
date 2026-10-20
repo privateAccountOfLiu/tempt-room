@@ -22,6 +22,12 @@ export const defaultDiscussionWindowConfig: DiscussionWindowConfig = {
   quantile: 0.95
 };
 
+export function isDiscussionWindowExpired(round: {windowDeadline?: string}, nowMs = Date.now()): boolean {
+  if (!round.windowDeadline) return false;
+  const deadline = Date.parse(round.windowDeadline);
+  return Number.isFinite(deadline) && deadline <= nowMs;
+}
+
 export function discussionBucketKey(sample: Pick<DiscussionDurationSample, 'provider' | 'adapterFingerprint' | 'model' | 'taskClass'>): string {
   return [sample.provider, sample.adapterFingerprint, sample.model ?? '', sample.taskClass].join('|');
 }

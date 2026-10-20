@@ -1,3 +1,4 @@
+import { isDiscussionWindowExpired } from './discussion-windows.ts';
 import { z } from 'zod';
 import {discussionPrompt,assessConvergence,discussionSummaryPrompt} from './discussions.ts';
 import { agentSchema,contextSeqOf,taskContractSchema, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type DiscussionRound, type Task, type Decision, type AgentSession, type Subscription, type WakeIntent, type ProjectBinding, type Integration, type BudgetReservation, type CapabilityEvidence } from '../../../packages/protocol/src/index.ts';
@@ -615,6 +616,14 @@ export class RoomService {
     if(limit&&discussion.activationsUsed>limit){this.endDiscussion(discussion,'activation_limit','stopped',`讨论激活额度已达上限（${limit}）`);return false;}
     this.store.event(discussion.roomId,'discussion.round',SYSTEM,{discussion});
     return true;
+  }
+  expireDiscussionWindows(){
+    for(const discussion of this.store.list<Discussion>('discussions').filter(item=>item.status==='active')){
+      const round=this.store.list<DiscussionRound>('discussion_rounds',discussion.roomId).find(item=>item.discussionId===discussion.id&&item.round===discussion.round&&item.status==='open');
+      if(!round||!isDiscussionWindowExpired(round))continue;
+      const completed=this.store.list<Run>('runs',discussion.roomId).find(run=>run.discussionId===discussion.id&&run.discussionRole!=='summary'&&run.round===discussion.round&&run.status==='completed');
+      if(completed)this.settleDiscussion(completed);
+    }
   }
   private recordLateDiscussionResult(discussion:Discussion,run:Run){
     const exists=this.store.events(discussion.roomId).some(event=>event.type==='discussion.round.late.received'&&(event.payload as any).late?.runId===run.id&&(event.payload as any).late?.round===run.round);

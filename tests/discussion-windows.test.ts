@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { discussionBucketKey, discussionWindowMs, ewmaDiscussionDuration, type DiscussionDurationSample } from '../apps/server/src/discussion-windows.ts';
+import { discussionBucketKey, discussionWindowMs, ewmaDiscussionDuration, isDiscussionWindowExpired, type DiscussionDurationSample } from '../apps/server/src/discussion-windows.ts';
 
 const bucket = {provider: 'codex', adapterFingerprint: 'fp_a', model: 'gpt', taskClass: 'code'};
 function sample(durationMs: number, overrides: Partial<DiscussionDurationSample> = {}): DiscussionDurationSample {
@@ -22,4 +22,10 @@ test('discussion windows isolate adapter/model/task buckets and expose EWMA sepa
   assert.equal(discussionBucketKey(bucket), 'codex|fp_a|gpt|code');
   assert.equal(ewmaDiscussionDuration([sample(20_000), sample(40_000)], bucket, 0.5), 30_000);
   assert.equal(ewmaDiscussionDuration([], bucket), undefined);
+});
+
+test('discussion windows expire after their deadline', () => {
+  assert.equal(isDiscussionWindowExpired({windowDeadline: new Date(Date.now() - 1000).toISOString()}), true);
+  assert.equal(isDiscussionWindowExpired({windowDeadline: new Date(Date.now() + 60_000).toISOString()}), false);
+  assert.equal(isDiscussionWindowExpired({}), false);
 });

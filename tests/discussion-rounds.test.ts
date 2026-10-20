@@ -52,3 +52,23 @@ test('late discussion results are recorded against the original round without re
   service.settleDiscussion(completed);
   assert.equal(store.events(roomId).filter(event => event.type === 'discussion.round.late.received').length, before);
 });
+
+test('expired round windows trigger settlement without cancelling slow runs', t => {
+  mkdirSync(parent, {recursive: true});
+  const root = mkdtempSync(join(parent, 'discussion-window-')), store = new Store(join(root, 'room.sqlite')), service = new RoomService(store), roomId = store.rooms()[0].id;
+  t.after(() => { store.close(); rmSync(root, {recursive: true, force: true}); });
+  const command = (type: string, payload: unknown) => service.execute({version: '0.1', commandId: uid(), roomId, type, payload}) as any;
+  const started = command('discussion.start', {goal: 'Window expiry', participants: ['demo-planner', 'demo-reviewer'], rounds: 1, maxResponses: 4, maxDurationMs: 60_000});
+  const discussion = store.get<Discussion>('discussions', started.result.discussionId)!;
+  const at = new Date().toISOString();
+  for (const queued of store.list<Run>('runs', roomId).filter(run => run.discussionId === discussion.id && run.round === 1)) {
+    store.event(roomId, 'run.started', SYSTEM, {run: {...queued, status: 'running', startedAt: at, updatedAt: at}});
+    const running = store.get<Run>('runs', queued.id)!;
+    store.event(roomId, 'run.updated', SYSTEM, {run: {...running, status: 'completed', finishedAt: at, updatedAt: at}});
+  }
+  const round = store.list<DiscussionRound>('discussion_rounds', roomId).find(item => item.discussionId === discussion.id && item.round === 1)!;
+  store.event(roomId, 'discussion.round.opened', SYSTEM, {round: {...round, windowDeadline: new Date(Date.now() - 60_000).toISOString()}});
+  service.expireDiscussionWindows();
+  assert.equal(store.get<Discussion>('discussions', discussion.id)!.status, 'completed');
+  assert.equal(store.list<DiscussionRound>('discussion_rounds', roomId).find(item => item.id === round.id)!.status, 'closed');
+});
