@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 166e96a6028fa2d299a56881994cfcf4edccb61d (dirty)
+source HEAD: 5ca9850fb887eb177dc98a9763b3e2d2559ee53b (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T09-54-56-435Z-c653301f/report.json
+report: .state/collaboration-baseline/run-2026-10-20T10-01-01-244Z-bede87da/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T09-54-56-435Z-c653301f/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-45ZMud/report.json`，162.1s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-954Fck/report.json`，163.2s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-ymRdfz/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-VPo76F/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T09-54-56-435Z-c653301f/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T09-54-56-435Z-c653301f/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T09-54-56-435Z-c653301f/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T09-54-56-435Z-c653301f/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T10-01-01-244Z-bede87da/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T10-01-01-244Z-bede87da/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T10-01-01-244Z-bede87da/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T10-01-01-244Z-bede87da/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -533,4 +533,5 @@ report: .state/collaboration-baseline/run-2026-10-20T09-54-56-435Z-c653301f/repo
   - 每段记录 fromSeq/throughSeq/hash/bytes
 - 新增 GET /api/runs/:id/context-segments 返回确定性分段预览
 - 新增 tests/context-segments.test.ts 3 项；trace 测试扩展路由断言
-- 尚未完成：Worker prompt 接入分段、逐段外部读取版本证据、订阅增量段、按实际冻结窗口生成提示词
+- Worker.context 使用 buildContextSegments 计算 history 段实际字节/省略条数，替换写死的「最近 40 条」说明；仍保留原有消息渲染与决策约束
+- 尚未完成：prompt 直接渲染四段内容、逐段外部读取版本证据、订阅增量段
