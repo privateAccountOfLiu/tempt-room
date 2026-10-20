@@ -11,6 +11,7 @@ import { trustForActor } from './trust.ts';
 import {provideTaskContext,assertExternalContextCurrent} from './external-context.ts';
 import {agentCapabilityFingerprint,capabilityEvidenceId,verifiedCapabilityState} from './adapter-capabilities.ts';
 import {InputDeliveryService} from './input-delivery.ts';
+import { validateOutboundUrl } from './outbound.ts';
 import {acquireResource,releaseResource} from './resource-manager.ts';
 import {canonicalProjectPath,buildProjectManifest,projectBaseCommit} from './project-manifest.ts';
 import {taskVerificationRecordSchema} from '../../../packages/protocol/src/index.ts';
@@ -177,6 +178,13 @@ export class RoomService {
         if (previous && (previous.roomId !== roomId || previous.agentSessionId !== subscription.agentSessionId)) throw new ProtocolError('subscription_conflict', '订阅 ID 已绑定其他会话', 409);
         this.store.event(roomId, 'subscription.updated', actor, {subscription});
         return {subscriptionId: subscription.id, scanSeq: subscription.scanSeq};
+      }
+      case 'outbound.enqueue': {
+        const roomId=this.requireRoom(command),room=this.store.room(roomId)!;
+        if(actor.kind!=='human')throw new ProtocolError('forbidden','只有 owner 可以配置外发',403);
+        const input=payloadSchemas['outbound.enqueue'].parse(p),url=validateOutboundUrl(input.url,this.store.settings().outboundAllowPrivate),deliveryId=uid('outbound'),throughSeq=Math.min(input.throughSeq??room.seq,room.seq);
+        this.store.event(roomId,'outbound.enqueued',OWNER,{deliveryId,url:url.toString(),throughSeq,redacted:input.redacted,createdAt:now()});
+        return {deliveryId,url:url.toString(),throughSeq};
       }
       case 'run.evidence.record': {
         const roomId=this.requireRoom(command);

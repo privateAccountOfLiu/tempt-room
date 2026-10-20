@@ -931,6 +931,62 @@
         },
         "type": {
           "type": "string",
+          "const": "outbound.enqueue"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "maxLength": 2000,
+              "format": "uri"
+            },
+            "throughSeq": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "redacted": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "url",
+            "redacted"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "commandId",
+        "type",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "const": "0.1"
+        },
+        "commandId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "roomId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "type": {
+          "type": "string",
           "const": "run.evidence.record"
         },
         "payload": {
@@ -2555,6 +2611,22 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 2592000000
+            },
+            "outboundAllowPrivate": {
+              "default": false,
+              "type": "boolean"
+            },
+            "outboundMaxAttempts": {
+              "default": 8,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "outboundTimeoutMs": {
+              "default": 10000,
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 60000
             }
           },
           "required": [
@@ -2587,7 +2659,10 @@
             "unknownCostPolicy",
             "stagingRetentionMs",
             "toolAuthorizationMode",
-            "resourceQuarantineTtlMs"
+            "resourceQuarantineTtlMs",
+            "outboundAllowPrivate",
+            "outboundMaxAttempts",
+            "outboundTimeoutMs"
           ],
           "additionalProperties": false
         }

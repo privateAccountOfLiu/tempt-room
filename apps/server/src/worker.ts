@@ -27,6 +27,8 @@ import { agentCapabilityFingerprint, verifiedCapabilityState } from './adapter-c
 import { authorizeTool } from './tool-authorization.ts';
 import { acquireResource, expireQuarantinedLeases, expireResourceLeases, quarantineResource, recoverResourceLeases, releaseResource } from './resource-manager.ts';
 import { cleanupProofComplete } from './cleanup-proof.ts';
+import { validateOutboundUrl } from './outbound.ts';
+import { redactExport } from './export-redaction.ts';
 import { codexThreadKey, reconcileAttachedRun } from './codex-attach.ts';
 import { assertRunFence,assertRunIdentity,executionFence } from './execution.ts';
 import { ToolOperations } from './tool-operations.ts';
@@ -170,6 +172,7 @@ export class Worker {
   start() { this.timer = setInterval(() => this.tick(), 250); this.timer.unref(); this.tick(); queueMicrotask(() => this.recoverInterrupted()); }
   tick() {
     if (this.closed) return;
+    void this.deliverOutbound();
     this.store.atomic(() => {
       for(const fence of this.executions.values()){
         let run:Run;try{run=assertRunFence(this.store,fence,{allowTerminal:true,allowStaleTask:true});}catch{continue;}
@@ -633,6 +636,43 @@ export class Worker {
     const stored=this.store.get<Run>('runs',run.id);
     if(stored&&this.shouldAutoRetry(stored))queueMicrotask(()=>this.autoRetry(stored));
   }
+  private outboundInFlight=false;
+  /** Deliver owner-enqueued webhooks from durable events; retries are bounded and audited. */
+  async deliverOutbound(){
+    if(this.closed||this.outboundInFlight)return;
+    this.outboundInFlight=true;
+    try{
+      const settings=this.store.settings();
+      for(const room of this.store.rooms()){
+        const events=this.store.events(room.id),enqueued=new Map<string,any>(),attempts=new Map<string,any[]>(),delivered=new Set<string>();
+        for(const event of events){
+          const payload=event.payload as any;
+          if(event.type==='outbound.enqueued'){enqueued.set(payload.deliveryId,payload);attempts.set(payload.deliveryId,[]);}
+          else if(event.type==='outbound.attempted'&&attempts.has(payload.deliveryId))attempts.get(payload.deliveryId)!.push(payload);
+          else if(event.type==='outbound.delivered')delivered.add(payload.deliveryId);
+        }
+        for(const [deliveryId,item] of enqueued){
+          if(delivered.has(deliveryId))continue;
+          const tried=attempts.get(deliveryId)??[],count=tried.length;
+          if(count>=settings.outboundMaxAttempts)continue;
+          const last=tried.at(-1);
+          if(last&&Date.parse(last.at)+Math.min(30000*2**count,30*60*1000)>Date.now())continue;
+          let status:number|undefined,error:string|undefined,ok=false;
+          try{
+            const url=validateOutboundUrl(item.url,settings.outboundAllowPrivate).toString();
+            const snapshot=this.store.snapshotAt(room.id,item.throughSeq);
+            const exported={version:VERSION,exportedAt:now(),room:snapshot.room,events:events.filter(event=>event.seq<=item.throughSeq)};
+            const body=item.redacted?redactExport(exported).value:exported;
+            const response=await fetch(url,{method:'POST',headers:{'content-type':'application/json','x-tempt-room-delivery':deliveryId},body:JSON.stringify(body),signal:AbortSignal.timeout(settings.outboundTimeoutMs)});
+            status=response.status;ok=response.ok;if(!ok)error='HTTP '+response.status;
+          }catch(caught){error=(caught as Error).message.slice(0,500);}
+          this.store.event(room.id,'outbound.attempted',SYSTEM,{deliveryId,attempt:count+1,ok,...(status===undefined?{}:{status}),...(error?{error}:{}),at:now()},null,deliveryId);
+          if(ok)this.store.event(room.id,'outbound.delivered',SYSTEM,{deliveryId,attempts:count+1,at:now()},null,deliveryId);
+        }
+      }
+    }catch{/* delivery attempts remain auditable; the next tick retries pending items */}finally{this.outboundInFlight=false;}
+  }
+
   private consumeToolCall(run:Run){const max=this.store.settings().maxToolCallsPerRun,used=this.toolCalls.get(run.id)??0;if(used>=max)throw new ProtocolError('tool_budget_exceeded',`单次运行工具调用已达上限（${max}）`,429);this.toolCalls.set(run.id,used+1);}
   /** Absence of Room writes is insufficient: native and remote effects remain unobservable. */
   private recoverInterrupted(){

@@ -35,7 +35,10 @@ export const executionSettingsSchema=z.object({
   unknownCostPolicy:z.enum(['block','allow']).default('block'),
   stagingRetentionMs:z.number().int().min(0).max(30*24*60*60*1000).default(24*60*60*1000),
   toolAuthorizationMode:z.enum(['off','warn','enforce']).default('off'),
-  resourceQuarantineTtlMs:z.number().int().min(0).max(30*24*60*60*1000).default(0)
+  resourceQuarantineTtlMs:z.number().int().min(0).max(30*24*60*60*1000).default(0),
+  outboundAllowPrivate:z.boolean().default(false),
+  outboundMaxAttempts:z.number().int().min(1).max(20).default(8),
+  outboundTimeoutMs:z.number().int().min(1000).max(60000).default(10000)
 }).strict();
 export type ExecutionSettings=z.infer<typeof executionSettingsSchema>;
 export const defaultExecutionSettings:ExecutionSettings=executionSettingsSchema.parse({});

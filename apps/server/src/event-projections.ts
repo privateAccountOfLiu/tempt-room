@@ -168,7 +168,7 @@ export function projectEvent(sink:ProjectionSink,event:RoomEvent){
     case 'usage-sample':put('usage_samples',payload.sample);break;
     case 'budget-reservation':put('budget_reservations',payload.reservation);break;
     case 'resource-lease':put('resource_leases',payload.lease);break;
-    case 'settings':case 'audit':break;
+    case 'settings':case 'audit':case 'outbound':break;
   }
 }
 

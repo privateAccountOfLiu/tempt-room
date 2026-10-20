@@ -1017,6 +1017,36 @@
     ]
   },
   {
+    "type": "outbound.enqueued",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "outbound",
+    "schemaVersion": 1,
+    "kinds": [
+      "outbound.enqueued"
+    ]
+  },
+  {
+    "type": "outbound.attempted",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "outbound",
+    "schemaVersion": 1,
+    "kinds": [
+      "outbound.attempted"
+    ]
+  },
+  {
+    "type": "outbound.delivered",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "outbound",
+    "schemaVersion": 1,
+    "kinds": [
+      "outbound.delivered"
+    ]
+  },
+  {
     "type": "token.delta",
     "durability": "ephemeral",
     "aggregate": "room",
