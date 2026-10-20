@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 046b3b458667d95c69072c4e0409cc1bac02ce34 (dirty)
+source HEAD: dc36ba7204bbef3da4dd01ed677451773f3a63ef (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T06-27-19-269Z-bb457d84/report.json
+report: .state/collaboration-baseline/run-2026-10-20T06-32-14-640Z-1be60c19/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -185,21 +185,34 @@ report: .state/collaboration-baseline/run-2026-10-20T06-27-19-269Z-bb457d84/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-z0aY5L/report.json`，156.6s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-2kfzUa/report.json`，161.4s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-KaXAaD/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-pXbgUJ/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T06-27-19-269Z-bb457d84/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T06-27-19-269Z-bb457d84/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T06-27-19-269Z-bb457d84/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T06-27-19-269Z-bb457d84/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T06-32-14-640Z-1be60c19/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T06-32-14-640Z-1be60c19/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T06-32-14-640Z-1be60c19/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T06-32-14-640Z-1be60c19/replay.stdout.txt`
 
-## D04a — 用量样本去重与统一聚合
+## E01 起点 — 有界可观测指标
+
+- 新增 apps/server/src/metrics.ts：collectMetrics/metricsText
+- 指标覆盖：
+  - queueDepth / activeRuns / oldestPendingAgeMs
+  - unknownRuns / unknownIntegrations / integrationConflicts
+  - pendingWakes / pendingDeliveries / unknownBatches
+  - budgetReservedUsd / unknownCostReservations / subscriptions
+- 新增 GET /api/metrics：
+  - owner 认证
+  - JSON 默认；Accept: text/plain 或 ?format=prometheus 返回 Prometheus 文本
+  - 不引入 runId 等高基数 label
+- 新增 tests/metrics.test.ts 1 项：计数正确、Prometheus 文本、未认证 401
+- 尚未完成：traceId 串联、延迟直方图、UI 指标卡## D04a — 用量样本去重与统一聚合
 
 - 新增 packages/protocol/src/usage.ts：UsageSample（provider/session/turn/request/scope/counterEpoch/tokens/cost/source）
 - 新增 apps/server/src/usage.ts 纯聚合器：

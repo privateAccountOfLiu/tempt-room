@@ -1,0 +1,36 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { createApp } from '../apps/server/src/app.ts';
+import { collectMetrics, metricsText } from '../apps/server/src/metrics.ts';
+import { uid } from '../apps/server/src/store.ts';
+import type { BudgetReservation, Integration, WakeIntent } from '../packages/protocol/src/index.ts';
+
+const parent = resolve('.state/test-data'), HASH = 'a'.repeat(64);
+test('metrics expose bounded queue/integration/budget counters and Prometheus text', async t => {
+  mkdirSync(parent, {recursive: true});
+  const root = mkdtempSync(join(parent, 'metrics-'));
+  const {app, store, service} = await createApp({root, startWorker: false, token: 'metrics-owner'});
+  t.after(async () => { await app.close(); rmSync(root, {recursive: true, force: true}); });
+  const roomId = store.rooms()[0].id;
+  service.execute({version: '0.1', commandId: uid(), roomId, type: 'message.send', payload: {text: 'queue me', mentions: ['demo-planner']}});
+  const stamp = new Date().toISOString(), actor = {id: 'owner', kind: 'human' as const};
+  const integration: Integration = {id: 'integration_metrics', roomId, artifactId: 'artifact_metrics', status: 'unknown', authorization: 'auto', requestActor: 'owner', createdAt: stamp, updatedAt: stamp};
+  store.event(roomId, 'integration.updated', actor, {integration});
+  const wakeIntent: WakeIntent = {id: 'wake_metrics', scopeKey: 'metrics', agentSessionId: 'session_metrics', sourceEventId: 'event_metrics', sourceSeq: 1, status: 'pending'};
+  store.event(roomId, 'wake.requested', {id: 'system', kind: 'system'}, {wakeIntent});
+  const reservation: BudgetReservation = {id: 'budget_metrics', roomId, runId: 'run_metrics', generation: 1, reservedUsd: 0.25, source: 'estimate', status: 'reserved', createdAt: stamp, updatedAt: stamp};
+  store.event(roomId, 'budget.reserved', {id: 'system', kind: 'system'}, {reservation});
+  const metrics = collectMetrics(store);
+  assert.ok(metrics.queueDepth >= 1);
+  assert.equal(metrics.unknownIntegrations, 1);
+  assert.equal(metrics.pendingWakes, 1);
+  assert.equal(metrics.budgetReservedUsd, 0.25);
+  assert.match(metricsText(metrics), /tempt_room_queueDepth \d+/);
+  const headers = {host: '127.0.0.1:4317', authorization: 'Bearer metrics-owner', 'room-protocol-version': '0.1', accept: 'text/plain'};
+  const response = await app.inject({url: '/api/metrics', headers});
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /tempt_room_unknownIntegrations 1/);
+  assert.equal((await app.inject({url: '/api/metrics', headers: {host: headers.host, 'room-protocol-version': '0.1'}})).statusCode, 401);
+});

@@ -12,6 +12,7 @@ import { VERSION,payloadSchemas, agentToolCallSchema, ProtocolError, type AgentD
 import { Store, now, OWNER, uid } from './store.ts';
 import {agentCapabilityFingerprint,capabilityNames,probeConfiguredAgent,verifiedCapabilityState} from './adapter-capabilities.ts';
 import { aggregateUsage } from './usage.ts';
+import { collectMetrics, metricsText } from './metrics.ts';
 import { RoomService } from './service.ts';
 import { Worker } from './worker.ts';
 import { diagnose,probeAgentProtocol } from './adapters.ts';
@@ -226,6 +227,11 @@ export async function createApp(options: AppOptions = {}) {
   app.get<{Params:{id:string}}>('/api/rooms/:id/budget-reservations', request => {
     const room = store.room(request.params.id); if (!room) throw new ProtocolError('not_found', '房间不存在', 404);
     return store.list<BudgetReservation>('budget_reservations', room.id);
+  });
+  app.get('/api/metrics', (request, reply) => {
+    const metrics = collectMetrics(store);
+    if (String(request.headers.accept ?? '').includes('text/plain') || (request.query as any)?.format === 'prometheus') return reply.type('text/plain').send(metricsText(metrics));
+    return metrics;
   });
   app.get<{Params:{id:string}}>('/api/rooms/:id/usage-summary', request => {
     const room = store.room(request.params.id); if (!room) throw new ProtocolError('not_found', '房间不存在', 404);
