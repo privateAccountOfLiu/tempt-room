@@ -871,17 +871,17 @@ export class Worker {
     }
     if (name === 'room_wait') {
       const input = z.object({ afterSeq: z.number().int().nonnegative().optional(), timeoutMs: z.number().int().min(500).max(25000).default(15000) }).strict().parse(args ?? {});
-      const startSeq = input.afterSeq ?? room.seq, deadline = Date.now() + input.timeoutMs;
+      const startSeq = input.afterSeq ?? room.seq, deadline = Date.now() + input.timeoutMs, historyFloor=this.store.projectionStatus(roomId).historyFloor;
       if(startSeq>room.seq)throw new ProtocolError('invalid_cursor','游标超出当前房间事件序号',400);
       let cursor=startSeq;
       while (Date.now() < deadline) {
         if(!this.store.get<AgentDescriptor>('agents',agentId)?.enabled||!this.store.room(roomId)?.members.includes(agentId))throw new ProtocolError('forbidden','Agent 房间访问已撤销',403);
         const events=this.store.events(roomId,cursor,1000),messages:unknown[]=[];
         for(const event of events){cursor=event.seq;if(event.type==='chat.message.created')messages.push(event.payload.message);if(messages.length===20)break;}
-        if(messages.length)return {roomId,fromSeq:startSeq,throughSeq:cursor,timeout:false,messages};
+        if(messages.length)return {roomId,fromSeq:startSeq,throughSeq:cursor,timeout:false,messages,head:this.store.room(roomId)!.seq,historyFloor,resetRequired:startSeq<historyFloor};
         await new Promise(resolve => setTimeout(resolve, events.length===1000?0:Math.max(0,Math.min(200,deadline-Date.now()))));
       }
-      return { roomId, fromSeq: startSeq, throughSeq: cursor, timeout: true, messages: [] };
+      return { roomId, fromSeq: startSeq, throughSeq: cursor, timeout: true, messages: [], head:this.store.room(roomId)!.seq, historyFloor, resetRequired:startSeq<historyFloor };
     }
     throw new Error('不支持的房间工具');
   }

@@ -218,6 +218,7 @@ while (running) {
   let waited;
   try { waited = await tool('room_wait', { afterSeq: cursor, timeoutMs: 20000 }); }
   catch (error) { log('room_wait failed: ' + error.message); await new Promise(resolve => setTimeout(resolve, 2000)); continue; }
+  if (waited.resetRequired) { log('inbox cursor below history floor; resyncing to floor'); cursor = waited.historyFloor ?? 0; continue; }
   cursor = waited.throughSeq ?? cursor;
   if (waited.timeout) continue;
   const messages = (waited.messages ?? []).filter(message => {
