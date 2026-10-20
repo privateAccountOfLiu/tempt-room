@@ -2828,10 +2828,62 @@
               "minLength": 1,
               "maxLength": 128,
               "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "requireAuthorization": {
+              "default": false,
+              "type": "boolean"
             }
           },
           "required": [
-            "artifactId"
+            "artifactId",
+            "requireAuthorization"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "commandId",
+        "type",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "const": "0.1"
+        },
+        "commandId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "roomId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "type": {
+          "type": "string",
+          "const": "integration.authorize"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "integrationId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            }
+          },
+          "required": [
+            "integrationId"
           ],
           "additionalProperties": false
         }

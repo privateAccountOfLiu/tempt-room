@@ -361,7 +361,8 @@ export class RoomService {
       }
       case 'artifact.integrate': {
         const roomId = this.requireRoom(command);
-        const artifact = this.store.get<Artifact>('artifacts', z.string().parse(p.artifactId));
+        const input = z.object({artifactId:z.string(),requireAuthorization:z.boolean().default(false)}).parse(p);
+        const artifact = this.store.get<Artifact>('artifacts', input.artifactId);
         if (!artifact || artifact.roomId !== roomId) throw new ProtocolError('not_found', '交付物不存在', 404);
         if (artifact.kind !== 'patch') throw new ProtocolError('not_applicable', '这份交付物不是可应用的文件差异', 409);
         const existing = this.store.list<Integration>('integrations', roomId).find(item => item.artifactId === artifact.id && ['queued', 'validating', 'applying', 'applied'].includes(item.status));
@@ -369,9 +370,21 @@ export class RoomService {
         const unsafe = this.store.list<Integration>('integrations', roomId).find(item => item.artifactId === artifact.id && ['unknown', 'blocked'].includes(item.status));
         if (unsafe) throw new ProtocolError('integration_unknown', '该交付物存在未知/阻塞的集成记录，请先审查后再入队', 409);
         if (artifact.applied) throw new ProtocolError('already_applied', '这份交付物已经应用', 409);
-        const integration: Integration = {id: uid('integration'), roomId, artifactId: artifact.id, ...(artifact.runId ? {runId: artifact.runId} : {}), ...(artifact.taskId ? {taskId: artifact.taskId} : {}), status: 'queued', requestActor: actor.id, createdAt: now(), updatedAt: now()};
+        const requireAuthorization = input.requireAuthorization;
+        const integration: Integration = {id: uid('integration'), roomId, artifactId: artifact.id, ...(artifact.runId ? {runId: artifact.runId} : {}), ...(artifact.taskId ? {taskId: artifact.taskId} : {}), status: 'queued', authorization: requireAuthorization ? 'waiting' : 'auto', requestActor: actor.id, createdAt: now(), updatedAt: now()};
         this.store.event(roomId, 'integration.queued', actor, {integration});
         return {integrationId: integration.id, status: integration.status};
+      }
+      case 'integration.authorize': {
+        const roomId = this.requireRoom(command);
+        if (actor.kind !== 'human') throw new ProtocolError('forbidden', '只有 owner 可以授权集成', 403);
+        const input = payloadSchemas['integration.authorize'].parse(p);
+        const integration = this.store.get<Integration>('integrations', input.integrationId);
+        if (!integration || integration.roomId !== roomId) throw new ProtocolError('not_found', '集成不存在', 404);
+        if (integration.status !== 'ready_to_apply') throw new ProtocolError('invalid_state', '集成尚未进入待授权状态', 409);
+        const next: Integration = {...integration, authorization: 'authorized', updatedAt: now()};
+        this.store.event(roomId, 'integration.updated', actor, {integration: next});
+        return {integrationId: next.id, status: next.status, authorization: next.authorization};
       }
       case 'artifact.apply': {
         const roomId = this.requireRoom(command), id = z.string().parse(p.artifactId), artifact = this.store.get<Artifact>('artifacts', id);

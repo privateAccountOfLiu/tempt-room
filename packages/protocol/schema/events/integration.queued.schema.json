@@ -75,6 +75,50 @@
             "blocked"
           ]
         },
+        "authorization": {
+          "default": "auto",
+          "type": "string",
+          "enum": [
+            "auto",
+            "waiting",
+            "authorized"
+          ]
+        },
+        "verificationExitCode": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "verificationOutputHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "verificationEnvironment": {
+          "type": "object",
+          "properties": {
+            "node": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "platform": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 50
+            },
+            "arch": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 50
+            }
+          },
+          "required": [
+            "node",
+            "platform",
+            "arch"
+          ],
+          "additionalProperties": false
+        },
         "verificationId": {
           "type": "string",
           "minLength": 1,
@@ -111,6 +155,7 @@
         "roomId",
         "artifactId",
         "status",
+        "authorization",
         "requestActor",
         "createdAt",
         "updatedAt"

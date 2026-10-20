@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: bee5d46337c33be494ceced3f6aa516f88d2d363 (dirty)
+source HEAD: f102d23a4dfdb3f360ae4a691896093f31915a68 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T04-47-38-454Z-555fcf44/report.json
+report: .state/collaboration-baseline/run-2026-10-20T04-52-45-726Z-4e0e4931/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -162,19 +162,19 @@ report: .state/collaboration-baseline/run-2026-10-20T04-47-38-454Z-555fcf44/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-RuXAon/report.json`，154.3s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-BOCBOm/report.json`，154.7s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-fDLnc1/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-1FdaNU/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T04-47-38-454Z-555fcf44/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T04-47-38-454Z-555fcf44/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T04-47-38-454Z-555fcf44/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T04-47-38-454Z-555fcf44/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-52-45-726Z-4e0e4931/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T04-52-45-726Z-4e0e4931/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-52-45-726Z-4e0e4931/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-52-45-726Z-4e0e4931/replay.stdout.txt`
 
 ## M1 验收 — 并行任务确定性 fixture
 
@@ -204,7 +204,12 @@ report: .state/collaboration-baseline/run-2026-10-20T04-47-38-454Z-555fcf44/repo
   - 不自动重放未知集成；artifact.integrate 对 unknown/blocked 记录返回 409，要求 owner 先审查
 - integrated 依赖条件接入真实 integration：只有该任务存在 applied 集成才解锁下游；Worker 派发同时传入集成列表
 - 新增 tests/integration-queue.test.ts 2 项：staging 验证成功/失败、重启 unknown 阻断
-- 尚未完成：验证环境版本/argv 白名单、ready_to_apply 独立授权门、staging 清理与 journal 对账恢复、旧同步 apply 移除
+- 新增 integration.authorize owner 命令与 authorization=auto/waiting/authorized：
+  - artifact.integrate 可要求 requireAuthorization，验证通过后停在 ready_to_apply/waiting，源文件不变
+  - owner 授权后下一 tick 才 applying/applied
+- 集成记录 verificationExitCode、verificationOutputHash、verificationEnvironment(node/platform/arch)
+- 新增集成测试：ready_to_apply 等待授权、验证元数据、授权后应用
+- 尚未完成：验证命令 argv 白名单/环境完整版本、staging 清理、journal 对账恢复、旧同步 apply 移除
 ## D02a — 持久集成队列主体
 
 - 新增 packages/protocol/src/integration.ts：Integration schema 与状态机（queued/validating/staging/testing/ready_to_apply/applying/applied/conflict/verification_failed/unknown/blocked）

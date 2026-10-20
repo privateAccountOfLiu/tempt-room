@@ -90,3 +90,21 @@ test('restart marks in-flight integrations unknown and blocks blind re-enqueue',
   assert.equal(recovered.errorCode, 'restart_unknown');
   assert.throws(() => command('artifact.integrate', {artifactId: artifact.id}), /未知\/阻塞/);
 });
+
+test('ready_to_apply waits for explicit owner authorization and records verification metadata', async t => {
+  const {store, project, worker, command, artifact} = await fixture(t, 'node -e "process.exit(0)"');
+  const queued = command('artifact.integrate', {artifactId: artifact.id, requireAuthorization: true});
+  worker.tick();
+  const waiting = store.get<Integration>('integrations', queued.result.integrationId as string)!;
+  assert.equal(waiting.status, 'ready_to_apply');
+  assert.equal(waiting.authorization, 'waiting');
+  assert.equal(waiting.verificationExitCode, 0);
+  assert.match(waiting.verificationOutputHash ?? '', /^[a-f0-9]{64}$/);
+  assert.ok(waiting.verificationEnvironment?.node);
+  assert.equal(readFileSync(join(project, 'answer.txt'), 'utf8'), 'original\n');
+  const authorized = command('integration.authorize', {integrationId: waiting.id});
+  assert.equal(authorized.result.authorization, 'authorized');
+  worker.tick();
+  assert.equal(store.get<Integration>('integrations', waiting.id)!.status, 'applied');
+  assert.equal(readFileSync(join(project, 'answer.txt'), 'utf8'), 'candidate\n');
+});

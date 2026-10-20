@@ -138,47 +138,51 @@ export class Worker {
   }
   private processIntegrations(){
     if(this.active.size>0)return;
-    const integration=this.store.list<Integration>('integrations').filter(item=>item.status==='queued').sort((a,b)=>a.createdAt.localeCompare(b.createdAt))[0];
+    const integration=this.store.list<Integration>('integrations').filter(item=>item.status==='queued'||(item.status==='ready_to_apply'&&item.authorization==='authorized')).sort((a,b)=>a.createdAt.localeCompare(b.createdAt))[0];
     if(!integration)return;
     const update=(status:Integration['status'],extra:Partial<Integration>={})=>{const next:Integration={...integration,...extra,status,updatedAt:now()};this.store.atomic(()=>{this.store.event(integration.roomId,'integration.updated',SYSTEM,{integration:next});});return next;};
-    update('validating');
-    let verificationId:string|undefined,artifactHash:string|undefined;
+    let artifactHash=integration.artifactHash,verificationId=integration.verificationId,verificationExitCode=integration.verificationExitCode,verificationOutputHash=integration.verificationOutputHash,verificationEnvironment=integration.verificationEnvironment;
+    const verificationFields=()=>{const fields:Partial<Integration>={};if(artifactHash)fields.artifactHash=artifactHash;if(verificationId)fields.verificationId=verificationId;if(verificationExitCode!==undefined)fields.verificationExitCode=verificationExitCode;if(verificationOutputHash)fields.verificationOutputHash=verificationOutputHash;if(verificationEnvironment)fields.verificationEnvironment=verificationEnvironment;return fields;};
     try{
-      const artifact=this.store.get<Artifact>('artifacts',integration.artifactId);
-      const task=artifact?.taskId?this.store.get<Task>('tasks',artifact.taskId):undefined;
-      const changes=JSON.parse(readFileSync(join(this.root,'artifacts',integration.artifactId+'.changes.json'),'utf8'));
-      artifactHash=digest(changes);
-      const checks=task?.contract?.acceptance??[];
-      if(checks.length){
-        update('testing',{artifactHash});
-        const staging=join(this.root,'staging',integration.id);mkdirSync(staging,{recursive:true});
-        for(const [filePath,file] of Object.entries<any>(changes.manifest.files??{})){
-          const target=safePath(staging,filePath);mkdirSync(dirname(target),{recursive:true});writeFileSync(target,Buffer.from(file.content,'base64'));
+      if(integration.status==='queued'){
+        update('validating');
+        const artifact=this.store.get<Artifact>('artifacts',integration.artifactId);
+        const task=artifact?.taskId?this.store.get<Task>('tasks',artifact.taskId):undefined;
+        const changes=JSON.parse(readFileSync(join(this.root,'artifacts',integration.artifactId+'.changes.json'),'utf8'));
+        artifactHash=digest(changes);
+        const checks=task?.contract?.acceptance??[];
+        if(checks.length){
+          update('testing',{artifactHash});
+          const staging=join(this.root,'staging',integration.id);mkdirSync(staging,{recursive:true});
+          for(const [filePath,file] of Object.entries<any>(changes.manifest.files??{})){
+            const target=safePath(staging,filePath);mkdirSync(dirname(target),{recursive:true});writeFileSync(target,Buffer.from(file.content,'base64'));
+          }
+          for(const change of changes.changes as any[]){
+            const target=safePath(staging,change.path);
+            if(change.after===null){if(existsSync(target))unlinkSync(target);continue;}
+            mkdirSync(dirname(target),{recursive:true});writeFileSync(target,Buffer.from(change.after,'base64'));
+          }
+          let failed:number|undefined,outputs='';
+          for(const check of checks){
+            const result=spawnSync(check.command,{shell:true,cwd:staging,encoding:'utf8',timeout:60000,windowsHide:true});
+            outputs+=(result.stdout??'')+(result.stderr??'');
+            if(result.status!==0){failed=result.status??1;break;}
+          }
+          const environment={node:process.version,platform:process.platform,arch:process.arch},outputHash=digest(outputs);
+          verificationEnvironment=environment;verificationOutputHash=outputHash;
+          if(failed!==undefined){verificationExitCode=failed;verificationId='verification_'+integration.id;update('verification_failed',{...verificationFields(),errorCode:'verification_exit_'+failed});return;}
+          verificationExitCode=0;verificationId='verification_'+integration.id;
         }
-        for(const change of changes.changes as any[]){
-          const target=safePath(staging,change.path);
-          if(change.after===null){if(existsSync(target))unlinkSync(target);continue;}
-          mkdirSync(dirname(target),{recursive:true});writeFileSync(target,Buffer.from(change.after,'base64'));
-        }
-        let failed:number|undefined,outputs='';
-        for(const check of checks){
-          const result=spawnSync(check.command,{shell:true,cwd:staging,encoding:'utf8',timeout:60000,windowsHide:true});
-          outputs+=(result.stdout??'')+(result.stderr??'');
-          if(result.status!==0){failed=result.status??1;break;}
-        }
-        if(failed!==undefined){update('verification_failed',{artifactHash,verificationId:'verification_'+integration.id,errorCode:'verification_exit_'+failed});return;}
-        verificationId='verification_'+integration.id;
-        update('ready_to_apply',{artifactHash,verificationId});
-      } else {
-        update('ready_to_apply',{artifactHash});
+        const ready=update('ready_to_apply',verificationFields());
+        if(ready.authorization==='waiting')return;
       }
-      update('applying',{artifactHash,...(verificationId?{verificationId}:{})});
+      update('applying',verificationFields());
       const result=this.apply(integration.artifactId);
-      update('applied',{artifactHash,...(verificationId?{verificationId}:{}),journalId:result.journalId});
+      update('applied',{...verificationFields(),journalId:result.journalId});
     }catch(error){
       const code=(error as any)?.code as string|undefined;
       const status:Integration['status']=code==='already_applied'?'applied':['apply_conflict','source_changed','stale_generation','stale_artifact','stale_dependency','artifact_binding_invalid','run_not_completed'].includes(code??'')?'conflict':code==='recovery_required'?'blocked':'unknown';
-      update(status,{...(artifactHash?{artifactHash}:{}),...(code?{errorCode:code}:{})});
+      update(status,{...verificationFields(),...(code?{errorCode:code}:{})});
     }
   }
   private scanSubscriptions(){
