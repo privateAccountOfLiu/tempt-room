@@ -178,6 +178,16 @@ export class RoomService {
         this.store.event(roomId, 'subscription.updated', actor, {subscription});
         return {subscriptionId: subscription.id, scanSeq: subscription.scanSeq};
       }
+      case 'run.evidence.record': {
+        const roomId=this.requireRoom(command);
+        if(actor.kind!=='human')throw new ProtocolError('forbidden','只有 owner 可以记录外部读取证据',403);
+        const input=payloadSchemas['run.evidence.record'].parse(p),run=this.store.get<Run>('runs',input.runId);
+        if(!run||run.roomId!==roomId)throw new ProtocolError('not_found','运行不存在',404);
+        if(!['running','waiting_input','queued'].includes(run.status))throw new ProtocolError('invalid_state','运行已结束，不能追加外部读取证据',409);
+        run.externalReads=[...(run.externalReads??[]),{kind:input.kind,source:input.source,...(input.version?{version:input.version}:{}),...(input.hash?{hash:input.hash}:{}),fetchedAt:input.fetchedAt??now()}];
+        this.store.event(roomId,'run.updated',SYSTEM,{run},null,run.id);
+        return {runId:run.id,externalReads:run.externalReads.length};
+      }
       case 'resource.reserve': {
         const roomId = this.requireRoom(command);
         if (actor.kind !== 'human') throw new ProtocolError('forbidden', '只有 owner 可以预留资源', 403);

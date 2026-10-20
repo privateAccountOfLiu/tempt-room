@@ -89,8 +89,9 @@ function relatedText(run: Run, task?: Task): string {
     parts.push(`acceptance=${task.contract.acceptance.map(check => check.description).join(' | ')}`);
     parts.push(`baselineRef=${binding.baselineRef} manifestHash=${binding.manifestHash}`);
     if (binding.allowedPaths.length) parts.push(`allowedPaths=${binding.allowedPaths.join(',')}`);
-    parts.push('externalReadVersion=unknown');
   }
+  for(const read of run.externalReads??[]) parts.push(`externalRead:${read.kind}:${read.source}:${read.version??'unknown'}${read.hash?`#${read.hash.slice(0,16)}`:''}`);
+  if(task?.contract&&!run.externalReads?.length) parts.push('externalReadVersion=unknown');
   return parts.join('\n');
 }
 
