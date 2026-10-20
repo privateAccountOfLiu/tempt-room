@@ -228,6 +228,10 @@ export async function createApp(options: AppOptions = {}) {
     const room = store.room(request.params.id); if (!room) throw new ProtocolError('not_found', '房间不存在', 404);
     return store.list<BudgetReservation>('budget_reservations', room.id);
   });
+  app.get<{Params:{id:string;traceId:string}}>('/api/rooms/:id/traces/:traceId', request => {
+    const room = store.room(request.params.id); if (!room) throw new ProtocolError('not_found', '房间不存在', 404);
+    return store.events(room.id).filter(event => event.traceId === request.params.traceId).slice(0, 500);
+  });
   app.get('/api/metrics', (request, reply) => {
     const metrics = collectMetrics(store);
     if (String(request.headers.accept ?? '').includes('text/plain') || (request.query as any)?.format === 'prometheus') return reply.type('text/plain').send(metricsText(metrics));

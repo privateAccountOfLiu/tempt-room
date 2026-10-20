@@ -22,11 +22,13 @@ export class RoomService {
   onRollback: (integrationId: string, actor: Actor) => Record<string, unknown> = () => { throw new ProtocolError('not_available', '集成回滚服务不可用', 503); };
   onInput: (runId: string, text: string) => void = () => {};
   readonly inputDelivery: InputDeliveryService;
+  private activeTraceId?:string;
   constructor(public store: Store) { this.inputDelivery = new InputDeliveryService(store); }
   execute(raw: unknown, actor: Actor = OWNER,scope?:{runId:string;generation?:number;executionId?:string}): Receipt {
     const parsed = commandSchema.safeParse(raw); if (!parsed.success) throw new ProtocolError('invalid_command', parsed.error.message);
     const command = parsed.data, hash = digest({ command, actor,...(scope?{scope}:{}) });
-    return this.store.atomic(() => {
+    const previousTrace=this.activeTraceId;this.activeTraceId=uid('trace');
+    try{ return this.store.atomic(() => {
       if(scope){const run=this.store.get<Run>('runs',scope.runId);if(run&&(run.executionId||scope.generation!==undefined||scope.executionId!==undefined))assertRunFence(this.store,{runId:run.id,roomId:command.roomId!,agentId:actor.id,generation:scope.generation!,executionId:scope.executionId!});}
       const previous = this.store.receipt(command.commandId);
       if (previous) { if (previous.hash !== hash) throw new ProtocolError('idempotency_conflict', '同一 commandId 不能用于不同内容', 409); return previous.receipt; }
@@ -40,7 +42,7 @@ export class RoomService {
       const result = this.dispatch(command, actor,scope);
       const receipt: Receipt = { commandId: command.commandId, accepted: true, result };
       this.store.saveReceipt(command.commandId, hash, receipt); return receipt;
-    });
+    });}finally{this.activeTraceId=previousTrace;}
   }
   private requireRoom(command: Command) { if (!command.roomId) throw new ProtocolError('room_required', '需要房间编号'); return command.roomId; }
   private dispatch(command: Command, actor: Actor,scope?:{runId:string;generation?:number;executionId?:string}): Record<string, unknown> {
@@ -212,12 +214,12 @@ export class RoomService {
         if (input.open) {
           if (actor.kind !== 'human') throw new ProtocolError('forbidden', 'Agent 不能创建开放认领任务', 403);
           if (input.agentId) throw new ProtocolError('validation_error', '开放认领任务不需要指定成员', 400);
-          const task: Task = { id: uid('task'), roomId, title: input.title, agentId: 'unassigned', projectPath: binding?.sourcePath??input.projectPath, dependencies: input.dependencies, ...(input.contract?{contract:input.contract}:{}), ...strictFields, ...(binding?{projectBindingId:binding.id,bindingVersion:binding.version,baselineManifestHash:binding.manifestHash}:{}), open: true, generation:1,version: 1, status: 'proposed', createdAt: now() };
+          const task: Task = { ...(this.activeTraceId?{traceId:this.activeTraceId}:{}), id: uid('task'), roomId, title: input.title, agentId: 'unassigned', projectPath: binding?.sourcePath??input.projectPath, dependencies: input.dependencies, ...(input.contract?{contract:input.contract}:{}), ...strictFields, ...(binding?{projectBindingId:binding.id,bindingVersion:binding.version,baselineManifestHash:binding.manifestHash}:{}), open: true, generation:1,version: 1, status: 'proposed', createdAt: now() };
            this.store.event(roomId, 'task.created', actor, { task },command.commandId,scope?.runId??null); return { taskId: task.id };
         }
         if (!input.agentId) throw new ProtocolError('validation_error', '请指定执行成员或选择开放认领', 400);
         this.checkAgent(roomId, input.agentId);
-        const task: Task = { id: uid('task'), roomId, title: input.title, agentId: input.agentId, projectPath: binding?.sourcePath??input.projectPath, dependencies: input.dependencies, ...(input.contract?{contract:input.contract}:{}), ...strictFields, ...(binding?{projectBindingId:binding.id,bindingVersion:binding.version,baselineManifestHash:binding.manifestHash}:{}), generation:1,version: 1, status: actor.kind === 'agent' ? 'proposed' : 'queued', createdAt: now() };
+        const task: Task = { ...(this.activeTraceId?{traceId:this.activeTraceId}:{}), id: uid('task'), roomId, title: input.title, agentId: input.agentId, projectPath: binding?.sourcePath??input.projectPath, dependencies: input.dependencies, ...(input.contract?{contract:input.contract}:{}), ...strictFields, ...(binding?{projectBindingId:binding.id,bindingVersion:binding.version,baselineManifestHash:binding.manifestHash}:{}), generation:1,version: 1, status: actor.kind === 'agent' ? 'proposed' : 'queued', createdAt: now() };
          const event = this.store.event(roomId, 'task.created', actor, { task },command.commandId,scope?.runId??null);
         if (actor.kind === 'human'&&this.store.get<AgentDescriptor>('agents',task.agentId)?.connectionMode!=='external') this.enqueue(roomId, task.agentId, task.title, event.seq, { taskId: task.id, taskVersion: 1 });
         return { taskId: task.id };
@@ -396,7 +398,7 @@ export class RoomService {
         if (unsafe) throw new ProtocolError('integration_unknown', '该交付物存在未知/阻塞的集成记录，请先审查后再入队', 409);
         if (artifact.applied) throw new ProtocolError('already_applied', '这份交付物已经应用', 409);
         const requireAuthorization = input.requireAuthorization;
-        const integration: Integration = {id: uid('integration'), roomId, artifactId: artifact.id, ...(artifact.runId ? {runId: artifact.runId} : {}), ...(artifact.taskId ? {taskId: artifact.taskId} : {}), status: 'queued', authorization: requireAuthorization ? 'waiting' : 'auto', requestActor: actor.id, createdAt: now(), updatedAt: now()};
+        const integration: Integration = {id: uid('integration'), roomId, artifactId: artifact.id, ...(artifact.traceId?{traceId:artifact.traceId}:{}), ...(artifact.runId ? {runId: artifact.runId} : {}), ...(artifact.taskId ? {taskId: artifact.taskId} : {}), status: 'queued', authorization: requireAuthorization ? 'waiting' : 'auto', requestActor: actor.id, createdAt: now(), updatedAt: now()};
         this.store.event(roomId, 'integration.queued', actor, {integration});
         return {integrationId: integration.id, status: integration.status};
       }
@@ -516,7 +518,7 @@ export class RoomService {
     const recentRuns=this.store.list<Run>('runs',roomId).filter(run=>run.agentId===agentId&&Date.now()-Date.parse(run.createdAt)<60000);if(recentRuns.length>=settings.maxAgentRunsPerMinute)throw new ProtocolError('agent_rate_limited',`该成员一分钟内启动的运行已达上限（${settings.maxAgentRunsPerMinute}）`,429);
     const baseTimeoutMs=fields.taskId?settings.taskTimeoutMs:settings.chatTimeoutMs;
     const timeoutMs=settings.adaptiveTimeouts?adaptiveTimeoutMs(this.store.list<Run>('runs',roomId),agentId,fields.taskId?'task':'chat',baseTimeoutMs):baseTimeoutMs;
-    const run: Run = { id: uid('run'), roomId, agentId, prompt, effectScope:['demo','api'].includes(executionAgent.provider)?'conversation-only':'unrestricted', basedOnSeq, status: 'queued',lifecycleVersion:1,generation:1,contextPolicy:structuredClone(settings.contextPolicy), createdAt: now(), updatedAt: now(),contextId:fields.contextId??this.saveContext(roomId,basedOnSeq),limits:{memoryMb:settings.memoryMb,maxProcesses:settings.maxProcesses,timeoutMs,tokenBudget:settings.tokenBudget,costBudgetUsd:settings.costBudgetUsd}, ...fields };
+    const run: Run = { ...(this.activeTraceId?{traceId:this.activeTraceId}:{}), id: uid('run'), roomId, agentId, prompt, effectScope:['demo','api'].includes(executionAgent.provider)?'conversation-only':'unrestricted', basedOnSeq, status: 'queued',lifecycleVersion:1,generation:1,contextPolicy:structuredClone(settings.contextPolicy), createdAt: now(), updatedAt: now(),contextId:fields.contextId??this.saveContext(roomId,basedOnSeq),limits:{memoryMb:settings.memoryMb,maxProcesses:settings.maxProcesses,timeoutMs,tokenBudget:settings.tokenBudget,costBudgetUsd:settings.costBudgetUsd}, ...fields };
      this.reserveBudgetForRun(run);
      this.store.event(roomId, 'run.created', SYSTEM, { run }, causationId ?? null, run.id); return run;
   }
@@ -622,7 +624,7 @@ export class RoomService {
         const message=(event?.payload as any)?.message, task=(event?.payload as any)?.task;
         const prompt=message?.text??task?.title??('订阅命中事件 '+(event?.type??'unknown'));
         try{
-          const run=this.enqueue(session.roomId,session.agentId,prompt,this.store.room(session.roomId)!.seq,{agentSessionId:session.id,...(wakeIntent.deliveryMode?{inputDeliveryMode:wakeIntent.deliveryMode}:{})});
+          const run=this.enqueue(session.roomId,session.agentId,prompt,this.store.room(session.roomId)!.seq,{agentSessionId:session.id,...(wakeIntent.deliveryMode?{inputDeliveryMode:wakeIntent.deliveryMode}:{}),...(event?.traceId?{traceId:event.traceId}:{})});
           wakeIntent.status='assigned';wakeIntent.runId=run.id;
           this.store.event(session.roomId,'wake.assigned',SYSTEM,{wakeIntent});
         }catch{/* Queue/pressure errors leave the wake pending for a later tick. */}

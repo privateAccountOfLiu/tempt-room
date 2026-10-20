@@ -531,7 +531,7 @@ export class Worker {
     assertRunIdentity(this.store,run);assertContextCurrent(this.store,run);
     if(run.discussionId&&run.discussionRole!=='summary')throw new ProtocolError('discussion_artifact_disabled','讨论发言不发布交付物；请在新建讨论时指定总结人',409);
     if (Buffer.byteLength(text) > 2 ** 20) throw new Error('交付物超过 1 MiB 文本上限');
-    const artifact: Artifact = { id: uid('artifact'), roomId: run.roomId, runId: run.id,generation:run.generation,executionId:run.executionId, taskId: run.taskId, ...(run.discussionId?{discussionId:run.discussionId}:{}), name: name.slice(0,160), kind, mediaType, size: Buffer.byteLength(text), createdAt: now() };
+    const artifact: Artifact = { ...(run.traceId?{traceId:run.traceId}:{}), id: uid('artifact'), roomId: run.roomId, runId: run.id,generation:run.generation,executionId:run.executionId, taskId: run.taskId, ...(run.discussionId?{discussionId:run.discussionId}:{}), name: name.slice(0,160), kind, mediaType, size: Buffer.byteLength(text), createdAt: now() };
     mkdirSync(join(this.root, 'artifacts'), { recursive: true }); writeFileSync(join(this.root, 'artifacts', artifact.id), text);
     this.store.atomic(() => {  this.store.event(run.roomId, 'artifact.created', { id: run.agentId, kind: 'agent' }, { artifact }, null, run.id); }); return artifact;
   }

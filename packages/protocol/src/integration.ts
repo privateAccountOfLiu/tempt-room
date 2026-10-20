@@ -12,6 +12,7 @@ export const integrationSchema = z.object({
   artifactId: id,
   artifactHash: hash.optional(),
   runId: id.optional(),
+  traceId: id.optional(),
   taskId: id.optional(),
   taskVersion: z.number().int().positive().optional(),
   baseManifestHash: hash.optional(),
