@@ -3,7 +3,7 @@ import { z } from 'zod';
 const id = z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/);
 const time = z.string().datetime();
 export const resourceLeaseStatusSchema = z.enum(['active', 'released', 'revoked', 'quarantined']);
-export const resourceLeaseKindSchema = z.enum(['workspace', 'project', 'port', 'session', 'process-tree']);
+export const resourceLeaseKindSchema = z.enum(['workspace', 'project', 'port', 'database', 'session', 'process-tree']);
 
 export const cleanupProofSchema = z.object({
   checkedAt: time,

@@ -23,6 +23,7 @@
             "workspace",
             "project",
             "port",
+            "database",
             "session",
             "process-tree"
           ]

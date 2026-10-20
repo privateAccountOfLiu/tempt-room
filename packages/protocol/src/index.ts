@@ -1,3 +1,4 @@
+import {resourceLeaseKindSchema} from './resource-lease.ts';
 import { z } from 'zod';
 import { executionSettingsSchema,type RunLimits } from './settings.ts';
 import { codexBindingSchema, type CodexRunState } from './codex.ts';
@@ -97,6 +98,7 @@ export const payloadSchemas={
   'input.reconcile':z.object({batchId:idSchema,decision:z.enum(['expire','unknown','provided'])}).strict(),
   'budget.reconcile':z.object({reservationId:idSchema,decision:z.enum(['settle','release']),actualUsd:z.number().nonnegative().optional()}).strict(),
   'resource.release':z.object({leaseId:idSchema,remainingProcesses:z.number().int().nonnegative(),evidence:z.string().min(1).max(500)}).strict(),
+  'resource.reserve':z.object({kind:resourceLeaseKindSchema,canonicalKey:z.string().min(1).max(2000),capacity:z.number().int().min(1).max(64).default(1),leaseMs:z.number().int().positive().max(30*24*60*60*1000).optional()}).strict(),
   'capability.verify':z.object({fingerprint:z.string().min(1).max(200),evidence:z.array(capabilityEvidenceSchema).min(1).max(20)}).strict(),
   'task.verification.record':taskVerificationRecordSchema,
   'project.bind':z.object({sourcePath:z.string().min(1).max(2000),allowedExecutionModes:z.array(z.enum(['sandbox','host'])).min(1).max(2).default(['sandbox']),verificationRefs:z.array(z.string().min(1).max(500)).max(50).default([]),baseCommit:z.string().max(200).optional()}).strict(),

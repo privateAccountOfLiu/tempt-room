@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Store, now, uid } from '../apps/server/src/store.ts';
+import { RoomService } from '../apps/server/src/service.ts';
 import { acquireResource, quarantineResource, recoverResourceLeases, releaseResource } from '../apps/server/src/resource-manager.ts';
 import type { ResourceLease, Run } from '../packages/protocol/src/index.ts';
 
@@ -50,4 +51,18 @@ test('agent-session leases are exclusive and released only with proof', t => {
   releaseResource(store, roomId, lease.id, {checkedAt: now(), remainingProcesses: 0, evidence: 'session worker exited'});
   const next = acquireResource(store, {roomId, kind: 'session', key: 'agent-session:room:demo-planner', run: {id: 'run_session_c', generation: 1}});
   assert.equal(next.status, 'active');
+});
+
+test('owner can reserve port and database capacities through the command surface', t => {
+  const {store, roomId} = fixture(t);
+  const service = new RoomService(store);
+  const command = (type: string, payload: unknown) => service.execute({version: '0.1', commandId: uid(), roomId, type, payload});
+  const port = command('resource.reserve', {kind: 'port', canonicalKey: '127.0.0.1:4318', capacity: 1});
+  assert.ok(port.result.leaseId);
+  assert.throws(() => command('resource.reserve', {kind: 'port', canonicalKey: '127.0.0.1:4318', capacity: 1}), /资源已被其他运行占用/);
+  const db = command('resource.reserve', {kind: 'database', canonicalKey: 'sqlite:fixture', capacity: 2});
+  assert.equal(db.result.capacity, 2);
+  assert.throws(() => service.execute({version: '0.1', commandId: uid(), roomId, type: 'resource.reserve', payload: {kind: 'port', canonicalKey: '127.0.0.1:4319', capacity: 1}}, {id: 'demo-planner', kind: 'agent'}), /无权执行此命令/);
+  command('resource.release', {leaseId: port.result.leaseId, remainingProcesses: 0, evidence: 'owner verified'});
+  command('resource.reserve', {kind: 'port', canonicalKey: '127.0.0.1:4318', capacity: 1});
 });
