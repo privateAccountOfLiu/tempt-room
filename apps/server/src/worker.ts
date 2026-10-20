@@ -26,6 +26,7 @@ import { buildContextSegments } from './context-segments.ts';
 import { agentCapabilityFingerprint, verifiedCapabilityState } from './adapter-capabilities.ts';
 import { authorizeTool } from './tool-authorization.ts';
 import { acquireResource, expireQuarantinedLeases, expireResourceLeases, quarantineResource, recoverResourceLeases, releaseResource } from './resource-manager.ts';
+import { cleanupProofComplete } from './cleanup-proof.ts';
 import { codexThreadKey, reconcileAttachedRun } from './codex-attach.ts';
 import { assertRunFence,assertRunIdentity,executionFence } from './execution.ts';
 import { ToolOperations } from './tool-operations.ts';
@@ -622,7 +623,8 @@ export class Worker {
       for(const leaseId of [...new Set([run.resourceLeaseId,run.sessionLeaseId].filter(Boolean) as string[])]){
         try{
           if(!['completed','failed','canceled','superseded'].includes(status))quarantineResource(this.store,run.roomId,leaseId,'terminal_state_'+status);
-          else if(run.sandbox&&!run.cleanupProof)quarantineResource(this.store,run.roomId,leaseId,'sandbox_cleanup_not_proven');
+          else if(run.sandbox&&!cleanupProofComplete(run.cleanupProof))quarantineResource(this.store,run.roomId,leaseId,'sandbox_cleanup_not_proven');
+          else if(run.cleanupProof&&!cleanupProofComplete(run.cleanupProof))quarantineResource(this.store,run.roomId,leaseId,'cleanup_proof_incomplete');
           else releaseResource(this.store,run.roomId,leaseId,run.cleanupProof??{checkedAt:now(),remainingProcesses:0,evidence:'worker-terminal'});
         }catch{/* Quarantine/release evidence remains auditable via events. */}
       }

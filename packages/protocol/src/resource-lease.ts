@@ -8,7 +8,9 @@ export const resourceLeaseKindSchema = z.enum(['workspace', 'project', 'port', '
 export const cleanupProofSchema = z.object({
   checkedAt: time,
   remainingProcesses: z.number().int().nonnegative(),
-  evidence: z.string().min(1).max(500)
+  remainingProcessesKnown: z.boolean().optional(),
+  evidence: z.string().min(1).max(500),
+  exitCode: z.number().int().optional()
 }).strict();
 export type CleanupProof = z.infer<typeof cleanupProofSchema>;
 

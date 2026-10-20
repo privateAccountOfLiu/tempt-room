@@ -6,6 +6,7 @@ import { Store, SYSTEM, uid } from '../apps/server/src/store.ts';
 import { RoomService } from '../apps/server/src/service.ts';
 import { Worker } from '../apps/server/src/worker.ts';
 import { defaultSandbox, type Run } from '../packages/protocol/src/index.ts';
+import { cleanupProofComplete, incompleteCleanupProof } from '../apps/server/src/cleanup-proof.ts';
 
 const parent = resolve('.state/test-data');
 test('sandbox job-empty exit evidence becomes a durable cleanup proof', async t => {
@@ -42,4 +43,15 @@ test('demo adapters record a no-local-process-tree cleanup proof on completion',
   assert.equal(run.status, 'completed', run.error);
   assert.equal(run.cleanupProof?.remainingProcesses, 0);
   assert.equal(run.cleanupProof?.evidence, 'adapter-has-no-local-process-tree');
+});
+
+test('only a known-empty process tree authorizes cleanup release', () => {
+  const checkedAt = new Date().toISOString();
+  assert.equal(cleanupProofComplete(undefined), false);
+  assert.equal(cleanupProofComplete({checkedAt, remainingProcesses: 0, evidence: 'appcontainer-job-empty'}), true);
+  assert.equal(cleanupProofComplete({checkedAt, remainingProcesses: 0, remainingProcessesKnown: false, evidence: 'host-direct-child-exit'}), false);
+  const partial = incompleteCleanupProof(checkedAt, 'host-direct-child-exit', 0);
+  assert.equal(partial.remainingProcessesKnown, false);
+  assert.equal(partial.exitCode, 0);
+  assert.equal(cleanupProofComplete(partial), false);
 });

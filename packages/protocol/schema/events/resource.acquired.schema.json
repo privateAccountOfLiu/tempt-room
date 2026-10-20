@@ -82,10 +82,18 @@
               "minimum": 0,
               "maximum": 9007199254740991
             },
+            "remainingProcessesKnown": {
+              "type": "boolean"
+            },
             "evidence": {
               "type": "string",
               "minLength": 1,
               "maxLength": 500
+            },
+            "exitCode": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             }
           },
           "required": [
