@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: d192a4e9e7d111ff4e350423f88022a5fc86d290 (dirty)
+source HEAD: 2708281bd9a82ec71d09a914d87543d400a9ab40 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T09-10-36-132Z-3fbda2a7/report.json
+report: .state/collaboration-baseline/run-2026-10-20T09-18-02-562Z-f60c4391/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -145,7 +145,8 @@ report: .state/collaboration-baseline/run-2026-10-20T09-10-36-132Z-3fbda2a7/repo
 - 新增 discussion-lifecycle 1 项测试：总结额度独立于讨论额度
 - DiscussionForm 新增「总结激活上限（可选）」输入，随 discussion.start 提交 summaryActivationLimit
 - 浏览器 E2E 讨论表单断言新增「总结激活上限」可见
-- 尚未完成：总结额度在讨论详情中的用量展示、更多额度策略
+- 讨论详情展示发言额度与总结额度用量；浏览器 E2E 断言「发言额度」
+- 尚未完成：更多额度策略
 ### B02 — 可重放投影与 v10 迁移
 
 - 数据库版本 v9→v10；新增投影表：agent_sessions、subscriptions、inbox_deliveries、input_batches、wake_intents、capability_evidence、discussion_rounds
@@ -207,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T09-10-36-132Z-3fbda2a7/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-CsWQdn/report.json`，169.6s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-BKDDFi/report.json`，169.6s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-JBnK1q/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-YyQeh1/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T09-10-36-132Z-3fbda2a7/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T09-10-36-132Z-3fbda2a7/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T09-10-36-132Z-3fbda2a7/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T09-10-36-132Z-3fbda2a7/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-18-02-562Z-f60c4391/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T09-18-02-562Z-f60c4391/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-18-02-562Z-f60c4391/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-18-02-562Z-f60c4391/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -446,7 +447,8 @@ report: .state/collaboration-baseline/run-2026-10-20T09-10-36-132Z-3fbda2a7/repo
   - 选择后提交 projectBindingId/bindingVersion，projectPath 隐藏并由服务端取绑定源目录
   - 未选择时保留原项目绝对路径/仅讨论流程
 - 浏览器 E2E 房间设置步骤新增「项目绑定」可见性断言
-- 尚未完成：绑定撤销/编辑 UI、host worktree 显式选择、TaskForm 展示绑定基线文件清单
+- TaskForm 在选择项目绑定时展示 baseline manifest 文件数/字节；浏览器/单元验证通过
+- 尚未完成：绑定撤销/编辑 UI、host worktree 显式选择
 ## D01a — 项目绑定与独立工作区
 
 - 新增 packages/protocol/src/project-binding.ts：ProjectBinding 严格 schema（sourcePath、baseCommit、manifestHash、allowedExecutionModes、verificationRefs、version）

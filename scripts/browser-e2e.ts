@@ -319,7 +319,7 @@ try {
     step('ui-discussion', {goal});
     const historyClicked = await evaluate("(()=>{const row=document.querySelector('.discussion-row');if(!row)return false;row.click();return true;})()");
     if (!historyClicked) fail('找不到讨论记录入口');
-    await waitFor('讨论详情', async () => { const text = await bodyText(); return text.includes('讨论目标') && text.includes('发言记录'); }, 10000);
+    await waitFor('讨论详情', async () => { const text = await bodyText(); return text.includes('讨论目标') && text.includes('发言记录') && text.includes('发言额度'); }, 10000);
     await evaluate("(()=>{const button=[...document.querySelectorAll('dialog.modal button')].find(item=>(item.textContent??'').trim()==='关闭');if(button)button.click();return !!button;})()");
     await waitFor('关闭讨论详情', async () => !(await bodyText()).includes('发言记录'), 10000);
     step('discussion-history');
