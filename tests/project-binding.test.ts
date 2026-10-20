@@ -75,3 +75,18 @@ test('two bound task runs receive distinct independent workspaces and leave the 
   assert.notEqual(runs[0].workspacePath, runs[1].workspacePath);
   assert.equal(readFileSync(join(project, 'src', 'fixed.ts'), 'utf8'), before);
 });
+
+test('non-binding project tasks record file read evidence for the source workspace', async t => {
+  const {project, store, worker, roomId, command} = projectFixture(t);
+  const taskId = command('task.create', {title: 'Direct project task', agentId: 'demo-planner', projectPath: project}).result.taskId as string;
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    worker.tick();
+    const run = store.list<Run>('runs', roomId).find(item => item.taskId === taskId);
+    if (run && ['completed', 'failed', 'canceled'].includes(run.status)) break;
+    await new Promise(done => setTimeout(done, 25));
+  }
+  const run = store.list<Run>('runs', roomId).find(item => item.taskId === taskId)!;
+  assert.equal(run.status, 'completed', run.error);
+  assert.ok((run.externalReads ?? []).some(read => read.kind === 'file' && read.source === project && read.hash));
+});

@@ -485,11 +485,14 @@ export class Worker {
           try { if (!statSync(workspace).isDirectory()) throw new Error('不是目录'); }
           catch (error) { throw new Error(`本机直连无法访问项目目录 ${workspace}：${(error as Error).message}`); }
           baseline = hostStatus(workspace);
+          if(!(run.externalReads??[]).some(read=>read.kind==='file'&&read.source===workspace))run.externalReads=[...(run.externalReads??[]),{kind:'file',source:workspace,hash:digest(baseline),fetchedAt:now()}];
           task.status = 'running'; this.store.atomic(() => {  this.store.event(run.roomId, 'task.updated', SYSTEM, { task }); });
         } else {
           workspace = join(this.root, 'sandboxes', run.id, 'workspace');
           if (task?.projectPath) {
             const manifest = this.workspaces.snapshot(task.projectPath, run.id); workspace = manifest.workspace;
+            const sourcePath=resolve(task.projectPath),manifestHash=digest(Object.fromEntries(Object.entries(manifest.files).map(([name,file])=>[name,file.hash])));
+            if(!(run.externalReads??[]).some(read=>read.kind==='file'&&read.source===sourcePath))run.externalReads=[...(run.externalReads??[]),{kind:'file',source:sourcePath,version:manifest.sourceCommit??undefined,hash:manifestHash,fetchedAt:now()}];
             task.workspaceId = run.id; task.status = 'running'; this.store.atomic(() => {  this.store.event(run.roomId, 'task.updated', SYSTEM, { task }); });
           } else mkdirSync(workspace, { recursive: true });
         }

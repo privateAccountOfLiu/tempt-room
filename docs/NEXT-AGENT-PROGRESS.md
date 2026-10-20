@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 313460169e9ff6eda3e09781df6262242a62dca0 (dirty)
+source HEAD: bd7e5a2dc43054226f376f9d68fcfb2994e24b98 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T13-15-09-619Z-64af7ae6/report.json
+report: .state/collaboration-baseline/run-2026-10-20T13-21-35-331Z-1289a238/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T13-15-09-619Z-64af7ae6/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-2hz16c/report.json`，163.9s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-cW1KLZ/report.json`，164.1s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-oXKwkA/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-oO7pmB/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T13-15-09-619Z-64af7ae6/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T13-15-09-619Z-64af7ae6/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T13-15-09-619Z-64af7ae6/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T13-15-09-619Z-64af7ae6/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T13-21-35-331Z-1289a238/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T13-21-35-331Z-1289a238/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T13-21-35-331Z-1289a238/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T13-21-35-331Z-1289a238/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -595,7 +595,9 @@ report: .state/collaboration-baseline/run-2026-10-20T13-15-09-619Z-64af7ae6/repo
 - api-output 测试覆盖 ETag 版本与无版本响应
 - Worker 对 room_read/task_context/room_inbox 工具读取自动记录 externalReads(database, source, version=head:seq, hash=digest(result), fetchedAt)
 - executeTool 授权测试扩展断言数据库读取证据
-- 尚未完成：非绑定任务文件读取自动采集
+- 非绑定 projectPath 任务启动时自动记录 file externalReads：host 模式 digest(baseline)，sandbox 模式 source manifest hash/sourceCommit
+- 新增 project-binding 测试：非绑定项目任务完成后包含 source workspace 文件证据
+- B08 自动/显式证据链覆盖 file/database/network
 
 ## B07 起点 — 外部 inbox 游标/重置契约
 
