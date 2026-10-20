@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 5a3de1d1c4725e26ad1944e303f7a3457aca6a44 (dirty)
+source HEAD: 43baba5023deadb85915dc95d82522442e4b4dd2 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T08-09-16-355Z-6c2e5392/report.json
+report: .state/collaboration-baseline/run-2026-10-20T08-18-16-683Z-bd7f1943/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -109,6 +109,7 @@ report: .state/collaboration-baseline/run-2026-10-20T08-09-16-355Z-6c2e5392/repo
 - capability.verify 每次记录当前证据并追加历史（当前 evidence 表仍按 fingerprint+capability 唯一）
 - API GET /api/rooms/:id/agents/:agentId/capability-history（按当前 fingerprint 过滤）
 - capability-evidence 测试扩展：同一指纹重复探测当前证据保持 10 条、历史累计 20 条
+- Agent 设置能力面板显示历史条数与最近 5 条历史（支持/不支持/未验证、时间）
 ### B04 — 订阅投递与幂等唤醒主体
 
 - 新增 apps/server/src/wake-policy.ts：纯触发策略；typing/partial/ACK/audit/状态/自身消息默认不唤醒，显式点名与 assigned-task 触发
@@ -204,19 +205,19 @@ report: .state/collaboration-baseline/run-2026-10-20T08-09-16-355Z-6c2e5392/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-dnZMfy/report.json`，171.8s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-mSx5Db/report.json`，170.4s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-Z8cQl6/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-nTqosp/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T08-09-16-355Z-6c2e5392/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T08-09-16-355Z-6c2e5392/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T08-09-16-355Z-6c2e5392/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T08-09-16-355Z-6c2e5392/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T08-18-16-683Z-bd7f1943/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T08-18-16-683Z-bd7f1943/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T08-18-16-683Z-bd7f1943/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T08-18-16-683Z-bd7f1943/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 

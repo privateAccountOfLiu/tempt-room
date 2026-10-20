@@ -205,3 +205,12 @@
 .trace-events>div{display:flex;gap:7px;font-size:9px;color:#9ead92;border-bottom:1px solid #222b1f;padding:2px 0}
 .trace-events code{color:#c6d5bb}
 .trace-events small{margin-left:auto;color:#66745d}
+/* B05 capability history */
+.capability-history{margin-top:7px;border-top:1px solid #263023;padding-top:6px}
+.capability-history>small{display:block;font-size:9px;color:#819175;margin-bottom:3px}
+.capability-history>div{display:flex;gap:6px;align-items:center;font-size:9px;color:#9ead92;padding:2px 0}
+.capability-history em{font-style:normal;border-radius:999px;padding:1px 6px;border:1px solid #3a4433}
+.capability-history em.verified_supported{color:#a8d28a;border-color:#4b6b37}
+.capability-history em.verified_unsupported{color:#d9a58a;border-color:#6b4a37}
+.capability-history em.unverified{color:#9b9b8c;border-color:#4c4c40}
+.capability-history small{margin-left:auto;color:#66745d}
