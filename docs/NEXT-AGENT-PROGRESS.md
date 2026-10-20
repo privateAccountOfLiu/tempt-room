@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: e83c577361442086ca0397c33068f60720fba2cb (dirty)
+source HEAD: 4be8ba409bc53598dc1acf9e5ef9fa7307f59773 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T10-46-41-166Z-ebfa669e/report.json
+report: .state/collaboration-baseline/run-2026-10-20T10-52-55-785Z-3760adc8/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T10-46-41-166Z-ebfa669e/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-SjBlGb/report.json`，163.3s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-bvcGeB/report.json`，161.1s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-0K48Lr/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-DJepyu/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T10-46-41-166Z-ebfa669e/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T10-46-41-166Z-ebfa669e/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T10-46-41-166Z-ebfa669e/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T10-46-41-166Z-ebfa669e/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T10-52-55-785Z-3760adc8/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T10-52-55-785Z-3760adc8/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T10-52-55-785Z-3760adc8/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T10-52-55-785Z-3760adc8/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -530,7 +530,10 @@ report: .state/collaboration-baseline/run-2026-10-20T10-46-41-166Z-ebfa669e/repo
 - 新增窗口到期与自动结算测试
 - DiscussionRound 新增 settledRunIds：关闭轮次时固化本轮已完成 Run ID 集合，late 结果不进入该集合
 - 讨论生命周期/窗口到期测试断言 settledRunIds 固化
-- 尚未完成：p95 窗口接入调度、按模型分桶持久历史样本
+- openDiscussionRound 在未显式设置 roundWindowMs 时，从已完成 Run 的 startedAt/finishedAt 取真实时长样本
+- 按 provider + agentCapabilityFingerprint + model + taskClass=discussion 分桶计算 P95；多参与者取最大窗口；无样本回退 90s
+- 新增 discussion-rounds 测试：观测 30s 完成后新讨论窗口约 30s（而非默认 90s）
+- 尚未完成：持久历史样本表、EWMA 平滑接入
 
 ## B08 起点 — 上下文分段与字节预算
 

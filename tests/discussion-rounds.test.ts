@@ -75,3 +75,18 @@ test('expired round windows trigger settlement without cancelling slow runs', t 
   assert.equal(closedRound.status, 'closed');
   assert.equal(closedRound.settledRunIds?.length, 2);
 });
+
+test('discussion window uses p95 of observed completed run durations', t => {
+  mkdirSync(parent, {recursive: true});
+  const root = mkdtempSync(join(parent, 'discussion-p95-')), store = new Store(join(root, 'room.sqlite')), service = new RoomService(store), roomId = store.rooms()[0].id;
+  t.after(() => { store.close(); rmSync(root, {recursive: true, force: true}); });
+  const now = new Date(), started = new Date(now.getTime() - 30_000).toISOString(), finished = now.toISOString();
+  const run: Run = {id: 'run_p95', roomId, agentId: 'demo-planner', status: 'queued', prompt: 'sample', basedOnSeq: 0, generation: 1, createdAt: started, updatedAt: started};
+  store.event(roomId, 'run.created', SYSTEM, {run});
+  store.event(roomId, 'run.started', SYSTEM, {run: {...run, status: 'running', startedAt: started, updatedAt: started}});
+  store.event(roomId, 'run.updated', SYSTEM, {run: {...run, status: 'completed', startedAt: started, finishedAt: finished, updatedAt: finished}});
+  service.execute({version: '0.1', commandId: uid(), roomId, type: 'discussion.start', payload: {goal: 'P95 window', participants: ['demo-planner'], rounds: 1, maxResponses: 2, maxDurationMs: 60_000}});
+  const round = store.list<DiscussionRound>('discussion_rounds', roomId).find(item => item.status === 'open')!;
+  const remaining = Date.parse(round.windowDeadline!) - Date.now();
+  assert.ok(remaining > 20_000 && remaining < 40_000, 'expected p95 window around 30s, got ' + remaining + 'ms');
+});
