@@ -23,11 +23,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: f7dea2fdcf0a502021aded9915ff7305fc415233 (dirty)
+source HEAD: 8b7d8f7ca4e54ad98134333a93cef63dfca92fc0 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T15-17-13-054Z-1337c5d8/report.json
+report: .state/collaboration-baseline/run-2026-10-20T15-28-57-112Z-13755603/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -220,19 +220,19 @@ report: .state/collaboration-baseline/run-2026-10-20T15-17-13-054Z-1337c5d8/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-nBHK3b/report.json`，211.4s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-wuayRN/report.json`，211.1s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-pazJi2/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-MUG4Ai/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T15-17-13-054Z-1337c5d8/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T15-17-13-054Z-1337c5d8/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T15-17-13-054Z-1337c5d8/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T15-17-13-054Z-1337c5d8/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T15-28-57-112Z-13755603/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T15-28-57-112Z-13755603/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T15-28-57-112Z-13755603/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T15-28-57-112Z-13755603/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -281,7 +281,11 @@ report: .state/collaboration-baseline/run-2026-10-20T15-17-13-054Z-1337c5d8/repo
 - native host 清理证明：killProcessTreeWithProof 在 taskkill /T /F 前用 CIM 计算后代集合，kill 后轮询确认所有 tracked PID 退出，产出 taskkill-tree-scan 证明
 - HostChannel.terminate 保存 cleanupProof；native adapter finally 通过 onCleanupProof 上报；Worker 写入 Run.cleanupProof，release 用 known-empty 语义
 - 新增 host-process-tree 测试：嵌套 node 子进程树清理后 remainingProcesses=0、trackedProcesses>=2
-- 尚未完成：Job Object 级硬保证（当前为 taskkill+CIM 扫描证据）；真实 CLI host 端到端实验## E01 起点 — 有界可观测指标
+- E02 准备：新增 scripts/real-dual-agent-experiment.ts + real-experiment-lib.ts + npm run experiment:real
+- dry-run 只读 /api/agents 与规划，不调用模型；--execute 需要 ROOM_EXPERIMENT_AUTHORIZED=1，且拒绝 demo/disabled/external Agent
+- 规划器排除 demo、disabled、external；roomIsIdle 判定终态；新增 real-experiment 测试 2 项
+- dry-run 实测：当前 live 配置识别 Codex + DeepSeek 两个真实 Agent，等待显式成本授权后执行 --execute
+- 尚未完成：Job Object 级硬保证；真实 CLI host 端到端实验（需授权）## E01 起点 — 有界可观测指标
 
 - 新增 apps/server/src/metrics.ts：collectMetrics/metricsText
 - 指标覆盖：

@@ -34,6 +34,7 @@
     "test:sdk": "npm run build:sdk && node scripts/probe-sdk.mjs",
     "test:browser-fixture": "tsx scripts/preview-regressions.ts",
     "test:browser": "tsx scripts/browser-e2e.ts",
+    "experiment:real": "tsx scripts/real-dual-agent-experiment.ts",
     "test:production": "tsx scripts/production-smoke.ts",
     "test:preflight": "tsx scripts/preflight.ts",
     "report:readiness": "tsx scripts/release-readiness.ts",
