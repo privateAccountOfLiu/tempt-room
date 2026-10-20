@@ -146,4 +146,30 @@ test('restart recovery classifies an applying integration from its apply journal
   const recovered = store.get<Integration>('integrations', integration.id)!;
   assert.equal(recovered.status, 'unknown');
   assert.equal(recovered.errorCode, 'journal_applied');
+  writeFileSync(join(project, 'answer.txt'), 'candidate\n');
+  const reconciled = command('integration.reconcile', {integrationId: recovered.id, decision: 'mark_applied', note: 'journal shows applied'});
+  assert.equal(reconciled.result.status, 'applied');
+  assert.equal(store.get<Artifact>('artifacts', artifact.id)!.applied, true);
+  assert.equal(store.get<Integration>('integrations', recovered.id)!.errorCode, undefined);
+});
+
+test('unknown integration can be retried by owner and then requires authorization', async t => {
+  const {store, project, worker, command, artifact, roomId, service, root} = await fixture(t);
+  const queued = command('artifact.integrate', {artifactId: artifact.id});
+  const broken = {...store.get<Integration>('integrations', queued.result.integrationId as string)!, status: 'applying' as const, updatedAt: new Date().toISOString()};
+  store.event(roomId, 'integration.updated', {id: 'system', kind: 'system'}, {integration: broken});
+  const restarted = new Worker(store, service, root, {});
+  t.after(async () => { await restarted.close(); await worker.close(); });
+  const recovered = store.get<Integration>('integrations', broken.id)!;
+  assert.equal(recovered.status, 'unknown');
+  assert.equal(recovered.errorCode, 'restart_unknown');
+  const retried = command('integration.reconcile', {integrationId: recovered.id, decision: 'retry', note: 'owner reviewed journal'});
+  assert.equal(retried.result.status, 'queued');
+  assert.equal(retried.result.authorization, 'waiting');
+  worker.tick();
+  assert.equal(store.get<Integration>('integrations', recovered.id)!.status, 'ready_to_apply');
+  assert.equal(readFileSync(join(project, 'answer.txt'), 'utf8'), 'original\n');
+  command('integration.authorize', {integrationId: recovered.id});
+  worker.tick();
+  assert.equal(store.get<Integration>('integrations', recovered.id)!.status, 'applied');
 });

@@ -391,6 +391,31 @@ export class RoomService {
         this.store.event(roomId, 'integration.updated', actor, {integration: next});
         return {integrationId: next.id, status: next.status, authorization: next.authorization};
       }
+      case 'integration.reconcile': {
+        const roomId = this.requireRoom(command);
+        if (actor.kind !== 'human') throw new ProtocolError('forbidden', '只有 owner 可以核对未知集成', 403);
+        const input = payloadSchemas['integration.reconcile'].parse(p);
+        const integration = this.store.get<Integration>('integrations', input.integrationId);
+        if (!integration || integration.roomId !== roomId) throw new ProtocolError('not_found', '集成不存在', 404);
+        if (!['unknown', 'blocked'].includes(integration.status)) throw new ProtocolError('invalid_state', '只有未知/阻塞集成需要人工核对', 409);
+        if (input.decision === 'mark_applied') {
+          if (integration.errorCode !== 'journal_applied') throw new ProtocolError('journal_evidence_required', 'journal 未证明已应用，不能标记 applied', 409);
+          const artifact = this.store.get<Artifact>('artifacts', integration.artifactId);
+          if (!artifact || artifact.roomId !== roomId) throw new ProtocolError('not_found', '交付物不存在', 404);
+          const next: Integration = {...integration, status: 'applied', errorCode: undefined, journalId: integration.journalId ?? 'owner-review', updatedAt: now()};
+          this.store.event(roomId, 'integration.updated', actor, {integration: next});
+          if (!artifact.applied) { artifact.applied = true; this.store.event(roomId, 'artifact.applied', actor, {artifact, reconciledBy: 'owner-journal-review'}); }
+          return {integrationId: next.id, status: next.status};
+        }
+        if (input.decision === 'retry') {
+          const next: Integration = {...integration, status: 'queued', authorization: 'waiting', errorCode: undefined, updatedAt: now()};
+          this.store.event(roomId, 'integration.updated', actor, {integration: next});
+          return {integrationId: next.id, status: next.status, authorization: next.authorization};
+        }
+        const next: Integration = {...integration, status: 'blocked', errorCode: 'owner_abandoned', updatedAt: now()};
+        this.store.event(roomId, 'integration.updated', actor, {integration: next});
+        return {integrationId: next.id, status: next.status};
+      }
       case 'artifact.apply': {
         const roomId = this.requireRoom(command), id = z.string().parse(p.artifactId), artifact = this.store.get<Artifact>('artifacts', id);
         if (!artifact || artifact.roomId !== roomId) throw new ProtocolError('not_found', '交付物不存在', 404);

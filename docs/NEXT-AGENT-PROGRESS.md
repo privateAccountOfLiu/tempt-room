@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 2a05e5402ef6379674ac8828b8253585fbeb01da (dirty)
+source HEAD: 3c137e07a812fa1b547d5f3d5a50ecbd48ee7d33 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T05-15-55-886Z-370d904f/report.json
+report: .state/collaboration-baseline/run-2026-10-20T05-20-48-369Z-d2ba8b6d/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -169,19 +169,19 @@ report: .state/collaboration-baseline/run-2026-10-20T05-15-55-886Z-370d904f/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-OrMgkr/report.json`，152.8s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-Xntz9q/report.json`，155.1s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-mIB03J/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-PvUgsx/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T05-15-55-886Z-370d904f/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T05-15-55-886Z-370d904f/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T05-15-55-886Z-370d904f/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T05-15-55-886Z-370d904f/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T05-20-48-369Z-d2ba8b6d/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T05-20-48-369Z-d2ba8b6d/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T05-20-48-369Z-d2ba8b6d/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T05-20-48-369Z-d2ba8b6d/replay.stdout.txt`
 
 ## M1 验收 — 并行任务确定性 fixture
 
@@ -223,7 +223,12 @@ report: .state/collaboration-baseline/run-2026-10-20T05-15-55-886Z-370d904f/repo
 - 验证环境记录 node/platform/arch/npm/git；staging 在成功应用后清理，失败保留供审查
 - 重启集成恢复按 apply journal 分类 unknown errorCode：journal_applied / journal_incomplete / journal_rolled_back / restart_unknown，仍不自动重放
 - 新增 3 项集成测试：argv 验证成功与 staging 清理、argv 白名单拒绝、journal 证据分类
-- 尚未完成：journal 自动对账/回滚、staging 保留策略与 UI、旧 command shell 路径移除
+- 新增 integration.reconcile owner 命令：
+  - mark_applied：仅当 errorCode=journal_applied 时允许，标记集成 applied 并补写 artifact.applied
+  - retry：unknown/blocked 记录回到 queued + authorization=waiting，需再次 owner 授权才应用
+  - abandon：标记 blocked(owner_abandoned)
+- 集成测试新增 journal 核对 mark_applied 与 retry 重新授权路径
+- 尚未完成：journal 自动回滚、staging 保留策略与 UI、旧 command shell 路径移除
 ## D02a — 持久集成队列主体
 
 - 新增 packages/protocol/src/integration.ts：Integration schema 与状态机（queued/validating/staging/testing/ready_to_apply/applying/applied/conflict/verification_failed/unknown/blocked）
