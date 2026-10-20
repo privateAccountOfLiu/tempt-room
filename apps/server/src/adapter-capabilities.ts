@@ -118,6 +118,16 @@ export function agentCapabilityFingerprint(agent: AgentDescriptor): string {
 
 /** Only deterministic demo behavior is a verified contract here. Real CLI
  * adapters stay unverified until an explicit authorized probe run. */
+export function agentInterceptionGaps(agent: AgentDescriptor): {capability: CapabilityName; reason: string; interceptable: boolean}[] {
+  if (agent.provider === 'demo') return [];
+  if (['codex', 'claude', 'deepseek'].includes(agent.provider)) return [
+    {capability: 'preToolGate', reason: '本地 CLI 以 bypass 权限运行，工具调用发生在 CLI 进程内，房间无法拦截', interceptable: false},
+    {capability: 'steerDuringRun', reason: agent.connectionMode === 'attach' ? 'attach 只桥接消息，不提供运行中 steer' : 'oneshot CLI 运行期间没有 steer 通道', interceptable: false},
+    {capability: 'toolBoundaryInput', reason: 'CLI 工具调用不经过房间 tool 通道', interceptable: false}
+  ];
+  return [{capability: 'preToolGate', reason: '远程/API Agent 的工具调用在远端执行，房间只能审计协议边界', interceptable: false}];
+}
+
 export function probeConfiguredAgent(agent: AgentDescriptor, testedAt = new Date().toISOString()): {fingerprint: string; evidence: CapabilityEvidence[]} {
   const fingerprint = agentCapabilityFingerprint(agent);
   const supported = agent.provider === 'demo' ? ['streamOutput', 'nextTurnInput'] as CapabilityName[] : [];

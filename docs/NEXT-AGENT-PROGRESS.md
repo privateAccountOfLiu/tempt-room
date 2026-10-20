@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: de8a2519937b3465fd33d083cdb5a84bfe232956 (dirty)
+source HEAD: c5a6628c597b42bb012400c7adb4bb8b622336d1 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T14-10-19-900Z-39997c61/report.json
+report: .state/collaboration-baseline/run-2026-10-20T14-17-56-928Z-d47c2483/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -213,19 +213,19 @@ report: .state/collaboration-baseline/run-2026-10-20T14-10-19-900Z-39997c61/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-urEVRU/report.json`，167.0s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-8oJTx3/report.json`，166.4s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-VaQEaf/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-D3nxGR/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T14-10-19-900Z-39997c61/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T14-10-19-900Z-39997c61/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T14-10-19-900Z-39997c61/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T14-10-19-900Z-39997c61/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T14-17-56-928Z-d47c2483/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T14-17-56-928Z-d47c2483/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T14-17-56-928Z-d47c2483/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T14-17-56-928Z-d47c2483/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -532,7 +532,9 @@ report: .state/collaboration-baseline/run-2026-10-20T14-10-19-900Z-39997c61/repo
 - 非 demo adapter 的未验证能力带显式 reason：preToolGate/steerDuringRun/toolBoundaryInput 未声明通道
 - capabilities API 返回 reason；Agent 能力面板展示缺口原因
 - 新增 probeConfiguredAgent 测试：真实 adapter 未验证原因存在，demo 不附加噪声
-- 尚未完成：MCP 权限桥接、按宿主的不可拦截清单
+- capabilities API 新增 interceptionGaps：native CLI 的 preToolGate/steerDuringRun/toolBoundaryInput 明确不可拦截及原因；a2a/api 标注远端边界；demo 为空
+- Agent 能力面板展示「不可拦截缺口」；新增 agentInterceptionGaps 测试
+- 尚未完成：MCP 权限桥接（MCP 写入已走 agentTool 授权，但宿主权限面仍无桥）
 
 ## B09 起点 — 讨论窗口估算
 

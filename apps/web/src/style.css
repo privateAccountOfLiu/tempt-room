@@ -230,3 +230,6 @@
 .external-reads>div{display:flex;align-items:center;gap:6px;font-size:9px;color:#9ead92;border-bottom:1px solid #222b1f;padding:2px 0}
 .external-reads code{color:#c6d5bb;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .external-reads small{margin-left:auto;color:#66745d}
+.capability-gaps{display:flex;flex-direction:column;gap:2px;margin-top:6px;border-top:1px solid #2b3527;padding-top:4px}
+.capability-gaps>div{display:flex;align-items:center;gap:6px;font-size:9px;color:#9ead92}
+.capability-gaps small{margin-left:auto;color:#66745d;max-width:65%;text-align:right}

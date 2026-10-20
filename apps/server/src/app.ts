@@ -14,7 +14,7 @@ import { VERSION,payloadSchemas, agentToolCallSchema, ProtocolError, type AgentD
 import { Store, digest, now, OWNER, SYSTEM, uid } from './store.ts';
 import { planRoomImport } from './room-import.ts';
 import { redactExport } from './export-redaction.ts';
-import {agentCapabilityFingerprint,capabilityNames,probeConfiguredAgent,verifiedCapabilityState} from './adapter-capabilities.ts';
+import {agentCapabilityFingerprint,agentInterceptionGaps,capabilityNames,probeConfiguredAgent,verifiedCapabilityState} from './adapter-capabilities.ts';
 import { aggregateUsage } from './usage.ts';
 import { collectMetrics, metricsText } from './metrics.ts';
 import { RoomService } from './service.ts';
@@ -325,7 +325,7 @@ export async function createApp(options: AppOptions = {}) {
       const match = evidence.find(item => item.capability === capability);
       return {capability, state: verifiedCapabilityState(fingerprint, evidence, capability), mode: match?.mode ?? 'not_run', testedAt: match?.testedAt ?? null, reason: match?.reason ?? null};
     });
-    return {fingerprint, states, member: room.members.includes(agent.id)};
+    return {fingerprint, states, member: room.members.includes(agent.id), interceptionGaps: agentInterceptionGaps(agent)};
   });
   app.post<{Params:{id:string};Body:{roomId?:string}}>('/api/agents/:id/capabilities/probe', request => {
     const roomId = request.body?.roomId; const room = roomId ? store.room(roomId) : undefined;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createApp } from '../apps/server/src/app.ts';
-import { probeConfiguredAgent } from '../apps/server/src/adapter-capabilities.ts';
+import { agentInterceptionGaps, probeConfiguredAgent } from '../apps/server/src/adapter-capabilities.ts';
 import { agentSchema } from '../packages/protocol/src/index.ts';
 import { agentCapabilityFingerprint } from '../apps/server/src/adapter-capabilities.ts';
 import type { AgentDescriptor } from '../packages/protocol/src/index.ts';
@@ -69,4 +69,15 @@ test('unverified adapter capabilities carry explicit gap reasons', () => {
   assert.match(String(preTool.reason), /未声明可拦截/);
   const demo = agentSchema.parse({id: 'demo-x', name: 'Demo', provider: 'demo'});
   assert.equal(probeConfiguredAgent(demo).evidence.find(item => item.capability === 'preToolGate')!.reason, undefined);
+});
+
+test('per-host interception gaps are explicit for native and remote adapters', () => {
+  const native = agentSchema.parse({id: 'native-gap', name: 'Native', provider: 'deepseek', connectionMode: 'managed', runtimeDirectory: '.', credentialEnv: 'GAP_KEY'});
+  const gaps = agentInterceptionGaps(native);
+  assert.equal(gaps.length, 3);
+  assert.ok(gaps.every(gap => gap.interceptable === false));
+  assert.ok(gaps.some(gap => gap.capability === 'preToolGate'));
+  const remote = agentSchema.parse({id: 'remote-gap', name: 'Remote', provider: 'a2a', endpoint: 'https://agent.example'});
+  assert.equal(agentInterceptionGaps(remote).length, 1);
+  assert.equal(agentInterceptionGaps(agentSchema.parse({id: 'demo-gap', name: 'Demo', provider: 'demo'})).length, 0);
 });
