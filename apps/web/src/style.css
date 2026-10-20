@@ -225,3 +225,8 @@
 .latency-chart span{width:44px;flex:0 0 auto}
 .latency-chart i{height:5px;background:linear-gradient(90deg,#3f5a32,#79a85f);border-radius:2px;min-width:1px}
 .latency-chart b{color:#c6d5bb;font-weight:600;margin-left:auto}
+/* B08 external read evidence */
+.external-reads{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+.external-reads>div{display:flex;align-items:center;gap:6px;font-size:9px;color:#9ead92;border-bottom:1px solid #222b1f;padding:2px 0}
+.external-reads code{color:#c6d5bb;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.external-reads small{margin-left:auto;color:#66745d}
