@@ -708,7 +708,7 @@ export class RoomService {
 }
 
 function p95DiscussionWindow(store:Store,discussion:Discussion):number{
-  const samples=store.list<Run>('runs',discussion.roomId).filter(run=>run.startedAt&&run.finishedAt&&run.status==='completed').map(run=>{const agent=store.get<AgentDescriptor>('agents',run.agentId);return agent?{durationMs:Math.max(0,Date.parse(run.finishedAt!)-Date.parse(run.startedAt!)),provider:agent.provider,adapterFingerprint:agentCapabilityFingerprint(agent),model:agent.model,taskClass:'discussion'}:undefined;}).filter(Boolean) as {durationMs:number;provider:string;adapterFingerprint:string;model?:string;taskClass:string}[];
+  const samples=store.list<Run>('runs',discussion.roomId).filter(run=>run.startedAt&&run.finishedAt&&run.status==='completed').map(run=>{const agent=store.get<AgentDescriptor>('agents',run.agentId);return agent?{durationMs:Math.max(0,Date.parse(run.finishedAt!)-Date.parse(run.startedAt!)),provider:agent.provider,adapterFingerprint:agentCapabilityFingerprint(agent),model:agent.model,taskClass:run.discussionId?'discussion':'task'}:undefined;}).filter(Boolean) as {durationMs:number;provider:string;adapterFingerprint:string;model?:string;taskClass:string}[];
   const windows=discussion.participants.map(agentId=>{const agent=store.get<AgentDescriptor>('agents',agentId);return agent?discussionWindowEstimate(samples,{provider:agent.provider,adapterFingerprint:agentCapabilityFingerprint(agent),model:agent.model,taskClass:'discussion'}).windowMs:undefined;}).filter((value):value is number=>value!==undefined);
   return windows.length?Math.max(...windows):90_000;
 }
