@@ -46,7 +46,7 @@ export class InboxService {
       if (this.store.get<InboxDelivery>('inbox_deliveries', deliveryId) || this.store.get<WakeIntent>('wake_intents', wakeId)) continue;
       const sourceBytes = Buffer.byteLength(JSON.stringify(event), 'utf8');
       const delivery: InboxDelivery = {id: deliveryId, agentSessionId, sourceEventId: event.eventId, sourceSeq: event.seq, status: 'pending', sourceBytes};
-      const wakeIntent: WakeIntent = {id: wakeId, scopeKey: decision.scopeKey ?? `${agentSessionId}:${event.eventId}`, agentSessionId, sourceEventId: event.eventId, sourceSeq: event.seq, status: 'pending'};
+      const wakeIntent: WakeIntent = {id: wakeId, scopeKey: decision.scopeKey ?? `${agentSessionId}:${event.eventId}`, agentSessionId, sourceEventId: event.eventId, sourceSeq: event.seq, deliveryMode: subscription.deliveryMode, status: 'pending'};
       plannedDeliveries.push(delivery); plannedWakes.push(wakeIntent);
       pendingCount++; pendingBytes += sourceBytes;
     }

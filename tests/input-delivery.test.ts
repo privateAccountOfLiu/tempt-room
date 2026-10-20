@@ -9,7 +9,7 @@ import { Worker } from '../apps/server/src/worker.ts';
 import type { AgentSession, InboxDelivery, InputBatch, Run, Subscription, WakeIntent } from '../packages/protocol/src/index.ts';
 
 const parent = resolve('.state/test-data');
-function fixture(t: import('node:test').TestContext, withWorker = false) {
+function fixture(t: import('node:test').TestContext, withWorker = false, deliveryMode?: 'next-turn' | 'tool-boundary' | 'steer') {
   mkdirSync(parent, {recursive: true});
   const root = mkdtempSync(join(parent, 'input-delivery-')), store = new Store(join(root, 'room.sqlite')), service = new RoomService(store), roomId = store.rooms()[0].id;
   const worker = withWorker ? new Worker(store, service, root, {adapter: async function* () { yield {type: 'text', text: 'Input delivered reply'}; }}) : undefined;
@@ -17,7 +17,7 @@ function fixture(t: import('node:test').TestContext, withWorker = false) {
   const now = new Date().toISOString(), session: AgentSession = {id: 'as_input', roomId, agentId: 'demo-planner', status: 'active', createdAt: now, updatedAt: now};
   store.event(roomId, 'agent_session.created', SYSTEM, {agentSession: session});
   const startSeq = store.room(roomId)!.seq;
-  const subscription: Subscription = {id: 'sub_input', roomId, agentSessionId: session.id, eventTypes: ['chat.message.created'], taskIds: [], sourcePolicy: 'explicit', enabled: true, scanSeq: startSeq};
+  const subscription: Subscription = {id: 'sub_input', roomId, agentSessionId: session.id, eventTypes: ['chat.message.created'], taskIds: [], sourcePolicy: 'explicit', ...(deliveryMode ? {deliveryMode} : {}), enabled: true, scanSeq: startSeq};
   service.execute({version: '0.1', commandId: uid(), roomId, type: 'subscription.set', payload: {subscription}});
   service.execute({version: '0.1', commandId: uid(), roomId, type: 'message.send', payload: {text: 'Provide this input', mentions: ['demo-planner']}});
   new InboxService(store).scan(roomId, session.id);
@@ -61,4 +61,18 @@ test('worker creates and provides an input batch before running a wake-dispatche
   assert.equal(batch.status, 'provided');
   assert.equal(batch.agentSessionId, session.id);
   assert.ok(store.list<InboxDelivery>('inbox_deliveries', roomId).every(delivery => delivery.status === 'provided'));
+});
+
+test('tool-boundary delivery mode reaches the run and injects input at a tool boundary', async t => {
+  const {store, service, worker, roomId, session, run} = fixture(t, true, 'tool-boundary');
+  assert.equal(run.inputDeliveryMode, 'tool-boundary');
+  const pending = store.list<InboxDelivery>('inbox_deliveries', roomId).filter(delivery => delivery.agentSessionId === session.id);
+  assert.equal(pending.length, 1);
+  assert.equal(store.list('input_batches', roomId).length, 0);
+  const result = (worker as any).attachToolBoundaryInput(run, {ok: true});
+  assert.ok(result.inputBatch?.id);
+  const batch = store.list<InputBatch>('input_batches', roomId).find(item => item.id === result.inputBatch.id)!;
+  assert.equal(batch.deliveryMode, 'tool-boundary');
+  assert.equal(batch.status, 'provided');
+  assert.equal(store.list<InboxDelivery>('inbox_deliveries', roomId).find(delivery => delivery.id === pending[0].id)!.status, 'provided');
 });

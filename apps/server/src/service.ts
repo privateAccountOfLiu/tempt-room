@@ -573,7 +573,7 @@ export class RoomService {
         const message=(event?.payload as any)?.message, task=(event?.payload as any)?.task;
         const prompt=message?.text??task?.title??('订阅命中事件 '+(event?.type??'unknown'));
         try{
-          const run=this.enqueue(session.roomId,session.agentId,prompt,this.store.room(session.roomId)!.seq,{agentSessionId:session.id});
+          const run=this.enqueue(session.roomId,session.agentId,prompt,this.store.room(session.roomId)!.seq,{agentSessionId:session.id,...(wakeIntent.deliveryMode?{inputDeliveryMode:wakeIntent.deliveryMode}:{})});
           wakeIntent.status='assigned';wakeIntent.runId=run.id;
           this.store.event(session.roomId,'wake.assigned',SYSTEM,{wakeIntent});
         }catch{/* Queue/pressure errors leave the wake pending for a later tick. */}

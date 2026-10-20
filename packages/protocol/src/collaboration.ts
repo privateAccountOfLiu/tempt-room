@@ -29,6 +29,7 @@ export const subscriptionSchema = z.object({
   eventTypes: z.array(z.string().min(1).max(100)).max(100).default([]),
   taskIds: z.array(id).max(100).default([]),
   sourcePolicy: subscriptionSourcePolicySchema,
+  deliveryMode: z.enum(['next-turn', 'tool-boundary', 'steer']).optional(),
   enabled: z.boolean(),
   scanSeq: z.number().int().nonnegative()
 }).strict();
@@ -95,6 +96,7 @@ export const wakeIntentSchema = z.object({
   agentSessionId: id,
   sourceEventId: id,
   sourceSeq: z.number().int().nonnegative(),
+  deliveryMode: z.enum(['next-turn', 'tool-boundary', 'steer']).optional(),
   status: wakeIntentStatusSchema,
   runId: id.optional(),
   suppressionReason: optionalText(300)

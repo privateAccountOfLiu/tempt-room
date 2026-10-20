@@ -42,6 +42,14 @@
       "minimum": 0,
       "maximum": 9007199254740991
     },
+    "deliveryMode": {
+      "type": "string",
+      "enum": [
+        "next-turn",
+        "tool-boundary",
+        "steer"
+      ]
+    },
     "status": {
       "type": "string",
       "enum": [

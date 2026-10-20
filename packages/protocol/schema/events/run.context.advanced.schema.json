@@ -378,6 +378,14 @@
           "maxLength": 128,
           "pattern": "^[a-zA-Z0-9_-]+$"
         },
+        "inputDeliveryMode": {
+          "type": "string",
+          "enum": [
+            "next-turn",
+            "tool-boundary",
+            "steer"
+          ]
+        },
         "operationScopeId": {
           "type": "string",
           "minLength": 1,

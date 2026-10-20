@@ -252,7 +252,7 @@ export class Worker {
     run.contextPolicy??={...settings.contextPolicy,maxRounds:0};run.lifecycleVersion??=1;
     run.limits??={memoryMb:settings.memoryMb,maxProcesses:settings.maxProcesses,timeoutMs:run.taskId?settings.taskTimeoutMs:settings.chatTimeoutMs,tokenBudget:settings.tokenBudget,costBudgetUsd:settings.costBudgetUsd};
     run.generation??=1;run.executionId=uid('execution');run.leaseUntil=new Date(Date.now()+settings.taskLeaseMs).toISOString();
-    if(run.agentSessionId){
+    if(run.agentSessionId&&(run.inputDeliveryMode??'next-turn')==='next-turn'){
       try{const batch=this.service.inputDelivery.createBatch({roomId:run.roomId,agentSessionId:run.agentSessionId,runId:run.id,generation:run.generation??1,executionId:run.executionId});if(batch)run.inputBatchId=batch.id;}catch{/* A failed batch reservation must not hide the run from operators. */}
     }
     const fence=executionFence(run);this.executions.set(fence.executionId,fence);
@@ -604,6 +604,15 @@ export class Worker {
     const result = this.workspaces.apply(changes.manifest, changes.changes); artifact.applied = true;
      this.store.event(artifact.roomId, 'artifact.applied', { id: 'owner', kind: 'human' }, { artifact, ...result }); return result;
   }
+  private attachToolBoundaryInput(run:Run,result:any){
+    if(!run.agentSessionId||!['tool-boundary','steer'].includes(run.inputDeliveryMode??''))return result;
+    try{
+      const batch=this.service.inputDelivery.createBatch({roomId:run.roomId,agentSessionId:run.agentSessionId,runId:run.id,generation:run.generation??1,executionId:run.executionId??run.id,deliveryMode:run.inputDeliveryMode});
+      if(!batch)return result;
+      this.service.inputDelivery.provideBatch(run.roomId,batch.id,'tool-boundary');
+      return {...result,inputBatch:{id:batch.id,deliveryMode:run.inputDeliveryMode}};
+    }catch{return result;}
+  }
   private async handleTool(frame: any) {
     const fence=this.executions.get(frame.runId);
     const result=fence?await this.executeTool(fence.runId,frame.request,fence):{error:'执行通道已经失效',code:'stale_generation'};
@@ -641,7 +650,7 @@ export class Worker {
         const input=z.object({name:z.string().min(1).max(160),text:z.string().max(2**20)}).strict().parse(args);
         action=()=>this.publishArtifact(run,input.name,input.text);
       }else throw new ProtocolError('unsupported_tool','不支持的群聊工具');
-      const commit=()=>{const result=action();this.store.event(run.roomId,'run.tool.completed',actor,{runId:run.id,generation:run.generation??1,executionId:run.executionId,name,success:true},null,run.id);return result;};
+      const commit=()=>{const result=action();this.store.event(run.roomId,'run.tool.completed',actor,{runId:run.id,generation:run.generation??1,executionId:run.executionId,name,success:true},null,run.id);return this.attachToolBoundaryInput(run,result);};
       if(fence&&name!=='room_read'){
         if(typeof request?.operationId!=='string')throw new ProtocolError('operation_id_required','写工具需要稳定 operationId',400);
         return this.operations.execute(fence,request.operationId,name,args,commit);

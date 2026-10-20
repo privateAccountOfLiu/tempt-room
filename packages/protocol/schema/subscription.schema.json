@@ -49,6 +49,14 @@
         "previous-response"
       ]
     },
+    "deliveryMode": {
+      "type": "string",
+      "enum": [
+        "next-turn",
+        "tool-boundary",
+        "steer"
+      ]
+    },
     "enabled": {
       "type": "boolean"
     },
