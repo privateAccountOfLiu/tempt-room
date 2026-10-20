@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: ed2b837b2c2e4582cafe17926c4feda18f3942ba (dirty)
+source HEAD: a2feb7e5907f34fa4af3213cde481a96326dcf2b (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T04-24-10-047Z-5b53abdc/report.json
+report: .state/collaboration-baseline/run-2026-10-20T04-29-17-792Z-117ac461/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -162,20 +162,28 @@ report: .state/collaboration-baseline/run-2026-10-20T04-24-10-047Z-5b53abdc/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：326/326
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-gKGQF1/report.json`，155.8s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-BB71zT/report.json`，152.8s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-XaJGMj/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-DWBcbE/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T04-24-10-047Z-5b53abdc/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T04-24-10-047Z-5b53abdc/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T04-24-10-047Z-5b53abdc/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T04-24-10-047Z-5b53abdc/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-29-17-792Z-117ac461/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T04-29-17-792Z-117ac461/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-29-17-792Z-117ac461/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-29-17-792Z-117ac461/replay.stdout.txt`
 
+## D03b — 验收状态 UI
+
+- 任务卡片显示严格任务的「执行完成/进行中」与「验收待验收/已通过/已拒绝」双状态
+- 任务完成后 owner 可直接「验收通过」或「验收拒绝」：
+  - 通过：携带该任务现有产物 ID，写 task.verification.recorded
+  - 拒绝：写 rejected 验收记录
+- 验收按钮只在 strict 且执行 completed 且未通过时出现，避免把执行完成误显示成验收通过
+- 尚未完成：真实 verifier 命令执行环境、exitCode/输出哈希自动记录、验收历史列表、integrated 条件
 ## D03a — 执行完成与验收分离
 
 - 新增 packages/protocol/src/task-acceptance.ts：
