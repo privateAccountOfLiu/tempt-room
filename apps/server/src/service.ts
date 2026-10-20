@@ -119,6 +119,7 @@ export class RoomService {
           return {...item, id: capabilityEvidenceId(item.fingerprint, item.capability)};
         });
         for (const capabilityEvidence of recorded) this.store.event(roomId, 'capability.verified', actor, {capabilityEvidence});
+        for (const capabilityEvidence of recorded) this.store.event(roomId, 'capability.history.recorded', actor, {capabilityEvidence: {...capabilityEvidence, id: uid('caph')}});
         return {fingerprint: input.fingerprint, recorded: recorded.length};
       }
       case 'discussion.start': {

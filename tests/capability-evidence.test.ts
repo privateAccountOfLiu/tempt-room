@@ -26,6 +26,14 @@ test('probe endpoint persists tristate evidence and invalidates it when the fing
   assert.equal(states.filter(state => state.state === 'verified_supported').length, 2);
   assert.ok(states.every(state => state.state !== 'verified_supported' || state.testedAt));
   assert.equal(store.list('capability_evidence', roomId).length, 10);
+  assert.equal(store.list('capability_evidence_history', roomId).length, 10);
+  const again = await app.inject({method: 'POST', url: `/api/agents/${agentId}/capabilities/probe`, headers, payload: {roomId}});
+  assert.equal(again.statusCode, 200, again.body);
+  assert.equal(store.list('capability_evidence', roomId).length, 10);
+  assert.equal(store.list('capability_evidence_history', roomId).length, 20);
+  const history = await app.inject({url: `/api/rooms/${roomId}/agents/${agentId}/capability-history`, headers});
+  assert.equal(history.statusCode, 200);
+  assert.equal(history.json().length, 20);
 
   const agent = store.get<AgentDescriptor>('agents', agentId)!;
   const previousFingerprint = agentCapabilityFingerprint(agent);

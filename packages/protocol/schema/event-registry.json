@@ -847,6 +847,16 @@
     ]
   },
   {
+    "type": "capability.history.recorded",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "capability-history",
+    "schemaVersion": 1,
+    "kinds": [
+      "capability.history.recorded"
+    ]
+  },
+  {
     "type": "project.bound",
     "durability": "durable",
     "aggregate": "room",

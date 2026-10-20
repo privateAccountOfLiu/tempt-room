@@ -265,6 +265,12 @@ export async function createApp(options: AppOptions = {}) {
     const room = store.room(request.params.id); if (!room) throw new ProtocolError('not_found', '房间不存在', 404);
     return store.list<ProjectBinding>('project_bindings', room.id).sort((a, b) => b.version - a.version);
   });
+  app.get<{Params:{id:string;agentId:string}}>('/api/rooms/:id/agents/:agentId/capability-history', request => {
+    const room = store.room(request.params.id); if (!room) throw new ProtocolError('not_found', '房间不存在', 404);
+    const agent = store.get<AgentDescriptor>('agents', request.params.agentId); if (!agent) throw new ProtocolError('not_found', 'Agent 不存在', 404);
+    const fingerprint = agentCapabilityFingerprint(agent);
+    return store.list<CapabilityEvidence>('capability_evidence_history', room.id).filter(item => item.fingerprint === fingerprint);
+  });
   app.get<{Params:{id:string;agentId:string}}>('/api/rooms/:id/agents/:agentId/capabilities', request => {
     const room = store.room(request.params.id); if (!room) throw new ProtocolError('not_found', '房间不存在', 404);
     const agent = store.get<AgentDescriptor>('agents', request.params.agentId); if (!agent) throw new ProtocolError('not_found', 'Agent 不存在', 404);

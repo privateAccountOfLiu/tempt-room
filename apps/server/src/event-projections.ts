@@ -161,6 +161,7 @@ export function projectEvent(sink:ProjectionSink,event:RoomEvent){
     case 'input-batch':put('input_batches',payload.batch);break;
     case 'wake-intent':put('wake_intents',payload.wakeIntent);break;
     case 'capability-evidence':put('capability_evidence',payload.capabilityEvidence);break;
+    case 'capability-history':put('capability_evidence_history',payload.capabilityEvidence);break;
     case 'discussion-round':put('discussion_rounds',payload.round);break;
     case 'project-binding':put('project_bindings',payload.projectBinding);break;
     case 'integration':put('integrations',payload.integration);break;
