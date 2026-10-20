@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: f96362a1c9e4cd3c62c116d6fe9875326eec569f (dirty)
+source HEAD: 5d9b9577cee898545693d699d9521d27b8bd33e9 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T04-11-49-918Z-f90b632d/report.json
+report: .state/collaboration-baseline/run-2026-10-20T04-17-22-287Z-f1074988/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -162,20 +162,33 @@ report: .state/collaboration-baseline/run-2026-10-20T04-11-49-918Z-f90b632d/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：324/324
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-E9MYFK/report.json`，151.7s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-R4B4Cd/report.json`，152.8s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-8LdYPO/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-VAgy8i/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T04-11-49-918Z-f90b632d/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T04-11-49-918Z-f90b632d/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T04-11-49-918Z-f90b632d/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T04-11-49-918Z-f90b632d/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-17-22-287Z-f1074988/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T04-17-22-287Z-f1074988/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-17-22-287Z-f1074988/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-17-22-287Z-f1074988/replay.stdout.txt`
 
+## D01b — 项目绑定 UI
+
+- 房间设置新增「项目绑定」区域：
+  - 项目绝对路径输入与 sandbox/host 模式多选
+  - 绑定按钮调用 project.bind
+  - 展示版本、源目录、manifest 前缀、文件数
+  - 错误内联显示
+- 任务创建表单：
+  - 加载当前房间绑定列表，可按版本选择
+  - 选择后提交 projectBindingId/bindingVersion，projectPath 隐藏并由服务端取绑定源目录
+  - 未选择时保留原项目绝对路径/仅讨论流程
+- 浏览器 E2E 房间设置步骤新增「项目绑定」可见性断言
+- 尚未完成：绑定撤销/编辑 UI、host worktree 显式选择、TaskForm 展示绑定基线文件清单
 ## D01a — 项目绑定与独立工作区
 
 - 新增 packages/protocol/src/project-binding.ts：ProjectBinding 严格 schema（sourcePath、baseCommit、manifestHash、allowedExecutionModes、verificationRefs、version）

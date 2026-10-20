@@ -159,3 +159,12 @@
 .capability-list em.verified_unsupported{color:#d9a58a;border-color:#6b4a37}
 .capability-list em.unverified{color:#9b9b8c;border-color:#4c4c40}
 .capability-list small{margin-left:auto;color:#66745d;font-size:8px}
+/* D01b project binding controls */
+.binding-section{margin:2px 0 14px}
+.binding-list{display:flex;flex-direction:column;gap:5px;margin:7px 0}
+.binding-list>div{display:flex;gap:8px;align-items:baseline;font-size:10px;color:#aebba3;border:1px solid #2b3527;border-radius:4px;padding:5px 7px;background:#131811}
+.binding-list strong{color:#cfe0c1}
+.binding-list span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.binding-list small{color:#718069;white-space:nowrap}
+.binding-modes{display:flex;gap:12px;flex-wrap:wrap;margin:6px 0}
+.form-error{color:#e0a08a;font-size:10px;margin:6px 0 0}

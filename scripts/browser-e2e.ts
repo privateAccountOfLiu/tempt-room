@@ -434,7 +434,7 @@ try {
     const renamedRoom = `${newRoomName} 改`;
     const settingsButton = await evaluate(`(() => { const button = document.querySelector('button[aria-label="房间设置"]'); if (!button) return 'missing'; button.click(); return 'ok'; })()`);
     if (settingsButton !== 'ok') fail('找不到房间设置入口');
-    await waitFor('房间设置表单', async () => (await bodyText()).includes('保存设置'), 10000);
+    await waitFor('房间设置表单', async () => { const text = await bodyText(); return text.includes('保存设置') && text.includes('项目绑定'); }, 10000);
     if (await setInputByLabel('房间名称', renamedRoom) !== 'ok') fail('无法修改房间名称');
     if (await clickByText('dialog.modal button', '保存设置') !== 'ok') fail('无法保存房间设置');
     await waitFor('房间名称已更新', async () => (await headerRoomName()) === renamedRoom, 15000);
