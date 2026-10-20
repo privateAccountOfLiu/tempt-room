@@ -194,3 +194,9 @@
 .budget-list{display:flex;flex-direction:column;gap:4px;margin-top:6px}
 .budget-row{display:flex;align-items:center;gap:7px;font-size:9px;color:#9ead92;border:1px solid #283024;border-radius:4px;padding:4px 6px;background:#121710}
 .budget-row small{flex:1;color:#819175}
+/* E01 metrics card */
+.usage-metrics{border-top:1px solid #263023;margin-top:10px;padding-top:8px}
+.usage-metrics>strong{font-size:10px;color:#c6d5bb}
+.usage-metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:4px;margin-top:6px}
+.usage-metric-grid span{font-size:9px;color:#819175;border:1px solid #283024;border-radius:4px;padding:4px 6px;background:#121710;display:flex;justify-content:space-between;gap:6px}
+.usage-metric-grid b{color:#c6d5bb;font-weight:600}
