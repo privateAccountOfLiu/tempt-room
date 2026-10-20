@@ -43,7 +43,7 @@ test('owner can import an exported room twice without entity collisions', async 
   const {mkdtempSync,rmSync,mkdirSync,writeFileSync}=await import('node:fs');
   const {join,resolve}=await import('node:path');
   const {createApp}=await import('../apps/server/src/app.ts');
-  const {uid}=await import('../apps/server/src/store.ts');
+  const {uid,digest}=await import('../apps/server/src/store.ts');
   const parent=resolve('.state/test-data');mkdirSync(parent,{recursive:true});
   const root=mkdtempSync(join(parent,'room-import-integration-'));
   const state=await createApp({root,startWorker:false,token:'import-owner'});
@@ -68,6 +68,15 @@ test('owner can import an exported room twice without entity collisions', async 
   const downloaded=await state.app.inject({url:'/api/artifacts/'+importedArtifact.id,headers});
   assert.equal(downloaded.statusCode,200);
   assert.equal(downloaded.body,'hello');
+  const tampered=(exported.json() as any);tampered.exportHash='0'.repeat(64);
+  const badHash=await state.app.inject({method:'POST',url:'/api/rooms/import',headers,payload:{export:tampered}});
+  assert.equal(badHash.statusCode,400);
+  const badArtifact=(exported.json() as any),replacement=[{...badArtifact.artifacts[0],contentBase64:Buffer.from('tampered').toString('base64')},...badArtifact.artifacts.slice(1)];
+  badArtifact.artifacts=replacement;badArtifact.exportHash=digest({room:badArtifact.room,events:badArtifact.events,artifactHashes:replacement.map((item:any)=>[item.artifact.id,item.contentHash])});
+  const tamperedImport=await state.app.inject({method:'POST',url:'/api/rooms/import',headers,payload:{export:badArtifact}});
+  assert.equal(tamperedImport.statusCode,200,tamperedImport.body);
+  assert.equal(tamperedImport.json().importedArtifacts,0);
+  assert.equal(tamperedImport.json().artifactIntegrityFailures,1);
   const snapshot=await state.app.inject({url:'/api/rooms/'+first.json().roomId+'/snapshot',headers});
   assert.equal(snapshot.statusCode,200);
   assert.ok((snapshot.json().snapshot.messages as {text:string}[]).some(message=>message.text==='portable history'));

@@ -240,18 +240,20 @@ export async function createApp(options: AppOptions = {}) {
   app.post<{Body:{export?:any;name?:string}}>('/api/rooms/import',request=>{
     const source=request.body?.export;
     if(!source||typeof source!=='object'||!Array.isArray(source.events)||!source.room)throw new ProtocolError('invalid_import','导入数据格式无效',400);
+    if(source.exportHash){const expected=digest({room:source.room,events:source.events,...(Array.isArray(source.artifacts)?{artifactHashes:source.artifacts.map((item:any)=>[item.artifact?.id,item.contentHash])}:{})});if(expected!==source.exportHash)throw new ProtocolError('invalid_import','导出完整性校验失败：exportHash 不匹配',400);}
     return store.atomic(()=>{
       const newRoomId=uid('room'),plan=planRoomImport(source,{newRoomId,name:request.body?.name,salt:uid('import'),now:now()});
       store.putRoom(plan.room as any,SYSTEM);
       for(const event of plan.events)store.event(newRoomId,event.type,(event.actor??SYSTEM) as any,event.payload as any);
-      let importedArtifacts=0;
+      let importedArtifacts=0,artifactIntegrityFailures=0;
       for(const item of (source.artifacts??[]).slice(0,200)){
         if(!item?.artifact?.id||typeof item.contentBase64!=='string')continue;
         const artifactId=plan.idMap[item.artifact.id];if(!artifactId)continue;
+        if(typeof item.contentHash==='string'&&digest(item.contentBase64)!==item.contentHash){artifactIntegrityFailures++;continue;}
         const bytes=Buffer.from(item.contentBase64,'base64');if(bytes.length>8*1024*1024)continue;
         mkdirSync(join(root,'artifacts'),{recursive:true});writeFileSync(join(root,'artifacts',artifactId),bytes);importedArtifacts++;
       }
-      return {roomId:newRoomId,events:plan.events.length,remappedIds:plan.remappedIds,importedArtifacts,exportHash:digest({room:plan.room,events:plan.events})};
+      return {roomId:newRoomId,events:plan.events.length,remappedIds:plan.remappedIds,importedArtifacts,artifactIntegrityFailures,exportHash:digest({room:plan.room,events:plan.events})};
     });
   });
   app.get<{Params:{id:string};Querystring:{includeArtifacts?:string;redact?:string}}>('/api/rooms/:id/export',request=>{
