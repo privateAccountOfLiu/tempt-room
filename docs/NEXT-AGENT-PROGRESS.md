@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 8cbab4cad2c5717e48f376fef34045eeb72e978f (dirty)
+source HEAD: 43a1ca46a7913e24d4d3ca835f430c8c1f3e6c9a (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T08-26-01-484Z-481fefaa/report.json
+report: .state/collaboration-baseline/run-2026-10-20T08-33-38-982Z-c476c1d2/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -85,6 +85,8 @@ report: .state/collaboration-baseline/run-2026-10-20T08-26-01-484Z-481fefaa/repo
   - 未验证时 WakeIntent 标记 suppressed(steer_unverified)，不创建 Run
   - 通过 capability.verify 记录证据后，steer wake 正常派发并标记 Run.inputDeliveryMode=steer
 - 新增 input-delivery 测试：steer 未验证抑制、验证后派发
+- 投递门禁扩展到 tool-boundary：要求 fingerprint 匹配的 preToolGate=verified_supported；未验证 WakeIntent suppressed(pre_tool_gate_unverified)
+- tool-boundary 测试增加 capability.verify 前置；新增未验证抑制测试
 - 尚未完成：真实 steer 适配器通道、批次分页/筛选、推送刷新
 ### B05b — 能力证据持久化与 UI
 
@@ -205,19 +207,19 @@ report: .state/collaboration-baseline/run-2026-10-20T08-26-01-484Z-481fefaa/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-loCrlu/report.json`，169.9s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-AJDbUD/report.json`，169.4s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-DepXIK/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-EZln3m/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T08-26-01-484Z-481fefaa/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T08-26-01-484Z-481fefaa/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T08-26-01-484Z-481fefaa/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T08-26-01-484Z-481fefaa/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T08-33-38-982Z-c476c1d2/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T08-33-38-982Z-c476c1d2/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T08-33-38-982Z-c476c1d2/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T08-33-38-982Z-c476c1d2/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 

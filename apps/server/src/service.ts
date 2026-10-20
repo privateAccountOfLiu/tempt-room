@@ -628,11 +628,12 @@ export class RoomService {
       for(const wakeIntent of this.store.list<WakeIntent>('wake_intents').filter(intent=>intent.status==='pending')){
         const session=this.store.get<AgentSession>('agent_sessions',wakeIntent.agentSessionId);
         if(!session||session.status!=='active'||!this.store.room(session.roomId)?.members.includes(session.agentId))continue;
-        if(wakeIntent.deliveryMode==='steer'){
+        const requiredCapability=wakeIntent.deliveryMode==='steer'?'steerDuringRun':wakeIntent.deliveryMode==='tool-boundary'?'preToolGate':undefined;
+        if(requiredCapability){
           const agent=this.store.get<AgentDescriptor>('agents',session.agentId);
           if(!agent){wakeIntent.status='suppressed';wakeIntent.suppressionReason='agent_missing';this.store.event(session.roomId,'wake.suppressed',SYSTEM,{wakeIntent});continue;}
-          const fingerprint=agentCapabilityFingerprint(agent),state=verifiedCapabilityState(fingerprint,this.store.list<CapabilityEvidence>('capability_evidence',session.roomId).filter(item=>item.fingerprint===fingerprint),'steerDuringRun');
-          if(state!=='verified_supported'){wakeIntent.status='suppressed';wakeIntent.suppressionReason='steer_unverified';this.store.event(session.roomId,'wake.suppressed',SYSTEM,{wakeIntent});continue;}
+          const fingerprint=agentCapabilityFingerprint(agent),state=verifiedCapabilityState(fingerprint,this.store.list<CapabilityEvidence>('capability_evidence',session.roomId).filter(item=>item.fingerprint===fingerprint),requiredCapability);
+          if(state!=='verified_supported'){wakeIntent.status='suppressed';wakeIntent.suppressionReason=requiredCapability==='steerDuringRun'?'steer_unverified':'pre_tool_gate_unverified';this.store.event(session.roomId,'wake.suppressed',SYSTEM,{wakeIntent});continue;}
         }
         if(this.store.list<Run>('runs',session.roomId).some(run=>run.agentSessionId===session.id&&!terminalStates.has(run.status)))continue;
         const event=this.store.events(session.roomId,Math.max(0,wakeIntent.sourceSeq-1),1).find(item=>item.seq===wakeIntent.sourceSeq);

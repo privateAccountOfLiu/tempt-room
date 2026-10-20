@@ -10,13 +10,18 @@ import { agentCapabilityFingerprint } from '../apps/server/src/adapter-capabilit
 import type { AgentSession, InboxDelivery, InputBatch, Run, Subscription, WakeIntent } from '../packages/protocol/src/index.ts';
 
 const parent = resolve('.state/test-data');
-function fixture(t: import('node:test').TestContext, withWorker = false, deliveryMode?: 'next-turn' | 'tool-boundary' | 'steer') {
+function fixture(t: import('node:test').TestContext, withWorker = false, deliveryMode?: 'next-turn' | 'tool-boundary' | 'steer', withCapability = false) {
   mkdirSync(parent, {recursive: true});
   const root = mkdtempSync(join(parent, 'input-delivery-')), store = new Store(join(root, 'room.sqlite')), service = new RoomService(store), roomId = store.rooms()[0].id;
   const worker = withWorker ? new Worker(store, service, root, {adapter: async function* () { yield {type: 'text', text: 'Input delivered reply'}; }}) : undefined;
   t.after(async () => { await worker?.close(); store.close(); rmSync(root, {recursive: true, force: true}); });
   const now = new Date().toISOString(), session: AgentSession = {id: 'as_input', roomId, agentId: 'demo-planner', status: 'active', createdAt: now, updatedAt: now};
   store.event(roomId, 'agent_session.created', SYSTEM, {agentSession: session});
+  if (withCapability) {
+    const agent = store.get<any>('agents', session.agentId)!;
+    const fingerprint = agentCapabilityFingerprint(agent), testedAt = new Date().toISOString();
+    service.execute({version: '0.1', commandId: uid(), roomId, type: 'capability.verify', payload: {fingerprint, evidence: [{fingerprint, capability: 'preToolGate', state: 'verified_supported', mode: 'simulated-contract', testedAt, suiteVersion: 'sim-v1', evidenceHash: 'b'.repeat(64)}]}});
+  }
   const startSeq = store.room(roomId)!.seq;
   const subscription: Subscription = {id: 'sub_input', roomId, agentSessionId: session.id, eventTypes: ['chat.message.created'], taskIds: [], sourcePolicy: 'explicit', ...(deliveryMode ? {deliveryMode} : {}), enabled: true, scanSeq: startSeq};
   service.execute({version: '0.1', commandId: uid(), roomId, type: 'subscription.set', payload: {subscription}});
@@ -65,7 +70,7 @@ test('worker creates and provides an input batch before running a wake-dispatche
 });
 
 test('tool-boundary delivery mode reaches the run and injects input at a tool boundary', async t => {
-  const {store, service, worker, roomId, session, run} = fixture(t, true, 'tool-boundary');
+  const {store, service, worker, roomId, session, run} = fixture(t, true, 'tool-boundary', true);
   assert.equal(run.inputDeliveryMode, 'tool-boundary');
   const pending = store.list<InboxDelivery>('inbox_deliveries', roomId).filter(delivery => delivery.agentSessionId === session.id);
   assert.equal(pending.length, 1);
@@ -104,4 +109,12 @@ test('steer delivery is suppressed until steerDuringRun is verified', async t =>
   service.dispatchPendingWakes();
   const assigned = store.list<Run>('runs', roomId).find(run => run.agentSessionId === session.id)!;
   assert.equal(assigned.inputDeliveryMode, 'steer');
+});
+
+test('tool-boundary delivery is suppressed until preToolGate is verified', t => {
+  const {store, roomId, session} = fixture(t, false, 'tool-boundary');
+  const wake = store.list<WakeIntent>('wake_intents', roomId)[0];
+  assert.equal(wake.status, 'suppressed');
+  assert.equal(wake.suppressionReason, 'pre_tool_gate_unverified');
+  assert.equal(store.list<Run>('runs', roomId).filter(run => run.agentSessionId === session.id).length, 0);
 });
