@@ -19,6 +19,7 @@ export {taskContractSchema,taskAcceptanceSchema,taskDependencyConditionSchema,ty
 export {projectBindingSchema,projectManifestEntrySchema,projectExecutionModeSchema,type ProjectBinding,type ProjectManifestEntry} from './project-binding.ts';
 export {taskAcceptanceStatusSchema,taskAcceptanceCheckSchema,dependencyRequirementSchema,taskVerificationRecordSchema,type TaskAcceptanceStatus,type DependencyRequirement,type TaskVerificationRecord,type DependencyRequirementKind} from './task-acceptance.ts';
 export {integrationSchema,integrationStatusSchema,type Integration,type IntegrationStatus} from './integration.ts';
+export {usageSampleSchema,usageScopeSchema,usageSourceSchema,type UsageSample,type UsageScope} from './usage.ts';
 import type {DiscussionBallot} from './discussion.ts';
 import {taskContractSchema} from './task-contract.ts';
 import {projectBindingSchema} from './project-binding.ts';

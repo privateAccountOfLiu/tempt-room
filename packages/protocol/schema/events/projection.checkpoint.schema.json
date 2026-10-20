@@ -347,6 +347,25 @@
             "additionalProperties": {}
           }
         },
+        "usage_samples": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[a-zA-Z0-9_-]+$"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": {}
+          }
+        },
         "operations": {
           "default": [],
           "type": "array",
@@ -384,6 +403,7 @@
         "discussion_rounds",
         "project_bindings",
         "integrations",
+        "usage_samples",
         "operations"
       ],
       "additionalProperties": false

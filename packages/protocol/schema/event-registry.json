@@ -887,6 +887,16 @@
     ]
   },
   {
+    "type": "usage.recorded",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "usage-sample",
+    "schemaVersion": 1,
+    "kinds": [
+      "usage.recorded"
+    ]
+  },
+  {
     "type": "discussion.round.opened",
     "durability": "durable",
     "aggregate": "room",

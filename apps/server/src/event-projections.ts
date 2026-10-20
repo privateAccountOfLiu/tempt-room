@@ -164,6 +164,7 @@ export function projectEvent(sink:ProjectionSink,event:RoomEvent){
     case 'discussion-round':put('discussion_rounds',payload.round);break;
     case 'project-binding':put('project_bindings',payload.projectBinding);break;
     case 'integration':put('integrations',payload.integration);break;
+    case 'usage-sample':put('usage_samples',payload.sample);break;
     case 'settings':case 'audit':break;
   }
 }

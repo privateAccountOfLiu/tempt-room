@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { basename, dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
-import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type AgentSession, type Artifact, type Discussion, type ExecutionSettings, type Subscription, type InputBatch, type ProjectBinding, type Integration, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
+import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type AgentSession, type Artifact, type Discussion, type UsageSample, type ExecutionSettings, type Subscription, type InputBatch, type ProjectBinding, type Integration, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { diagnose, ExecutionUnknown, RemoteCanceled, runAdapter } from './adapters.ts';
 import { SandboxHost } from './sandbox.ts';
 import { digest, now, Store, SYSTEM, uid } from './store.ts';
@@ -61,6 +61,7 @@ export class Worker {
   private closed = false;
   private scheduler = new ReadyScheduler();
   private toolCalls = new Map<string,number>();
+  private usageSequence = new Map<string,number>();
   readonly streamListeners = new Set<(delta: StreamDelta) => void>();
   constructor(public store: Store, public service: RoomService, public root: string,private options:{adapter?:typeof runAdapter}={}) {
     this.operations=new ToolOperations(store,()=>store.settings().maxToolResultBytes);
@@ -359,7 +360,7 @@ export class Worker {
           const current=this.store.get<Run>('runs',run.id)!;current.nativeSessionId=output.id;this.store.atomic(()=>{this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);});
         } else if(output.type==='remote-task'){
           run.remoteTaskId=output.id;const current=this.store.get<Run>('runs',run.id)!;current.remoteTaskId=output.id;this.store.atomic(()=>{this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);});
-        } else if (output.type === 'usage') {run.usage=output.usage;const current=this.store.get<Run>('runs',run.id)!;current.usage=output.usage;current.usageByGeneration={...current.usageByGeneration,[String(run.generation??1)]:output.usage};this.store.atomic(()=>{this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);});const budget=budgetError(run.limits,current.usageByGeneration);if(budget)throw new BudgetExceeded(budget);}
+        } else if (output.type === 'usage') {run.usage=output.usage;const current=this.store.get<Run>('runs',run.id)!;current.usage=output.usage;current.usageByGeneration={...current.usageByGeneration,[String(run.generation??1)]:output.usage};const sequence=(this.usageSequence.get(run.id)??0)+1;this.usageSequence.set(run.id,sequence);const sample:UsageSample={id:'usage_'+digest({runId:run.id,executionId:run.executionId,generation:run.generation??1,sequence}).slice(0,64),roomId:run.roomId,runId:run.id,executionId:run.executionId??run.id,provider:agent.provider,...(current.nativeSessionId?{nativeSessionId:current.nativeSessionId}:{}),scope:output.usage.scope??'last-request',counterEpoch:run.generation??1,...(output.usage.inputTokens!==undefined?{inputTokens:output.usage.inputTokens}:{}),...(output.usage.outputTokens!==undefined?{outputTokens:output.usage.outputTokens}:{}),...(output.usage.costUsd!==undefined?{costUsd:output.usage.costUsd}:{}),source:'adapter',observedAt:now()};this.store.atomic(()=>{this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);this.store.event(run.roomId,'usage.recorded',SYSTEM,{sample},null,run.id);});const budget=budgetError(run.limits,current.usageByGeneration);if(budget)throw new BudgetExceeded(budget);}
         else if (output.type === 'input') { this.publishMessage(run, output.question, uid('msg')); }
         else if (output.type === 'artifact'){if(artifacts.length>=10||Buffer.byteLength(output.text)>2**20)throw new Error('候选交付物超过 10 份或单份 1 MiB 上限');artifacts.push(output);}
       }
