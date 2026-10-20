@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {discussionPrompt,assessConvergence,discussionSummaryPrompt} from './discussions.ts';
-import { agentSchema,contextSeqOf, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type Task, type Decision, type AgentSession, type Subscription, type WakeIntent } from '../../../packages/protocol/src/index.ts';
+import { agentSchema,contextSeqOf,taskContractSchema, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type Task, type Decision, type AgentSession, type Subscription, type WakeIntent } from '../../../packages/protocol/src/index.ts';
 import { digest, now, OWNER, Store, SYSTEM, uid } from './store.ts';
 import {assertContextCurrent} from './context-reconciliation.ts';
 import { assertRunFence } from './execution.ts';
@@ -167,17 +167,18 @@ export class RoomService {
       }
       case 'task.create': {
         const roomId = this.requireRoom(command);
-        const input = z.object({ title: z.string().trim().min(1).max(5000), agentId: z.string().optional(), projectPath: z.string().max(1500).default(''), dependencies: z.array(z.string()).max(20).default([]), open: z.boolean().default(false) }).parse(p);
+        const input = z.object({ title: z.string().trim().min(1).max(5000), agentId: z.string().optional(), projectPath: z.string().max(1500).default(''), dependencies: z.array(z.string()).max(20).default([]), open: z.boolean().default(false), contract:taskContractSchema.optional() }).parse(p);
+        if(input.contract){for(const dependency of input.contract.dependencies){const target=this.store.get<Task>('tasks',dependency.taskId);if(!target||target.roomId!==roomId)throw new ProtocolError('invalid_dependency','契约依赖任务不存在',400);if(dependency.taskVersion>target.version)throw new ProtocolError('invalid_dependency','契约依赖版本晚于当前任务版本',409);}}
         for (const id of input.dependencies) if (this.store.get<Task>('tasks', id)?.roomId !== roomId) throw new ProtocolError('invalid_dependency', '依赖任务不存在');
         if (input.open) {
           if (actor.kind !== 'human') throw new ProtocolError('forbidden', 'Agent 不能创建开放认领任务', 403);
           if (input.agentId) throw new ProtocolError('validation_error', '开放认领任务不需要指定成员', 400);
-          const task: Task = { id: uid('task'), roomId, title: input.title, agentId: 'unassigned', projectPath: input.projectPath, dependencies: input.dependencies, open: true, generation:1,version: 1, status: 'proposed', createdAt: now() };
+          const task: Task = { id: uid('task'), roomId, title: input.title, agentId: 'unassigned', projectPath: input.projectPath, dependencies: input.dependencies, ...(input.contract?{contract:input.contract}:{}), open: true, generation:1,version: 1, status: 'proposed', createdAt: now() };
            this.store.event(roomId, 'task.created', actor, { task },command.commandId,scope?.runId??null); return { taskId: task.id };
         }
         if (!input.agentId) throw new ProtocolError('validation_error', '请指定执行成员或选择开放认领', 400);
         this.checkAgent(roomId, input.agentId);
-        const task: Task = { id: uid('task'), roomId, title: input.title, agentId: input.agentId, projectPath: input.projectPath, dependencies: input.dependencies, generation:1,version: 1, status: actor.kind === 'agent' ? 'proposed' : 'queued', createdAt: now() };
+        const task: Task = { id: uid('task'), roomId, title: input.title, agentId: input.agentId, projectPath: input.projectPath, dependencies: input.dependencies, ...(input.contract?{contract:input.contract}:{}), generation:1,version: 1, status: actor.kind === 'agent' ? 'proposed' : 'queued', createdAt: now() };
          const event = this.store.event(roomId, 'task.created', actor, { task },command.commandId,scope?.runId??null);
         if (actor.kind === 'human'&&this.store.get<AgentDescriptor>('agents',task.agentId)?.connectionMode!=='external') this.enqueue(roomId, task.agentId, task.title, event.seq, { taskId: task.id, taskVersion: 1 });
         return { taskId: task.id };
@@ -250,10 +251,11 @@ export class RoomService {
         return { taskId: task.id, previousAgentId, version: task.version };
       }
       case 'task.revise': {
-        const roomId = this.requireRoom(command), input = z.object({ taskId: z.string(), title: z.string().trim().min(1).max(5000) }).parse(p);
+        const roomId = this.requireRoom(command), input = z.object({ taskId: z.string(), title: z.string().trim().min(1).max(5000), contract:taskContractSchema.optional() }).parse(p);
         const task = this.store.get<Task>('tasks', input.taskId); if (!task || task.roomId !== roomId) throw new ProtocolError('not_found', '任务不存在', 404);
         if(task.agentId!=='unassigned')this.checkAgent(roomId,task.agentId);
-        const affectedTaskIds=this.reviseTaskTree(task,actor,command.commandId,current=>{current.title=input.title;});
+        if(input.contract){for(const dependency of input.contract.dependencies){const target=this.store.get<Task>('tasks',dependency.taskId);if(!target||target.roomId!==roomId)throw new ProtocolError('invalid_dependency','契约依赖任务不存在',400);if(dependency.taskVersion>target.version)throw new ProtocolError('invalid_dependency','契约依赖版本晚于当前任务版本',409);}}
+        const affectedTaskIds=this.reviseTaskTree(task,actor,command.commandId,current=>{current.title=input.title;if(input.contract)current.contract=input.contract;});
         return {affectedTaskIds};
       }
       case 'task.accept':{

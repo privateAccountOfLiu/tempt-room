@@ -15,7 +15,10 @@ export {runStatusSchema,terminalStates,runPartialSchema,PARTIAL_INTERVAL_MS,PART
 import type {RunStatus,RunPartial} from './run-state.ts';
 
 export {discussionSchema,discussionBallotSchema,parseDiscussionReply,defaultDiscussionResponses,type DiscussionBallot} from './discussion.ts';
+export {taskContractSchema,taskAcceptanceSchema,taskDependencyConditionSchema,type TaskContract,type TaskAcceptance,type TaskDependencyCondition} from './task-contract.ts';
 import type {DiscussionBallot} from './discussion.ts';
+import {taskContractSchema} from './task-contract.ts';
+import type {TaskContract} from './task-contract.ts';
 
 export const VERSION = '0.1' as const;
 export const idSchema = z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/);
@@ -83,8 +86,8 @@ export const payloadSchemas={
   'subscription.set':z.object({subscription:subscriptionSchema}).strict(),
   'input.ack':z.object({batchId:idSchema,agentSessionId:idSchema,receiptEvidence:z.string().max(500).optional()}).strict(),
   'capability.verify':z.object({fingerprint:z.string().min(1).max(200),evidence:z.array(capabilityEvidenceSchema).min(1).max(20)}).strict(),
-  'task.create':z.object({title,agentId:idSchema.optional(),projectPath:z.string().max(1500).default(''),dependencies:z.array(idSchema).max(20).default([]),open:z.boolean().default(false)}).strict(),
-  'task.revise':z.object({taskId:idSchema,title}).strict(),
+  'task.create':z.object({title,agentId:idSchema.optional(),projectPath:z.string().max(1500).default(''),dependencies:z.array(idSchema).max(20).default([]),open:z.boolean().default(false),contract:taskContractSchema.optional()}).strict(),
+  'task.revise':z.object({taskId:idSchema,title,contract:taskContractSchema.optional()}).strict(),
   'task.accept':z.object({taskId:idSchema,projectPath:z.string().max(1500).optional()}).strict(),
   'task.handoff':z.object({taskId:idSchema,agentId:idSchema,note:z.string().max(300).default('')}).strict(),
   'task.claim':z.object({taskId:idSchema,managed:z.boolean().default(true)}).strict(),
@@ -113,7 +116,7 @@ export interface Room { id: string; name: string; description: string; members: 
 export interface Message { supersedes?:string; final?:boolean; id: string; roomId: string; actor: Actor; text: string; mentions: string[]; replyTo?: string; attachments: string[]; createdAt: string; runId?: string;taskId?:string;taskVersion?:number; basedOnSeq?: number; generation?:number; executionId?:string; stale?: boolean; trust?: 'owner'|'managed'|'external'|'remote' }
 export interface RunContext { fromSeq:number;throughSeq:number;messages:Message[];decisions:Decision[];members:{id:string;name:string;role:string}[] }
 export interface Run { effectScope?:'conversation-only'|'unrestricted'; usageByGeneration?:Record<string,NonNullable<Run['usage']>>; contextPolicy?:ContextPolicy; contextSeq?:number; deltaContextId?:string; contextRound?:number; contextPending?:boolean; contextConfirmedSeq?:number; lifecycleVersion?:1; partial?:RunPartial; finalMessageId?:string; stopReason?:'superseded'|'user_cancel'; generation?:number; executionId?:string; leaseUntil?:string; id: string; roomId: string; agentId: string; status: RunStatus; prompt: string; basedOnSeq: number; contextId?:string; limits?:RunLimits; inputArtifacts?:string[];dependencyVersions?:Record<string,number>;taskId?: string; discussionId?: string; discussionRole?:'summary'; discussionBallot?:DiscussionBallot; round?: number; taskVersion?: number; autoRetryOf?: string; autoRetryCount?: number; wakeChainDepth?: number; recoveryCount?: number; agentSessionId?: string; inputBatchId?: string; operationScopeId?: string; responseSlotId?: string; startedAt?: string; finishedAt?: string; adapterFingerprint?: string; nativeSessionId?: string; codex?: CodexRunState; remoteTaskId?:string; sandbox?: SandboxProfile & { verifiedAt:string }; error?: string; createdAt: string; updatedAt: string; usage?: { inputTokens?: number; outputTokens?: number; costUsd?: number;scope?:'run'|'last-request'|'session-total' }; }
-export interface Task { externalContext?:TaskContext; generation?:number; id: string; roomId: string; title: string; agentId: string; projectPath: string; version: number; status: string; dependencies: string[]; workspaceId?: string; open?: boolean; leaseUntil?: string; createdAt: string }
+export interface Task { contract?:TaskContract; externalContext?:TaskContext; generation?:number; id: string; roomId: string; title: string; agentId: string; projectPath: string; version: number; status: string; dependencies: string[]; workspaceId?: string; open?: boolean; leaseUntil?: string; createdAt: string }
 export interface Artifact { discussionId?:string; generation?:number; executionId?:string; id: string; roomId: string; runId?: string; taskId?: string; name: string; kind: 'file' | 'patch' | 'report'; mediaType: string; size: number; createdAt: string; applied?: boolean }
 export interface Discussion { id: string; roomId: string; goal: string; participants: string[]; rounds: number; round: number; maxResponses: number; responses: number; quorum: number; absent?: string[]; deadline: string; status: 'active' | 'paused' | 'completed' | 'stopped'; stopOnConvergence?:boolean; triggerPolicy?:'all'|'explicit'|'assigned-task'; activationLimit?:number; activationsUsed?:number; roundWindowMs?:number; activeRoundId?:string; authorizationRef?:string; lifecycleVersion?:number; summarizerId?:string; startedSeq?:number; endedSeq?:number; endedAt?:string; endReason?:'converged'|'round_limit'|'response_limit'|'time_limit'|'no_quorum'|'user_stop'|'restart'|'scheduling_failed'|'budget_exhausted'|'activation_limit'; consensus?:{proposalId:string;text:string;round:number;agreedBy:string[]}; summary?:{runId?:string;status:'queued'|'completed'|'failed'|'canceled'|'interrupted';artifactId?:string;error?:string} }
 export interface Decision { id: string; text: string; accepted: boolean; actor: Actor }

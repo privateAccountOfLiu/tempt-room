@@ -2,6 +2,233 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
+    "contract": {
+      "type": "object",
+      "properties": {
+        "objective": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "projectBinding": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "version": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "baselineRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "manifestHash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "allowedPaths": {
+              "minItems": 1,
+              "maxItems": 200,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              }
+            }
+          },
+          "required": [
+            "id",
+            "version",
+            "baselineRef",
+            "manifestHash",
+            "allowedPaths"
+          ],
+          "additionalProperties": false
+        },
+        "acceptance": {
+          "minItems": 1,
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              },
+              "command": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              },
+              "verifierVersion": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "verifierHash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "id",
+              "description",
+              "command",
+              "verifierVersion",
+              "verifierHash"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "expectedArtifacts": {
+          "default": [],
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "mediaType": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "dependencies": {
+          "default": [],
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[a-zA-Z0-9_-]+$"
+              },
+              "condition": {
+                "type": "string",
+                "enum": [
+                  "execution",
+                  "accepted_artifact",
+                  "integrated"
+                ]
+              },
+              "taskVersion": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "artifactHash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "taskId",
+              "condition",
+              "taskVersion"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "authorizedExecutor": {
+          "type": "object",
+          "properties": {
+            "agentId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "executionMode": {
+              "type": "string",
+              "enum": [
+                "sandbox",
+                "host"
+              ]
+            }
+          },
+          "required": [
+            "agentId"
+          ],
+          "additionalProperties": false
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "durationLimitMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 86400000
+            },
+            "activationLimit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            }
+          },
+          "additionalProperties": false
+        },
+        "failureHandling": {
+          "type": "string",
+          "enum": [
+            "stop_branch",
+            "isolate_branch"
+          ]
+        },
+        "collaborationBoundary": {
+          "type": "object",
+          "properties": {
+            "canModifyInterfaces": {
+              "type": "boolean"
+            },
+            "notes": {
+              "type": "string",
+              "maxLength": 2000
+            }
+          },
+          "required": [
+            "canModifyInterfaces"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "objective",
+        "projectBinding",
+        "acceptance",
+        "expectedArtifacts",
+        "dependencies"
+      ],
+      "additionalProperties": false
+    },
     "externalContext": {
       "type": "object",
       "properties": {

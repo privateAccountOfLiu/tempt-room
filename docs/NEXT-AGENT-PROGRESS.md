@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: ea15b6081d837066f546ba5021445bbcd840916b (dirty)
+source HEAD: 28dc3445f1c2ee86b5f20a67b0cdd4dda780e63d (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T03-56-44-374Z-23c99490/report.json
+report: .state/collaboration-baseline/run-2026-10-20T04-02-58-525Z-9fcfa781/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -98,7 +98,9 @@ report: .state/collaboration-baseline/run-2026-10-20T03-56-44-374Z-23c99490/repo
 - 讨论 Run 禁止普通 run.retry；summary retry 保持可见（既有测试）
 - 激活额度：scheduleRound 在 enqueue 前检查 activationLimit；超额以 activation_limit 停止，不静默继续；responses 与 activationsUsed 同时计数
 - 新增 tests/discussion-lifecycle.test.ts 3 项：AgentSession/responseSlot、pause 持久化与 Worker 不派发、激活额度
-- 尚未完成：sessionKey 加入 agentSessionId、额外对账轮次计费、总结独立授权额度与 UI（留给后续 B03 余项/B09）
+- sessionKey 新增 v3 逻辑会话 scope（agentSessionId + workspace + 模式）；无 agentSessionId 的旧 chat 保持 v2 可续接
+- 新增 tests/session-scope.test.ts 2 项
+- 尚未完成：额外对账轮次计费、总结独立授权额度与 UI
 ### B02 — 可重放投影与 v10 迁移
 
 - 数据库版本 v9→v10；新增投影表：agent_sessions、subscriptions、inbox_deliveries、input_batches、wake_intents、capability_evidence、discussion_rounds
@@ -159,21 +161,31 @@ report: .state/collaboration-baseline/run-2026-10-20T03-56-44-374Z-23c99490/repo
 
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
-- `npm test`：316/316
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-2e2lay/report.json`，152.7s）
+- `npm test`：321/321
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-cm47Yj/report.json`，155.8s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-QudG8s/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-gCewfX/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T03-56-44-374Z-23c99490/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T03-56-44-374Z-23c99490/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T03-56-44-374Z-23c99490/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T03-56-44-374Z-23c99490/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-02-58-525Z-9fcfa781/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T04-02-58-525Z-9fcfa781/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-02-58-525Z-9fcfa781/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T04-02-58-525Z-9fcfa781/replay.stdout.txt`
 
+## M1 起点：Task 契约
+
+- 新增 packages/protocol/src/task-contract.ts：
+  - objective、projectBinding(id/version/baselineRef/manifestHash/allowedPaths)
+  - acceptance 数组（描述、验证命令、verifierVersion、verifierHash）
+  - expectedArtifacts、dependencies（execution/accepted_artifact/integrated）
+  - authorizedExecutor、limits、failureHandling、collaborationBoundary
+- Task 增加可选 contract；task.create/task.revise 接受契约并冻结；契约依赖必须引用同房间存在的任务且版本不超前
+- 新增 tests/task-contract.test.ts 3 项：严格 schema、契约持久化/修订版本、依赖校验
+- 尚未完成：项目绑定/基线 manifest 生成、独立工作区、验收/集成分离、真实双 Agent 并行交付脚本
 ## 未完成 / 下一波
 
 - B05a 能力探针与三态结果格式（M0 前移切片）
