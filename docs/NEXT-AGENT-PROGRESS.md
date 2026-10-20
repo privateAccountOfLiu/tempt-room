@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 2aea024c06936d8f90f8f4a4151e82135cd94c21 (dirty)
+source HEAD: 19815a41296e3b0948621f9ebc4995b242cef276 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T07-52-56-892Z-410d2721/report.json
+report: .state/collaboration-baseline/run-2026-10-20T07-59-01-898Z-7f09076c/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -107,6 +107,9 @@ report: .state/collaboration-baseline/run-2026-10-20T07-52-56-892Z-410d2721/repo
 - 权限/会话/成员撤销立即阻断；scanSeq 与 pending delivery 分开保存
 - 新增 tests/inbox-subscription.test.ts 3 项：唤醒白名单、幂等扫描、队列上限与禁用
 - 新增 dispatchPendingWakes：pending WakeIntent 为每个 AgentSession 生成一个 queued Run；重复 tick 不重复派工；active Run 存在时保持 pending
+- 新增 GET /api/rooms/:id/subscriptions
+- 集成面板新增「订阅」区：agentSessionId、deliveryMode、scanSeq、sourcePolicy、启用/停用切换
+- 尚未完成：InputBatch 与输入回执（B06）
 ### B03 — 讨论生命周期主体（pause/resume/激活额度）
 
 - discussion.start 在同一事务创建参与成员 AgentSession、首轮 Run（带唯一 responseSlotId）并冻结 activationLimit/activationsUsed
@@ -189,19 +192,19 @@ report: .state/collaboration-baseline/run-2026-10-20T07-52-56-892Z-410d2721/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-PBl7fv/report.json`，169.5s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-z1hVXS/report.json`，170.1s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-MBGVwM/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-RCF1y3/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T07-52-56-892Z-410d2721/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T07-52-56-892Z-410d2721/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T07-52-56-892Z-410d2721/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T07-52-56-892Z-410d2721/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T07-59-01-898Z-7f09076c/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T07-59-01-898Z-7f09076c/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T07-59-01-898Z-7f09076c/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T07-59-01-898Z-7f09076c/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
