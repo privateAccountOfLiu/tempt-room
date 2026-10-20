@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 8173d45e63fb73778200ab372ac01c52fba7bc9d (dirty)
+source HEAD: 439d479aeae615abd063816701f1fff5dd03deb4 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T06-14-46-922Z-7829ee0b/report.json
+report: .state/collaboration-baseline/run-2026-10-20T06-20-41-360Z-296a7346/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -185,19 +185,19 @@ report: .state/collaboration-baseline/run-2026-10-20T06-14-46-922Z-7829ee0b/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-rCmq38/report.json`，157.1s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-GKHrxN/report.json`，156.7s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-wsjz7y/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-kvQBah/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T06-14-46-922Z-7829ee0b/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T06-14-46-922Z-7829ee0b/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T06-14-46-922Z-7829ee0b/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T06-14-46-922Z-7829ee0b/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T06-20-41-360Z-296a7346/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T06-20-41-360Z-296a7346/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T06-20-41-360Z-296a7346/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T06-20-41-360Z-296a7346/replay.stdout.txt`
 
 ## D04a — 用量样本去重与统一聚合
 
@@ -220,7 +220,13 @@ report: .state/collaboration-baseline/run-2026-10-20T06-14-46-922Z-7829ee0b/repo
 - budget.reconcile owner 命令：settle/release 人工核对 unknown 预留
 - API GET /api/rooms/:id/budget-reservations
 - 新增 tests/budget-reservation.test.ts 2 项：并行预留互斥+已知结算、unknown 保持占用+人工释放
-- 尚未完成：UI 预算账本展示、未知费用 policy 自动执行、按请求级预留估算
+- 新增 GET /api/rooms/:id/usage-summary（服务端统一聚合器结果）
+- UsagePanel 新增「服务端用量账本」：
+  - 样本数/去重数、已知/未知输入输出与费用
+  - budget reservations 列表：状态、预留/实际、来源、释放操作
+  - 3 秒轮询刷新
+- 浏览器 E2E 用量面板断言新增「服务端用量账本」
+- 尚未完成：未知费用 policy 自动执行、按请求级预留估算、预算账本导出
 ## M1 验收 — 并行任务确定性 fixture
 
 - 新增 scripts/acceptance-parallel-tasks.ts：

@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { VERSION,payloadSchemas, agentToolCallSchema, ProtocolError, type AgentDescriptor, type Artifact, type RoomEvent,type ServerCapabilities,type Run,type ToolOperation,type CapabilityEvidence,type ProjectBinding,type Integration,type InputBatch,type UsageSample,type BudgetReservation } from '../../../packages/protocol/src/index.ts';
 import { Store, now, OWNER, uid } from './store.ts';
 import {agentCapabilityFingerprint,capabilityNames,probeConfiguredAgent,verifiedCapabilityState} from './adapter-capabilities.ts';
+import { aggregateUsage } from './usage.ts';
 import { RoomService } from './service.ts';
 import { Worker } from './worker.ts';
 import { diagnose,probeAgentProtocol } from './adapters.ts';
@@ -225,6 +226,10 @@ export async function createApp(options: AppOptions = {}) {
   app.get<{Params:{id:string}}>('/api/rooms/:id/budget-reservations', request => {
     const room = store.room(request.params.id); if (!room) throw new ProtocolError('not_found', '房间不存在', 404);
     return store.list<BudgetReservation>('budget_reservations', room.id);
+  });
+  app.get<{Params:{id:string}}>('/api/rooms/:id/usage-summary', request => {
+    const room = store.room(request.params.id); if (!room) throw new ProtocolError('not_found', '房间不存在', 404);
+    return aggregateUsage(store.list<UsageSample>('usage_samples', room.id));
   });
   app.get<{Params:{id:string}}>('/api/rooms/:id/usage-samples', request => {
     const room = store.room(request.params.id); if (!room) throw new ProtocolError('not_found', '房间不存在', 404);

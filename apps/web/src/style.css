@@ -188,3 +188,9 @@
 /* B06 input batch list */
 .input-batch-section{margin-top:12px;border-top:1px solid #263023;padding-top:9px}
 .input-batch-section .section-heading{margin-bottom:6px}
+/* D04 usage ledger */
+.usage-ledger{border-top:1px solid #263023;margin-top:10px;padding-top:8px}
+.usage-ledger>strong{font-size:10px;color:#c6d5bb}
+.budget-list{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.budget-row{display:flex;align-items:center;gap:7px;font-size:9px;color:#9ead92;border:1px solid #283024;border-radius:4px;padding:4px 6px;background:#121710}
+.budget-row small{flex:1;color:#819175}
