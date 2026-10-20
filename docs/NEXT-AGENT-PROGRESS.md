@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 8265f6456e62154f5968d328d0f2b0643c299c1a (dirty)
+source HEAD: ef8b9e65c5cadeba2813f1967d22afc79a3bd185 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T08-55-45-729Z-a501f292/report.json
+report: .state/collaboration-baseline/run-2026-10-20T09-03-22-804Z-7542ab17/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -207,19 +207,19 @@ report: .state/collaboration-baseline/run-2026-10-20T08-55-45-729Z-a501f292/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-gbHKOk/report.json`，171.3s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-zihd1v/report.json`，170.8s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-JziMvH/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-G4CVMH/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T08-55-45-729Z-a501f292/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T08-55-45-729Z-a501f292/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T08-55-45-729Z-a501f292/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T08-55-45-729Z-a501f292/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-03-22-804Z-7542ab17/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T09-03-22-804Z-7542ab17/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-03-22-804Z-7542ab17/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-03-22-804Z-7542ab17/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -252,6 +252,7 @@ report: .state/collaboration-baseline/run-2026-10-20T08-55-45-729Z-a501f292/repo
 - 新增 resource-lease 测试：port 容量排他、database capacity=2、owner 权限、释放后重新预留
 - 租约 TTL：resource.reserve 可带 leaseMs；Worker.tick 调用 expireResourceLeases，将过期 active 租约标记 revoked 并写 resource.released
 - 新增 resource-lease 测试：TTL 过期后 revoke、不可再 release、同 key 可重新预留
+- 集成面板「资源租约」新增预留入口：owner 可填 kind/key/capacity/租约分钟，调用 resource.reserve 并刷新列表
 - 尚未完成：真实进程树清理证明、自动解除隔离策略## E01 起点 — 有界可观测指标
 
 - 新增 apps/server/src/metrics.ts：collectMetrics/metricsText
