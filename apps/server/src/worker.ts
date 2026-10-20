@@ -263,8 +263,13 @@ export class Worker {
   }
   private dispatchCandidates():Run[]{
     const runs=this.store.list<Run>('runs'),candidates:Run[]=[];
+    const roomLimit=this.store.settings().maxConcurrentRunsPerRoom;
+    const activeRoomCounts=new Map<string,number>();
+    for(const id of this.active.keys()){const active=this.store.get<Run>('runs',id);if(active)activeRoomCounts.set(active.roomId,(activeRoomCounts.get(active.roomId)??0)+1);}
+    const roomCount=(roomId:string)=>activeRoomCounts.get(roomId)??0;
     for(const run of runs){
       if(run.status!=='queued'||this.active.has(run.id))continue;
+      if(roomCount(run.roomId)>=roomLimit)continue;
       if(run.discussionId&&run.discussionRole!=='summary'){const discussion=this.store.get<Discussion>('discussions',run.discussionId);if(!discussion||discussion.status!=='active')continue;}
       const thread=this.threadKey(run);
       if(thread&&runs.some(other=>other.id!==run.id&&this.threadKey(other)===thread&&(this.active.has(other.id)||(other.codex&&!['completed','canceled'].includes(other.codex.phase)&&['unknown','interrupted'].includes(other.status)))))continue;
@@ -279,6 +284,7 @@ export class Worker {
         if(task.dependencyRequirements?.length&&!dependencyRequirementsReady(task,this.store.list<Task>('tasks',run.roomId),this.store.list<Integration>('integrations',run.roomId)).ready)continue;
       }
       candidates.push(run);
+      activeRoomCounts.set(run.roomId,roomCount(run.roomId)+1);
     }
     return candidates;
   }

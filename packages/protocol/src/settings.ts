@@ -7,6 +7,7 @@ export type RunLimits=z.infer<typeof runLimitsSchema>;
 export const executionSettingsSchema=z.object({
   contextPolicy:contextPolicySchema.default(()=>contextPolicySchema.parse({})),
   concurrency:z.number().int().min(1).max(8).default(2),
+  maxConcurrentRunsPerRoom:z.number().int().min(1).max(64).default(4),
   memoryMb:z.number().int().min(256).max(16384).default(4096),
   maxProcesses:z.number().int().min(1).max(128).default(64),
   taskTimeoutMs:z.number().int().min(1000).max(7200000).default(1800000),
