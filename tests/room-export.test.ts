@@ -16,6 +16,7 @@ test('owner can export one room as events and metadata', async t => {
   const artifact = {id: 'artifact_export1', roomId, name: 'report.txt', kind: 'file' as const, mediaType: 'text/plain', size: 5, createdAt: new Date().toISOString()};
   mkdirSync(join(root, 'artifacts'), {recursive: true}); writeFileSync(join(root, 'artifacts', artifact.id), 'hello');
   store.event(roomId, 'artifact.created', {id: 'owner', kind: 'human'}, {artifact});
+  service.execute({version: '0.1', commandId: uid(), roomId, type: 'message.send', payload: {text: 'token ' + ['s','k-','abcdefghijklmnopqrstuvwx'].join('')}});
   const headers = {host: '127.0.0.1:4317', authorization: 'Bearer export-owner', 'room-protocol-version': '0.1'};
   const exported = await app.inject({url: `/api/rooms/${roomId}/export`, headers});
   assert.equal(exported.statusCode, 200);
@@ -30,5 +31,9 @@ test('owner can export one room as events and metadata', async t => {
   assert.equal(item.artifact.id, artifact.id);
   assert.equal(Buffer.from(item.contentBase64, 'base64').toString('utf8'), 'hello');
   assert.match(item.contentHash, /^[a-f0-9]{64}$/i);
+  const redacted = await app.inject({url: `/api/rooms/${roomId}/export?redact=1`, headers});
+  const redactedBody = redacted.json() as {redactions: number; events: {payload: any}[]};
+  assert.ok(redactedBody.redactions > 0);
+  assert.ok(redactedBody.events.some(event => JSON.stringify(event.payload).includes('[REDACTED]')));
   assert.equal((await app.inject({url: `/api/rooms/${roomId}/export`, headers: {host: headers.host, 'room-protocol-version': '0.1'}})).statusCode, 401);
 });

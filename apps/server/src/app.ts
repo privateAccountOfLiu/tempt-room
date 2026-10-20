@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { VERSION,payloadSchemas, agentToolCallSchema, ProtocolError, type AgentDescriptor, type Artifact, type RoomEvent,type ServerCapabilities,type Run,type Task,type ToolOperation,type Discussion,type DiscussionRound,type CapabilityEvidence,type ProjectBinding,type Integration,type InputBatch,type UsageSample,type BudgetReservation,type ResourceLease,type Subscription } from '../../../packages/protocol/src/index.ts';
 import { Store, digest, now, OWNER, SYSTEM, uid } from './store.ts';
 import { planRoomImport } from './room-import.ts';
+import { redactExport } from './export-redaction.ts';
 import {agentCapabilityFingerprint,capabilityNames,probeConfiguredAgent,verifiedCapabilityState} from './adapter-capabilities.ts';
 import { aggregateUsage } from './usage.ts';
 import { collectMetrics, metricsText } from './metrics.ts';
@@ -248,14 +249,16 @@ export async function createApp(options: AppOptions = {}) {
       return {roomId:newRoomId,events:plan.events.length,remappedIds:plan.remappedIds,importedArtifacts,exportHash:digest({room:plan.room,events:plan.events})};
     });
   });
-  app.get<{Params:{id:string};Querystring:{includeArtifacts?:string}}>('/api/rooms/:id/export',request=>{
+  app.get<{Params:{id:string};Querystring:{includeArtifacts?:string;redact?:string}}>('/api/rooms/:id/export',request=>{
     const room=store.room(request.params.id);if(!room)throw new ProtocolError('not_found','房间不存在',404);
-    const events=store.events(room.id),base={version:VERSION,exportedAt:new Date().toISOString(),room,events,exportHash:digest({room,events})};
+    const rawEvents=store.events(room.id),redacted=['1','true'].includes(String(request.query.redact??'')),applied=redacted?redactExport({room,events:rawEvents}):{value:{room,events:rawEvents},redactions:0};
+    const roomValue=applied.value.room as typeof room,events=applied.value.events;
+    const base={version:VERSION,exportedAt:new Date().toISOString(),room:roomValue,events,redactions:applied.redactions,exportHash:digest({room:roomValue,events})};
     if(!['1','true'].includes(String(request.query.includeArtifacts??'')))return base;
     let total=0;const artifacts=store.list<Artifact>('artifacts',room.id).slice(0,200).flatMap(artifact=>{
       try{const bytes=readFileSync(join(root,'artifacts',artifact.id));if(bytes.length>8*1024*1024||total+bytes.length>32*1024*1024)return [];total+=bytes.length;return [{artifact,contentBase64:bytes.toString('base64'),contentHash:digest(bytes.toString('base64'))}];}catch{return [];}
     });
-    return {...base,artifacts,exportHash:digest({room,events,artifactHashes:artifacts.map(item=>[item.artifact.id,item.contentHash])})};
+    return {...base,artifacts,exportHash:digest({room:roomValue,events,artifactHashes:artifacts.map(item=>[item.artifact.id,item.contentHash])})};
   });
   app.get<{Params:{id:string;discussionId:string}}>('/api/rooms/:id/discussions/:discussionId/rounds',request=>{
     const room=store.room(request.params.id);if(!room)throw new ProtocolError('not_found','房间不存在',404);

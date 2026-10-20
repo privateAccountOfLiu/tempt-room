@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: d5e93403b8f0ece46e779484ad3aca19619cc6bf (dirty)
+source HEAD: de8a2519937b3465fd33d083cdb5a84bfe232956 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T14-02-38-488Z-64e009e4/report.json
+report: .state/collaboration-baseline/run-2026-10-20T14-10-19-900Z-39997c61/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -212,19 +212,19 @@ report: .state/collaboration-baseline/run-2026-10-20T14-02-38-488Z-64e009e4/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-PmBJgz/report.json`，164.3s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-urEVRU/report.json`，167.0s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-YQuyWx/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-VaQEaf/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T14-02-38-488Z-64e009e4/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T14-02-38-488Z-64e009e4/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T14-02-38-488Z-64e009e4/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T14-02-38-488Z-64e009e4/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T14-10-19-900Z-39997c61/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T14-10-19-900Z-39997c61/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T14-10-19-900Z-39997c61/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T14-10-19-900Z-39997c61/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -634,4 +634,6 @@ report: .state/collaboration-baseline/run-2026-10-20T14-02-38-488Z-64e009e4/repo
 - 新增 room-import 测试 3 项：ID 一致重映射、salt 确定性、真实导出导入两次无实体冲突
 - export?includeArtifacts=1：附 artifact contentBase64/contentHash（单文件 8MiB、总 32MiB、最多 200 个）
 - import 写入 remap 后的 artifact 文件并返回 importedArtifacts；测试覆盖 artifact 内容往返下载
-- 尚未完成：导出脱敏、可靠外发；导入的 seq/throughSeq 引用按原顺序近似
+- export?redact=1：递归脱敏 secret/token/apiKey/authorization/credential/privateKey 键与 sk-/gh*/xox*/AKIA/Bearer/PRIVATE KEY 值，返回 redactions；UI 默认导出脱敏版
+- 新增 export-redaction 测试 2 项 + room-export 路由脱敏断言
+- 尚未完成：可靠外发；导入的 seq/throughSeq 引用按原顺序近似；artifact contentBase64 不做内容扫描
