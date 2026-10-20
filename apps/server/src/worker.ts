@@ -84,6 +84,9 @@ export class Worker {
     service.onRollback = (id,actor) => this.rollbackIntegration(id,actor);
     this.host.on('notification', frame => {
       if (frame.type === 'sandbox.toolRequest') void this.handleTool(frame);
+      if(frame.type==='sandbox.exit'&&frame.jobEmpty&&frame.runId){
+        const fence=this.executions.get(frame.runId);if(fence){try{const run=assertRunFence(this.store,fence);run.cleanupProof={checkedAt:now(),remainingProcesses:0,evidence:'appcontainer-job-empty',...(typeof frame.exitCode==='number'?{exitCode:frame.exitCode}:{})};this.store.event(run.roomId,'run.updated',SYSTEM,{run},null,run.id);}catch{/* Old process cleanup cannot refresh a newer execution. */}}
+      }
       if(frame.type==='sandbox.started'&&frame.appContainer&&frame.job){
         const fence=this.executions.get(frame.runId);if(!fence)return;
         try { const run=assertRunFence(this.store,fence);if(frame.limits){run.sandbox={...defaultSandbox,...frame.limits,verifiedAt:now()};this.store.event(run.roomId,'sandbox.verified',SYSTEM,{runId:run.id,generation:fence.generation,executionId:fence.executionId,sandbox:run.sandbox},null,run.id);} } catch { /* An old process cannot refresh a newer run's sandbox proof. */ }
@@ -611,7 +614,11 @@ export class Worker {
       this.service.settleDiscussion(run);
       this.service.settleBudgetForRun(run);
       for(const leaseId of [...new Set([run.resourceLeaseId,run.sessionLeaseId].filter(Boolean) as string[])]){
-        try{if(['completed','failed','canceled','superseded'].includes(status))releaseResource(this.store,run.roomId,leaseId,{checkedAt:now(),remainingProcesses:0,evidence:'worker-terminal'});else quarantineResource(this.store,run.roomId,leaseId,'terminal_state_'+status);}catch{/* Quarantine/release evidence remains auditable via events. */}
+        try{
+          if(!['completed','failed','canceled','superseded'].includes(status))quarantineResource(this.store,run.roomId,leaseId,'terminal_state_'+status);
+          else if(run.sandbox&&!run.cleanupProof)quarantineResource(this.store,run.roomId,leaseId,'sandbox_cleanup_not_proven');
+          else releaseResource(this.store,run.roomId,leaseId,run.cleanupProof??{checkedAt:now(),remainingProcesses:0,evidence:'worker-terminal'});
+        }catch{/* Quarantine/release evidence remains auditable via events. */}
       }
     });
     this.toolCalls.delete(run.id);
