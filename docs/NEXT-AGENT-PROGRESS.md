@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 2708281bd9a82ec71d09a914d87543d400a9ab40 (dirty)
+source HEAD: a6ed4318eb15ded8072adc8651c1eb0fff32b0c6 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T09-18-02-562Z-f60c4391/report.json
+report: .state/collaboration-baseline/run-2026-10-20T09-24-44-494Z-47d421cd/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T09-18-02-562Z-f60c4391/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-BKDDFi/report.json`，169.6s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-r9zllk/report.json`，168.9s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-YyQeh1/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-SbFrYT/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T09-18-02-562Z-f60c4391/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T09-18-02-562Z-f60c4391/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T09-18-02-562Z-f60c4391/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T09-18-02-562Z-f60c4391/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-24-44-494Z-47d421cd/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T09-24-44-494Z-47d421cd/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-24-44-494Z-47d421cd/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T09-24-44-494Z-47d421cd/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -486,3 +486,10 @@ report: .state/collaboration-baseline/run-2026-10-20T09-18-02-562Z-f60c4391/repo
 - 本波次未迁移日常数据库，未启动真实模型，未修改账号或模型配置。
 - `maxBypassDispatches` 是派发次数上界，不是 CPU/Token/完成时间 WFQ；真正的加权资源份额仍需后续立项。
 - 审计导出从 seq 0 开始读取当前 event log；historyFloor 以响应头展示，不重写旧事件。
+
+## E03 起点 — CI release preflight
+
+- `.github/workflows/ci.yml` 新增 release-preflight job（needs: verify）
+- 运行 `npm run test:preflight`：typecheck、单测、secret scan、build、SDK consumer、browser E2E、production smoke
+- 上传 `.state/preflight/**` 与 `.state/browser-e2e/**` 作为 release evidence artifact，保留 14 天
+- 尚未完成：真实模型双 CLI 实验的 CI 条件门禁、跨平台（非 Windows）隔离验证

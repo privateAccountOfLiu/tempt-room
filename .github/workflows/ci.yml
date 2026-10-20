@@ -40,3 +40,32 @@ jobs:
         run: npm run test:concurrency
       - name: Production build
         run: npm run build
+
+  release-preflight:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: npm ci
+      - name: Build Windows sandbox host and pipe compatibility module
+        run: npm run build:sandbox
+      - name: Release preflight (typecheck, tests, secrets, build, SDK consumer, browser E2E, production smoke)
+        run: npm run test:preflight
+      - name: Upload release evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence
+          path: |
+            .state/preflight/**
+            .state/browser-e2e/**
+          if-no-files-found: warn
+          retention-days: 14
