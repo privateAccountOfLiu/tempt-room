@@ -165,6 +165,7 @@ export function projectEvent(sink:ProjectionSink,event:RoomEvent){
     case 'project-binding':put('project_bindings',payload.projectBinding);break;
     case 'integration':put('integrations',payload.integration);break;
     case 'usage-sample':put('usage_samples',payload.sample);break;
+    case 'budget-reservation':put('budget_reservations',payload.reservation);break;
     case 'settings':case 'audit':break;
   }
 }

@@ -20,6 +20,7 @@ export {projectBindingSchema,projectManifestEntrySchema,projectExecutionModeSche
 export {taskAcceptanceStatusSchema,taskAcceptanceCheckSchema,dependencyRequirementSchema,taskVerificationRecordSchema,type TaskAcceptanceStatus,type DependencyRequirement,type TaskVerificationRecord,type DependencyRequirementKind} from './task-acceptance.ts';
 export {integrationSchema,integrationStatusSchema,type Integration,type IntegrationStatus} from './integration.ts';
 export {usageSampleSchema,usageScopeSchema,usageSourceSchema,type UsageSample,type UsageScope} from './usage.ts';
+export {budgetReservationSchema,budgetReservationStatusSchema,type BudgetReservation,type BudgetReservationStatus} from './budget-reservation.ts';
 import type {DiscussionBallot} from './discussion.ts';
 import {taskContractSchema} from './task-contract.ts';
 import {projectBindingSchema} from './project-binding.ts';
@@ -93,6 +94,7 @@ export const payloadSchemas={
   'subscription.set':z.object({subscription:subscriptionSchema}).strict(),
   'input.ack':z.object({batchId:idSchema,agentSessionId:idSchema,receiptEvidence:z.string().max(500).optional()}).strict(),
   'input.reconcile':z.object({batchId:idSchema,decision:z.enum(['expire','unknown','provided'])}).strict(),
+  'budget.reconcile':z.object({reservationId:idSchema,decision:z.enum(['settle','release']),actualUsd:z.number().nonnegative().optional()}).strict(),
   'capability.verify':z.object({fingerprint:z.string().min(1).max(200),evidence:z.array(capabilityEvidenceSchema).min(1).max(20)}).strict(),
   'task.verification.record':taskVerificationRecordSchema,
   'project.bind':z.object({sourcePath:z.string().min(1).max(2000),allowedExecutionModes:z.array(z.enum(['sandbox','host'])).min(1).max(2).default(['sandbox']),verificationRefs:z.array(z.string().min(1).max(500)).max(50).default([]),baseCommit:z.string().max(200).optional()}).strict(),

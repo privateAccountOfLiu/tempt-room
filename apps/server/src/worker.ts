@@ -536,6 +536,7 @@ export class Worker {
         if (task && task.version === run.taskVersion) { task.status = status; if(task.strict||task.requiresAcceptance){task.acceptanceStatus=status==='completed'?'pending':'rejected';}  this.store.event(run.roomId, 'task.updated', SYSTEM, { task }); }
       }
       this.service.settleDiscussion(run);
+      this.service.settleBudgetForRun(run);
     });
     this.toolCalls.delete(run.id);
     const stored=this.store.get<Run>('runs',run.id);

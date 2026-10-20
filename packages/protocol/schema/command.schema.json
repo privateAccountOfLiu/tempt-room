@@ -743,6 +743,65 @@
         },
         "type": {
           "type": "string",
+          "const": "budget.reconcile"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "reservationId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "settle",
+                "release"
+              ]
+            },
+            "actualUsd": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "reservationId",
+            "decision"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "version",
+        "commandId",
+        "type",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "const": "0.1"
+        },
+        "commandId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "roomId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "type": {
+          "type": "string",
           "const": "capability.verify"
         },
         "payload": {

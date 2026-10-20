@@ -897,6 +897,26 @@
     ]
   },
   {
+    "type": "budget.reserved",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "budget-reservation",
+    "schemaVersion": 1,
+    "kinds": [
+      "budget.updated"
+    ]
+  },
+  {
+    "type": "budget.updated",
+    "durability": "durable",
+    "aggregate": "run",
+    "projector": "budget-reservation",
+    "schemaVersion": 1,
+    "kinds": [
+      "budget.updated"
+    ]
+  },
+  {
     "type": "discussion.round.opened",
     "durability": "durable",
     "aggregate": "room",

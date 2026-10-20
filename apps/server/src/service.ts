@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {discussionPrompt,assessConvergence,discussionSummaryPrompt} from './discussions.ts';
-import { agentSchema,contextSeqOf,taskContractSchema, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type Task, type Decision, type AgentSession, type Subscription, type WakeIntent, type ProjectBinding, type Integration } from '../../../packages/protocol/src/index.ts';
+import { agentSchema,contextSeqOf,taskContractSchema, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type Task, type Decision, type AgentSession, type Subscription, type WakeIntent, type ProjectBinding, type Integration, type BudgetReservation } from '../../../packages/protocol/src/index.ts';
 import { digest, now, OWNER, Store, SYSTEM, uid } from './store.ts';
 import {assertContextCurrent} from './context-reconciliation.ts';
 import { assertRunFence } from './execution.ts';
@@ -172,6 +172,17 @@ export class RoomService {
         if (previous && (previous.roomId !== roomId || previous.agentSessionId !== subscription.agentSessionId)) throw new ProtocolError('subscription_conflict', '订阅 ID 已绑定其他会话', 409);
         this.store.event(roomId, 'subscription.updated', actor, {subscription});
         return {subscriptionId: subscription.id, scanSeq: subscription.scanSeq};
+      }
+      case 'budget.reconcile': {
+        const roomId = this.requireRoom(command);
+        if (actor.kind !== 'human') throw new ProtocolError('forbidden', '只有 owner 可以核对预算预留', 403);
+        const input = payloadSchemas['budget.reconcile'].parse(p);
+        const reservation = this.store.get<BudgetReservation>('budget_reservations', input.reservationId);
+        if (!reservation || reservation.roomId !== roomId) throw new ProtocolError('not_found', '预算预留不存在', 404);
+        if (!['reserved', 'unknown'].includes(reservation.status)) throw new ProtocolError('invalid_state', '预留已是终态', 409);
+        const next: BudgetReservation = input.decision === 'settle' ? {...reservation, status: 'settled', ...(input.actualUsd !== undefined ? {actualUsd: input.actualUsd} : {}), source: 'manual', updatedAt: now()} : {...reservation, status: 'released', source: 'manual', updatedAt: now()};
+        this.store.event(roomId, 'budget.updated', actor, {reservation: next});
+        return {reservationId: next.id, status: next.status};
       }
       case 'input.reconcile': {
         const roomId = this.requireRoom(command);
@@ -473,6 +484,23 @@ export class RoomService {
     if (!agent.enabled) throw new ProtocolError('agent_disabled', `${agent.name} 尚未启用，请先配置并诊断`, 409);
     return agent;
   }
+  private reserveBudgetForRun(run:Run){
+    const settings=this.store.settings();if(!settings.roomCostBudgetUsd)return;
+    const reservedUsd=run.limits?.costBudgetUsd??0;if(!reservedUsd)return;
+    const reservations=this.store.list<BudgetReservation>('budget_reservations',run.roomId).filter(item=>item.status==='reserved'||item.status==='unknown');
+    const reserved=reservations.reduce((sum,item)=>sum+item.reservedUsd,0);
+    const spent=this.store.list<Run>('runs',run.roomId).reduce((sum,item)=>sum+Object.values(item.usageByGeneration??{}).reduce((inner,usage)=>inner+(usage?.costUsd??0),0),0);
+    if(spent+reserved+reservedUsd>settings.roomCostBudgetUsd)throw new ProtocolError('room_budget_exhausted',`房间费用预算不足：已用/预留 US$ ${(spent+reserved).toFixed(4)} + 本次 US$ ${reservedUsd.toFixed(4)} > 上限 US$ ${settings.roomCostBudgetUsd.toFixed(4)}`,429);
+    const reservation:BudgetReservation={id:uid('budget'),roomId:run.roomId,runId:run.id,generation:run.generation??1,reservedUsd,source:'estimate',status:'reserved',createdAt:now(),updatedAt:now()};
+    this.store.event(run.roomId,'budget.reserved',SYSTEM,{reservation});
+  }
+  settleBudgetForRun(run:Run){
+    const reservation=this.store.list<BudgetReservation>('budget_reservations',run.roomId).find(item=>item.runId===run.id&&item.status==='reserved');if(!reservation)return;
+    const costs=Object.values(run.usageByGeneration??{}).flatMap(usage=>usage?.costUsd!==undefined?[usage.costUsd]:[]);
+    const known=costs.length>0,actualUsd=known?costs.reduce((sum,value)=>sum+value,0):undefined;
+    const next:BudgetReservation={...reservation,...(actualUsd!==undefined?{actualUsd}:{}),status:known?'settled':'unknown',source:known?'adapter':'estimate',updatedAt:now()};
+    this.store.event(run.roomId,'budget.updated',SYSTEM,{reservation:next});
+  }
   enqueue(roomId: string, agentId: string, prompt: string, basedOnSeq: number, extra: Partial<Run> & { causationId?: string } = {}): Run {
     const executionAgent=this.checkAgent(roomId,agentId);
     if(executionAgent.connectionMode==='external')throw new ProtocolError('external_agent','外部会话不创建托管运行',409);
@@ -486,6 +514,7 @@ export class RoomService {
     const baseTimeoutMs=fields.taskId?settings.taskTimeoutMs:settings.chatTimeoutMs;
     const timeoutMs=settings.adaptiveTimeouts?adaptiveTimeoutMs(this.store.list<Run>('runs',roomId),agentId,fields.taskId?'task':'chat',baseTimeoutMs):baseTimeoutMs;
     const run: Run = { id: uid('run'), roomId, agentId, prompt, effectScope:['demo','api'].includes(executionAgent.provider)?'conversation-only':'unrestricted', basedOnSeq, status: 'queued',lifecycleVersion:1,generation:1,contextPolicy:structuredClone(settings.contextPolicy), createdAt: now(), updatedAt: now(),contextId:fields.contextId??this.saveContext(roomId,basedOnSeq),limits:{memoryMb:settings.memoryMb,maxProcesses:settings.maxProcesses,timeoutMs,tokenBudget:settings.tokenBudget,costBudgetUsd:settings.costBudgetUsd}, ...fields };
+     this.reserveBudgetForRun(run);
      this.store.event(roomId, 'run.created', SYSTEM, { run }, causationId ?? null, run.id); return run;
   }
   private saveContext(roomId:string,throughSeq:number){const id=uid('context');this.store.put('contexts',{id,roomId,...captureContext(this.store,roomId,throughSeq)});return id;}
