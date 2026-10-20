@@ -23,7 +23,7 @@ import {NativeEvidenceParser,type NativeEvidence} from './native-evidence.ts';
 import {nativeExecutionStream} from './native-stream.ts';
 export { ExecutionUnknown, RemoteCanceled } from './errors.ts';
 
-export interface AdapterContext { onNativeEvidence?:(evidence:NativeEvidence)=>void; executionId?:string; agent: AgentDescriptor; run: Run; prompt: string; workspace: string; home: string; stateRoot: string; nativeSession?: string; signal: AbortSignal; host: SandboxHost; hostMode?: boolean; onRoomTool?: (request:any)=>Promise<any>; requestInput?: (question:string,signal?:AbortSignal)=>Promise<string>; transport?:typeof remoteRequest; saveCodexState?:(state:CodexRunState)=>void }
+export interface AdapterContext { onNativeEvidence?:(evidence:NativeEvidence)=>void; executionId?:string; agent: AgentDescriptor; run: Run; prompt: string; workspace: string; home: string; stateRoot: string; nativeSession?: string; signal: AbortSignal; host: SandboxHost; hostMode?: boolean; onRoomTool?: (request:any)=>Promise<any>; requestInput?: (question:string,signal?:AbortSignal)=>Promise<string>; transport?:typeof remoteRequest; onToolPermission?: (request:any)=>boolean|Promise<boolean>; saveCodexState?:(state:CodexRunState)=>void }
 export type AgentAdapter = ProtocolAdapter<AdapterContext,SandboxHost>;
 const native = new Set(['codex', 'claude', 'deepseek']);
 export async function diagnose(agent: AgentDescriptor, host: SandboxHost): Promise<Diagnostic> {
@@ -377,7 +377,7 @@ export function nativeRun(input:AdapterContext):AsyncIterable<AgentOutput> {
         }
         const exit=await channel.exit; if(!finished||exit.exitCode!==0)throw new Error('Claude 未成功完成运行');
       } else {
-        await runAcp({channel,workspace:ctx.workspace,model:ctx.agent.model,nativeSession:ctx.nativeSession,prompt:ctx.prompt,mcpServers:hostMode?[]:[mcp],signal:ctx.signal,emit:item=>output.push(item),onNativeEvidence:ctx.onNativeEvidence,setCancel:cancel=>{cancelProtocol=cancel;},onError:error=>output.end(error)});
+        await runAcp({channel,workspace:ctx.workspace,model:ctx.agent.model,nativeSession:ctx.nativeSession,prompt:ctx.prompt,mcpServers:hostMode?[]:[mcp],signal:ctx.signal,emit:item=>output.push(item),onNativeEvidence:ctx.onNativeEvidence,setCancel:cancel=>{cancelProtocol=cancel;},onError:error=>output.end(error),authorizePermission:ctx.onToolPermission});
       }
     } catch(error){if(error instanceof ExecutionUnknown)throw error;const diagnostic=channel.diagnostic(error,[key]);if(error instanceof NativeExecutionFailed)throw new NativeExecutionFailed(diagnostic.message,{cause:error});throw diagnostic;}
     finally {for(const input of pendingInputs.values())input.abort(new Error('Agent 运行已结束'));ctx.signal.removeEventListener('abort',abort); try{if(aborting)await aborting;if(hostMode&&channel instanceof HostChannel)hostDebugProcesses(channel.child.pid);await channel.terminate();}finally{channel.dispose();setup.cleanup();} }

@@ -18,7 +18,7 @@ export function acpModelValue(option:any,requested:string):string {
   return matches[0].value;
 }
 
-export async function runAcp(options:{channel:AcpChannel;workspace:string;model:string;nativeSession?:string;prompt:string;mcpServers:unknown[];signal:AbortSignal;emit:(item:AgentOutput)=>void;onNativeEvidence?:(item:NativeEvidence)=>void;setCancel:(cancel:()=>Promise<void>)=>void;onError:(error:unknown)=>void}) {
+export async function runAcp(options:{channel:AcpChannel;workspace:string;model:string;nativeSession?:string;prompt:string;mcpServers:unknown[];signal:AbortSignal;emit:(item:AgentOutput)=>void;onNativeEvidence?:(item:NativeEvidence)=>void;setCancel:(cancel:()=>Promise<void>)=>void;onError:(error:unknown)=>void;authorizePermission?:(request:any)=>boolean|Promise<boolean>}) {
   const {channel,signal}=options;
   const evidence=new NativeEvidenceParser(item=>options.onNativeEvidence?.(item));let ownedSession:string|undefined;
   hostDebug('[acp] start nativeSession='+(options.nativeSession??'none'));
@@ -29,8 +29,11 @@ export async function runAcp(options:{channel:AcpChannel;workspace:string;model:
     if(frame.method==='session/update'&&update?.sessionUpdate!=='agent_message_chunk')hostDebug('[acp] update '+(update?.sessionUpdate??'?')+' '+JSON.stringify(update).slice(0,350));
     if(frame.method==='session/update'&&update?.sessionUpdate==='agent_message_chunk'&&update.content?.type==='text')options.emit({type:'text',text:update.content.text});
     if(frame.method==='session/request_permission'&&frame.id!==undefined){
-      const choice=frame.params?.options?.find((item:any)=>item.kind==='allow_once');
-      void channel.reply(frame.id,signal.aborted||!choice||!ownedSession||frame.params?.sessionId!==ownedSession?{outcome:{outcome:'cancelled'}}:{outcome:{outcome:'selected',optionId:choice.optionId}}).catch(options.onError);
+      const params=frame.params,choice=params?.options?.find((item:any)=>item.kind==='allow_once');
+      const cancel=()=>channel.reply(frame.id,{outcome:{outcome:'cancelled'}});
+      if(signal.aborted||!choice||!ownedSession||params?.sessionId!==ownedSession){void cancel().catch(options.onError);return;}
+      if(options.authorizePermission){void Promise.resolve(options.authorizePermission(params)).then(allowed=>channel.reply(frame.id,allowed?{outcome:{outcome:'selected',optionId:choice.optionId}}:{outcome:{outcome:'cancelled'}})).catch(options.onError);return;}
+      void channel.reply(frame.id,{outcome:{outcome:'selected',optionId:choice.optionId}}).catch(options.onError);
     }
   };
   const initialized=await channel.request('initialize',{protocolVersion:1,clientCapabilities:{},clientInfo:{name:'tempt-room',version:'0.1.0'}});

@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 964828b522a3e81480ed668ac55ed7fd2d225080 (dirty)
+source HEAD: 0493e27e0458030768be54bb564363c94ba46249 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T12-21-48-384Z-e9781af5/report.json
+report: .state/collaboration-baseline/run-2026-10-20T12-27-36-398Z-6741f8fc/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -208,19 +208,19 @@ report: .state/collaboration-baseline/run-2026-10-20T12-21-48-384Z-e9781af5/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-azwmXz/report.json`，162.8s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-Z6zJZQ/report.json`，163.0s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-IJ1J8k/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-uVEgql/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T12-21-48-384Z-e9781af5/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T12-21-48-384Z-e9781af5/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T12-21-48-384Z-e9781af5/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T12-21-48-384Z-e9781af5/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T12-27-36-398Z-6741f8fc/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T12-27-36-398Z-6741f8fc/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T12-27-36-398Z-6741f8fc/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T12-27-36-398Z-6741f8fc/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -515,7 +515,10 @@ report: .state/collaboration-baseline/run-2026-10-20T12-21-48-384Z-e9781af5/repo
 - authorizeTool 支持 transport=external：外部 Agent 写工具不再要求 run fence，但仍要求 preToolGate 证据
 - Worker.agentTool 在 warn/enforce 模式下执行同一授权策略并写 tool.authorization.recorded 审计
 - 新增 external agent tools 测试：enforce 拒绝无证据 room_post、room_read 可读、写入证据后允许
-- 尚未完成：ACP 宿主桥接、批准/取消竞态、CLI 不可拦截缺口标注
+- runAcp 新增 authorizePermission 回调：session/request_permission 不再无条件允许 allow_once
+- Worker 在 warn/enforce 模式下按 preToolGate 证据决定 ACP 权限选择，并写 tool.authorization.recorded 审计
+- 新增 acp-permission 测试：拒绝→cancelled，允许→selected allow_once
+- 尚未完成：批准/取消竞态、CLI 不可拦截缺口标注、MCP 权限桥接
 
 ## B09 起点 — 讨论窗口估算
 

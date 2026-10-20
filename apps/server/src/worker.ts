@@ -23,7 +23,7 @@ import { InboxService } from './inbox.ts';
 import { prepareHostChatWorkspace, hostStatus, hostChangeReport } from './host-workspace.ts';
 import { buildProjectManifest } from './project-manifest.ts';
 import { buildContextSegments } from './context-segments.ts';
-import { agentCapabilityFingerprint } from './adapter-capabilities.ts';
+import { agentCapabilityFingerprint, verifiedCapabilityState } from './adapter-capabilities.ts';
 import { authorizeTool } from './tool-authorization.ts';
 import { acquireResource, expireResourceLeases, quarantineResource, recoverResourceLeases, releaseResource } from './resource-manager.ts';
 import { codexThreadKey, reconcileAttachedRun } from './codex-attach.ts';
@@ -423,7 +423,7 @@ export class Worker {
         if(current.status!=='cancel_requested')current.status='running';
         current.updatedAt=now();this.store.atomic(()=>{this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);});
       };
-      for await (const output of (this.options.adapter??runAdapter)({ onNativeEvidence:nativeIntent?evidence=>this.nativeOperations.observe(nativeIntent!,evidence):undefined, executionId:fence.executionId,agent, run, prompt, workspace, home, stateRoot: this.root, hostMode, onRoomTool: hostMode ? (request:any) => this.executeTool(run.id, request, fence) : undefined, nativeSession: attached?undefined:this.store.session(scope), signal: controller.signal, host: this.host, saveCodexState, requestInput:(question,signal)=>this.requestInput(run,question,signal?AbortSignal.any([controller.signal,signal]):controller.signal) })) {
+      for await (const output of (this.options.adapter??runAdapter)({ onNativeEvidence:nativeIntent?evidence=>this.nativeOperations.observe(nativeIntent!,evidence):undefined, executionId:fence.executionId,agent, run, prompt, workspace, home, stateRoot: this.root, hostMode, onRoomTool: hostMode ? (request:any) => this.executeTool(run.id, request, fence) : undefined, nativeSession: attached?undefined:this.store.session(scope), signal: controller.signal, host: this.host, saveCodexState, requestInput:(question,signal)=>this.requestInput(run,question,signal?AbortSignal.any([controller.signal,signal]):controller.signal),onToolPermission:async(request:any)=>{const authMode=this.store.settings().toolAuthorizationMode;if(authMode==='off')return true;const fingerprint=agentCapabilityFingerprint(agent),evidence=this.store.list('capability_evidence',run.roomId).filter((item:any)=>item.fingerprint===fingerprint) as any,state=verifiedCapabilityState(fingerprint,evidence,'preToolGate'),allowed=state==='verified_supported';try{this.store.event(run.roomId,'tool.authorization.recorded',{id:run.agentId,kind:'agent'},{runId:run.id,tool:'acp.permission',authorizationDecision:allowed?'allow':'deny',...(allowed?{}:{reason:'capability_unverified'}),argumentDigest:digest({toolCall:request?.toolCall??null}),fingerprint,authorizationMode:authMode},null,run.id);}catch{}return authMode==='warn'?true:allowed;} })) {
         assertRunIdentity(this.store,run);
         if(!attached||run.codex?.nativeStatus!=='completed')controller.signal.throwIfAborted();
         if (output.type === 'text') {
