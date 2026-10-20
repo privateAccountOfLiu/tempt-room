@@ -401,7 +401,7 @@ export class Worker {
       const delta=contextDelta(this.store,run);
       if(delta){
         supplement=reconciliationPrompt(delta,JSON.stringify({message:text,artifacts:candidate.artifacts}));
-        const next=advanceContext(this.store,run,delta);this.executions.delete(run.executionId!);this.executions.set(next.executionId!,executionFence(next));ownedExecutions.add(next.executionId!);run=next;continue;
+        const next=advanceContext(this.store,run,delta);this.executions.delete(run.executionId!);this.executions.set(next.executionId!,executionFence(next));ownedExecutions.add(next.executionId!);if(!this.service.recordDiscussionContinuation(next)){this.finish(next,'canceled','讨论额外上下文额度已用尽');return;}run=next;continue;
       }
       this.store.atomic(()=>{
       assertContextCurrent(this.store,run);

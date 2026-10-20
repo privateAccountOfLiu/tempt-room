@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 32099e2e050255044aea10897f15359360982fe8 (dirty)
+source HEAD: e80b5af333714c4891e1e539de3de68e7b10c8fc (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T04-59-48-053Z-23d7cd01/report.json
+report: .state/collaboration-baseline/run-2026-10-20T05-04-55-206Z-bcb8961a/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -100,7 +100,9 @@ report: .state/collaboration-baseline/run-2026-10-20T04-59-48-053Z-23d7cd01/repo
 - 新增 tests/discussion-lifecycle.test.ts 3 项：AgentSession/responseSlot、pause 持久化与 Worker 不派发、激活额度
 - sessionKey 新增 v3 逻辑会话 scope（agentSessionId + workspace + 模式）；无 agentSessionId 的旧 chat 保持 v2 可续接
 - 新增 tests/session-scope.test.ts 2 项
-- 尚未完成：额外对账轮次计费、总结独立授权额度与 UI
+- 额外上下文输入计费：Worker 在 context reconciliation 推进 generation 前调用 recordDiscussionContinuation；计入 activationsUsed，超限时以 activation_limit 结束并取消当前 run
+- 新增 discussion-lifecycle 1 项测试
+- 尚未完成：总结独立授权额度与 UI、摘要额度
 ### B02 — 可重放投影与 v10 迁移
 
 - 数据库版本 v9→v10；新增投影表：agent_sessions、subscriptions、inbox_deliveries、input_batches、wake_intents、capability_evidence、discussion_rounds
@@ -162,19 +164,19 @@ report: .state/collaboration-baseline/run-2026-10-20T04-59-48-053Z-23d7cd01/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-ozb29C/report.json`，153.0s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-yk8Cay/report.json`，153.8s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-lmTxuw/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-E9jwrq/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T04-59-48-053Z-23d7cd01/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T04-59-48-053Z-23d7cd01/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T04-59-48-053Z-23d7cd01/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T04-59-48-053Z-23d7cd01/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T05-04-55-206Z-bcb8961a/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T05-04-55-206Z-bcb8961a/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T05-04-55-206Z-bcb8961a/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T05-04-55-206Z-bcb8961a/replay.stdout.txt`
 
 ## M1 验收 — 并行任务确定性 fixture
 

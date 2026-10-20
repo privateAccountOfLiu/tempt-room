@@ -69,3 +69,17 @@ test('activation limit ends the discussion before exceeding its budget', t => {
   assert.equal(discussion.activationsUsed, 1);
   assert.equal(store.list<Run>('runs', roomId).filter(run => run.discussionId === id).length, 1);
 });
+
+test('additional context input consumes activation budget and stops the discussion', t => {
+  const {store, service, roomId, start} = base(t);
+  const id = start({participants: ['demo-planner'], activationLimit: 2, rounds: 3, maxResponses: 10});
+  const discussion = store.get<Discussion>('discussions', id)!;
+  assert.equal(discussion.activationsUsed, 1);
+  const run = {id: 'run_context', roomId, agentId: 'demo-planner', discussionId: id, status: 'running', prompt: '', basedOnSeq: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()} as Run;
+  service.recordDiscussionContinuation(run);
+  assert.equal(store.get<Discussion>('discussions', id)!.activationsUsed, 2);
+  service.recordDiscussionContinuation(run);
+  const stopped = store.get<Discussion>('discussions', id)!;
+  assert.equal(stopped.status, 'stopped');
+  assert.equal(stopped.endReason, 'activation_limit');
+});

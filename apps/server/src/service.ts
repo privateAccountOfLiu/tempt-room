@@ -497,6 +497,17 @@ export class RoomService {
       catch(error){this.endDiscussion(discussion,'scheduling_failed','stopped',(error as Error).message);}
     });
   }
+  /** Additional model input inside one discussion turn also consumes the budget. */
+  recordDiscussionContinuation(run:Run):boolean{
+    if(!run.discussionId)return true;
+    const discussion=this.store.get<Discussion>('discussions',run.discussionId);
+    if(!discussion||discussion.status!=='active')return true;
+    discussion.activationsUsed=(discussion.activationsUsed??0)+1;
+    const limit=discussion.activationLimit;
+    if(limit&&discussion.activationsUsed>limit){this.endDiscussion(discussion,'activation_limit','stopped',`讨论激活额度已达上限（${limit}）`);return false;}
+    this.store.event(discussion.roomId,'discussion.round',SYSTEM,{discussion});
+    return true;
+  }
   private endDiscussion(discussion:Discussion,reason:NonNullable<Discussion['endReason']>,status:'completed'|'stopped',detail?:string){
     if(discussion.status!=='active'&&discussion.status!=='paused')return;
     discussion.status=status;discussion.endReason=reason;discussion.endedAt=now();
