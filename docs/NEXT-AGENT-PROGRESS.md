@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 869730aa7a4ebc1fdcdf6e35056c18a6be58fe2d (dirty)
+source HEAD: d18042fbf604fe7a2ae45f28abb85ddf0a583c01 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T07-17-47-113Z-0d09e941/report.json
+report: .state/collaboration-baseline/run-2026-10-20T07-23-38-308Z-6e7f9d3f/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -185,19 +185,19 @@ report: .state/collaboration-baseline/run-2026-10-20T07-17-47-113Z-0d09e941/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-yvNiOL/report.json`，158.5s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-4TC77C/report.json`，159.8s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-SSnbhx/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-pz018q/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T07-17-47-113Z-0d09e941/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T07-17-47-113Z-0d09e941/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T07-17-47-113Z-0d09e941/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T07-17-47-113Z-0d09e941/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T07-23-38-308Z-6e7f9d3f/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T07-23-38-308Z-6e7f9d3f/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T07-23-38-308Z-6e7f9d3f/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T07-23-38-308Z-6e7f9d3f/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -335,7 +335,11 @@ report: .state/collaboration-baseline/run-2026-10-20T07-17-47-113Z-0d09e941/repo
   - 不再要求 owner 手动 mark_applied
   - journal_incomplete/rolled_back/restart_unknown 仍标记 unknown，不自动重放
 - 集成测试更新：journal_applied 重启自动恢复 applied/artifact.applied
-- 尚未完成：journal 自动回滚、staging 保留策略、旧 command shell 路径移除
+- ExecutionSettings 新增 stagingRetentionMs（默认 24h，0 表示不清理）
+- Worker.tick 清理 root/staging 下超过保留期的目录；正在使用/清理失败的目录保留到下次扫描
+- 运行设置 UI 新增「staging 保留时长（小时）」；浏览器 E2E 断言可见
+- 新增 tests/staging-retention.test.ts：过期目录删除、新鲜目录保留
+- 尚未完成：journal 自动回滚、旧 command shell 路径移除
 ## D02a — 持久集成队列主体
 
 - 新增 packages/protocol/src/integration.ts：Integration schema 与状态机（queued/validating/staging/testing/ready_to_apply/applying/applied/conflict/verification_failed/unknown/blocked）

@@ -2388,6 +2388,12 @@
                 "block",
                 "allow"
               ]
+            },
+            "stagingRetentionMs": {
+              "default": 86400000,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2592000000
             }
           },
           "required": [
@@ -2417,7 +2423,8 @@
             "adaptiveTimeouts",
             "roomTokenBudget",
             "roomCostBudgetUsd",
-            "unknownCostPolicy"
+            "unknownCostPolicy",
+            "stagingRetentionMs"
           ],
           "additionalProperties": false
         }

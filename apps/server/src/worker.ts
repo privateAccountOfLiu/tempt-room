@@ -175,6 +175,16 @@ export class Worker {
     }
     this.processIntegrations();
     this.scanSubscriptions();
+    this.cleanupStaging();
+  }
+  private cleanupStaging(){
+    const stagingRoot=join(this.root,'staging');if(!existsSync(stagingRoot))return;
+    const retention=this.store.settings().stagingRetentionMs;if(retention<=0)return;
+    const cutoff=Date.now()-retention;
+    for(const entry of readdirSync(stagingRoot,{withFileTypes:true})){
+      if(!entry.isDirectory())continue;
+      try{const path=join(stagingRoot,entry.name),mtime=statSync(path).mtimeMs;if(mtime<cutoff)rmSync(path,{recursive:true,force:true});}catch{/* A staging directory in use stays until the next scan. */}
+    }
   }
   private rollbackIntegration(integrationId:string,actor:any){
     const integration=this.store.get<Integration>('integrations',integrationId);
