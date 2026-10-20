@@ -214,3 +214,14 @@
 .capability-history em.verified_unsupported{color:#d9a58a;border-color:#6b4a37}
 .capability-history em.unverified{color:#9b9b8c;border-color:#4c4c40}
 .capability-history small{margin-left:auto;color:#66745d}
+/* E01 trace tree */
+.trace-tree details{border-bottom:1px solid #222b1f;padding:2px 0}
+.trace-tree summary{cursor:pointer;font-size:9px;color:#9ead92;padding:2px 0}
+.trace-tree summary::marker{color:#66745d}
+/* E01 latency chart */
+.latency-chart{margin-top:6px}
+.latency-chart>small{display:block;font-size:9px;color:#819175;margin-bottom:3px}
+.latency-chart>div{display:flex;align-items:center;gap:6px;font-size:8px;color:#819175;padding:1px 0}
+.latency-chart span{width:44px;flex:0 0 auto}
+.latency-chart i{height:5px;background:linear-gradient(90deg,#3f5a32,#79a85f);border-radius:2px;min-width:1px}
+.latency-chart b{color:#c6d5bb;font-weight:600;margin-left:auto}

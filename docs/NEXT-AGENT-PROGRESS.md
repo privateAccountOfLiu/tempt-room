@@ -19,11 +19,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 43a1ca46a7913e24d4d3ca835f430c8c1f3e6c9a (dirty)
+source HEAD: 84680d696e876b80bb52844832894cc936c139de (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T08-33-38-982Z-c476c1d2/report.json
+report: .state/collaboration-baseline/run-2026-10-20T08-41-09-372Z-cddd59f0/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -207,19 +207,19 @@ report: .state/collaboration-baseline/run-2026-10-20T08-33-38-982Z-c476c1d2/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-AJDbUD/report.json`，169.4s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-K81BSW/report.json`，169.9s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-EZln3m/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-Gp6U64/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T08-33-38-982Z-c476c1d2/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T08-33-38-982Z-c476c1d2/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T08-33-38-982Z-c476c1d2/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T08-33-38-982Z-c476c1d2/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T08-41-09-372Z-cddd59f0/report.json`
+- `.state/collaboration-baseline/run-2026-10-20T08-41-09-372Z-cddd59f0/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T08-41-09-372Z-cddd59f0/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-20T08-41-09-372Z-cddd59f0/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -273,7 +273,10 @@ report: .state/collaboration-baseline/run-2026-10-20T08-33-38-982Z-c476c1d2/repo
 - 浏览器 E2E 运行详情断言新增「追踪链路」
 - metrics 新增 enqueueToStart/runDuration 延迟直方图：bucket 100/500/1000/5000/30000/+Inf 以及 count
 - Prometheus 文本输出 `tempt_room_*_bucket{le=...}`；metrics test 断言 bucket/count
-- 尚未完成：指标图表化、trace 全链路树形视图## D04a — 用量样本去重与统一聚合
+- Run 详情追踪链路按 aggregate 分组为可折叠树（room/task/run/artifact 等，最近 30 个事件）
+- 用量面板指标卡新增「排队延迟分布」横向条形图（100/500/1000/5000/30000/+Inf）
+- 浏览器 E2E 断言新增「排队延迟分布」
+- 尚未完成：实时图表轮询历史、trace 跨房间时钟对齐## D04a — 用量样本去重与统一聚合
 
 - 新增 packages/protocol/src/usage.ts：UsageSample（provider/session/turn/request/scope/counterEpoch/tokens/cost/source）
 - 新增 apps/server/src/usage.ts 纯聚合器：
