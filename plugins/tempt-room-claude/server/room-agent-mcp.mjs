@@ -38,16 +38,26 @@ const tools = [
 ];
 
 async function call(name, args, commandId) {
-  if (!token || !roomId) throw new Error('缺少 ROOM_AGENT_TOKEN 或 ROOM_ROOM_ID');
-  const response = await fetch(base + '/api/agent/tool', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token, 'room-protocol-version': '0.1' },
-    body: JSON.stringify({ commandId, roomId, name, arguments: args ?? {} })
-  });
+  if (!token || !roomId) throw Object.assign(new Error('缺少 ROOM_AGENT_TOKEN 或 ROOM_ROOM_ID'), {code: 'missing_agent_token', retryable: false});
+  const timeoutMs = Math.max(1000, Math.min(120000, Number(process.env.ROOM_AGENT_HTTP_TIMEOUT_MS) || 30000));
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let response;
+  try {
+    response = await fetch(base + '/api/agent/tool', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token, 'room-protocol-version': '0.1' },
+      body: JSON.stringify({ commandId, roomId, name, arguments: args ?? {} })
+    });
+  } catch (error) {
+    if (controller.signal.aborted) throw Object.assign(new Error('房间服务请求超时'), {code: 'room_timeout', retryable: true});
+    throw Object.assign(new Error(error?.message ?? '房间服务连接失败'), {code: 'room_unreachable', retryable: true});
+  } finally { clearTimeout(timer); }
   const text = await response.text();
   let body;
-  try { body = JSON.parse(text); } catch { throw new Error('房间服务返回非 JSON 响应'); }
-  if (!response.ok) throw new Error(body.message ?? ('房间服务 HTTP ' + response.status));
+  try { body = JSON.parse(text); } catch { throw Object.assign(new Error('房间服务返回非 JSON 响应'), {code: 'invalid_room_response', status: response.status, retryable: false}); }
+  if (!response.ok) throw Object.assign(new Error(body.message ?? ('房间服务 HTTP ' + response.status)), {code: body.code ?? 'room_http_error', status: response.status, retryable: response.status === 429 || response.status >= 500});
   return body.result;
 }
 
@@ -72,7 +82,7 @@ for await (const line of lines) {
           const image = await roomSendImage(call, {...args, operationId: rootOperationId}, imageRoots());
           result = { content: [{ type: 'text', text: JSON.stringify(image) }], isError: false };
         } catch (error) {
-          result = { content: [{ type: 'text', text: JSON.stringify({ error: { code: error.code ?? 'image_transfer_failed', message: error.message, stage: error.stage, artifactId: error.artifactId } }) }], isError: true };
+          result = { content: [{ type: 'text', text: JSON.stringify({ error: { code: error.code ?? 'image_transfer_failed', message: error.message, stage: error.stage, artifactId: error.artifactId, retryable: error.retryable, status: error.status } }) }], isError: true };
         }
       } else {
         const response = await call(request.params.name, args, explicitId ? `mcp_${createHash('sha256').update(explicitId).digest('hex')}` : commandId);

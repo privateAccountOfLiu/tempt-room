@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { join, resolve } from 'node:path';
+import { createServer } from 'node:http';
 import sharp from 'sharp';
 import { createApp } from '../apps/server/src/app.ts';
 import { issueAgentToken } from '../apps/server/src/agent-tokens.ts';
@@ -96,4 +97,31 @@ test('retrying a lost MCP reply with the same operationId creates one artifact a
   assert.equal(ctx.store.events(ctx.roomId).filter(event => event.type === 'artifact.created').length, 1);
   assert.equal(ctx.store.snapshot(ctx.roomId).messages.filter(message => message.attachments.includes(first.artifactId)).length, 1);
   assert.ok(existsSync(join(ctx.root, 'artifacts', first.artifactId)));
+});
+
+test('external MCP classifies unauthorized image calls as non-retryable isError without looping', async t => {
+  const ctx = await fixture(t);
+  const connector = startConnector({...ctx.env, ROOM_AGENT_TOKEN: 'not-a-valid-agent-token'});
+  t.after(() => connector.stop());
+  await connector.request('initialize', {protocolVersion: '2025-06-18'});
+  const called = await callImage(ctx, connector, 'external_bad_token');
+  assert.equal(called.isError, true);
+  const payload = JSON.parse(called.content[0].text);
+  assert.equal(payload.error.code, 'invalid_agent_token');
+  assert.equal(payload.error.retryable, false);
+  assert.equal(ctx.store.events(ctx.roomId).filter(event => event.type === 'artifact.created').length, 0);
+});
+
+test('external MCP aborts a hung HTTP request at the configured timeout', async t => {
+  const server = createServer((_request, response) => { response.writeHead(200, {'content-type': 'application/json'}); /* keep the response open */ });
+  await new Promise<void>(resolveListen => server.listen(0, '127.0.0.1', () => resolveListen()));
+  t.after(() => new Promise<void>(resolveClose => server.close(() => resolveClose())));
+  const address = server.address();
+  const port = typeof address === 'object' && address ? address.port : 0;
+  const connector = startConnector({ROOM_URL: `http://127.0.0.1:${port}`, ROOM_AGENT_TOKEN: 'fixture-token', ROOM_ROOM_ID: 'room_fixture', ROOM_AGENT_HTTP_TIMEOUT_MS: '1000'});
+  t.after(() => connector.stop());
+  await connector.request('initialize', {protocolVersion: '2025-06-18'});
+  const started = Date.now();
+  await assert.rejects(() => connector.request('tools/call', {name: 'room_read', arguments: {}}), /超时|timeout/i);
+  assert.ok(Date.now() - started < 5000);
 });

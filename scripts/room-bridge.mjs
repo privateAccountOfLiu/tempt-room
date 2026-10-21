@@ -43,7 +43,7 @@ for await (const line of lines) {
           const image = await roomSendImage(call, {...args, operationId}, imageRoots());
           result = { content: [{ type: 'text', text: JSON.stringify(image) }], isError: false };
         } catch (error) {
-          result = { content: [{ type: 'text', text: JSON.stringify({ error: { code: error.code ?? 'image_transfer_failed', message: error.message, stage: error.stage, artifactId: error.artifactId } }) }], isError: true };
+          result = { content: [{ type: 'text', text: JSON.stringify({ error: { code: error.code ?? 'image_transfer_failed', message: error.message, stage: error.stage, artifactId: error.artifactId, retryable: error.retryable, status: error.status } }) }], isError: true };
         }
       } else {
         const response = await call(request.params.name,args,operationId);

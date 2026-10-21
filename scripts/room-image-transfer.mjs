@@ -121,6 +121,8 @@ export async function uploadImage(call, bytes, options) {
     if (error?.stage) throw error;
     const wrapped = new Error(error?.message ?? String(error));
     wrapped.code = error?.code ?? 'image_upload_failed';
+    wrapped.status = error?.status;
+    wrapped.retryable = error?.retryable;
     wrapped.stage = stage;
     wrapped.commandId = stage === 'begin' ? ids.begin : stage === 'complete' ? ids.complete : ids.part(0);
     if (uploadId) wrapped.uploadId = uploadId;
@@ -138,6 +140,8 @@ export async function sendImage(call, bytes, options) {
   } catch (error) {
     const wrapped = new Error(error?.message ?? String(error));
     wrapped.code = error?.code ?? 'image_post_failed';
+    wrapped.status = error?.status;
+    wrapped.retryable = error?.retryable;
     wrapped.stage = 'post';
     wrapped.commandId = ids.post;
     wrapped.artifactId = image.artifactId;

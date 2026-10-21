@@ -32,7 +32,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | I02 有界可恢复的上传临时状态 | verified | image_uploads/parts 表 + migration 19、分块状态机、配额/TTL、原子落盘、缺失块检测、GC 与 Worker image 工具/删除房间失效接线完成；重启进程 E2E 仍由 I04 覆盖 |
 | I03 解码验真、原图与安全预览 | verified | sharp 0.35.5 + 签名/结构检查 + 完整解码 + 1920 PNG 预览 + 原子落盘/稳定 artifactId；Worker 三个低层工具已接线并通过 3+3 用例；bridge/helper 归 I04 |
 | I04 托管 bridge/host/AppContainer 传输 | in_progress | Worker 三段式工具、helper、bridge `room_send_image`、toolchain 复制；真实 HostRoomPipe 固定图 smoke 通过（`test:room-images-native --mode host`）；AppContainer 模式明确 not_verified |
-| I05 外部 MCP、插件与 SDK 发图 | in_progress | SDK、外部 MCP room_send_image、插件同步；真实 stdio→HTTP 上传/丢回复同 operationId 重试 e2e 通过（2 个用例）；网络超时/错误码分类待补 |
+| I05 外部 MCP、插件与 SDK 发图 | in_progress | SDK、外部 MCP room_send_image、真实 stdio→HTTP 重试幂等、HTTP timeout/401/403/410 分类与 no-retry 语义通过 4 个用例；并发双图与手动宿主验证待补 |
 | I06 安全内联路由与图片展示 | verified | 私有 `/api/artifacts/:id/image`（active/verified/hash/no-store）、缩略图、失败降级、键盘 Lightbox、纯图不渲染空 Markdown 已完成并通过 3 个接口用例与完整浏览器 E2E |
 | I07 跨功能竞态 | in_progress | 删房/移除成员/并行上传/丢回执重试/导出回放/删后审计 6 类竞态通过 6 个用例；`acceptance:room-images --check` 通过；托管取消、删除与最终 apply、最后房间重启组合仍未覆盖 |
 | V01 开发/发布报告分模式 | in_progress | schemaVersion 2、sourceBefore/sourceAfter、tracked/working/untracked+lockfile hash、`--release --expected-head` 前置失败 not_run、source_changed 检测与 checksPassed/releaseEligible 已完成并通过 5 个用例；真实 release 运行与 expected-head 参数化脚本入口待补 |
@@ -1278,6 +1278,53 @@ delivery/image-upload 细节与全入口 assertActiveRoom 仍待补）
   外部 MCP 网络超时/401/403/410 分类与并发双图 e2e 未补；CI native job 未实际
   推送运行；V03 真实付费 CLI 实验仍未获授权
 下一张卡与依赖：V03（需明确付费授权）或 I07 剩余竞态
+```
+
+## I05 — 外部 MCP 超时与错误分类补充
+
+```
+卡号与状态：I05 补充切片 / in_progress
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 a9e5fa0（原生/外部 e2e 提交）；实现见本次提交
+修改文件和关键符号：
+  scripts/room-agent-mcp.mjs
+    call() 增加 ROOM_AGENT_HTTP_TIMEOUT_MS（默认 30s，限 1–120s），
+    AbortController 超时返回 room_timeout/retryable=true；
+    连接失败 room_unreachable；非 JSON invalid_room_response；
+    HTTP 错误保留 body.code/status，429/5xx retryable=true，401/403/410
+    retryable=false；不做自动无限重试
+  scripts/room-image-transfer.mjs
+    image 阶段包装保留 status/retryable，图片错误可判断是否需要重试
+  scripts/room-bridge.mjs / scripts/room-agent-mcp.mjs
+    image isError 小对象增加 retryable/status，不返回 base64 或本地路径
+  plugins/tempt-room-claude/server/*
+    同步后的 MCP 与 helper
+  tests/external-image-tools.test.ts（+2 个用例）
+    非法 token 的 room_send_image → isError code=invalid_agent_token、
+      retryable=false、零 artifact；
+    挂起 HTTP 服务 + ROOM_AGENT_HTTP_TIMEOUT_MS=1000 → 请求在 5s 内以
+      room_timeout 失败
+变更前触发条件 / 变更后行为：
+  变更前：外部 MCP fetch 无超时、HTTP 错误只保留 message，图片工具错误
+  不携带 retryable/status，客户端无法安全决定是否重试。
+  变更后：超时与 5xx/429 标记可重试，401/403/410 明确不可重试；
+  中途失败不重放低层请求，客户端用同 operationId 精确恢复。
+接口/事件/迁移/兼容性：
+  仅 connector 环境变量与错误字段；room HTTP 协议不变；无迁移。
+执行命令、cwd、环境、开始结束、退出码：
+  node --check scripts/room-agent-mcp.mjs                         exit 0
+  node scripts/sync-room-agent-plugin.mjs --check                  exit 0（2 in-sync）
+  npx tsx --test tests/external-image-tools.test.ts                 exit 0（4 pass / 0 fail）
+  npm test                                                           exit 0（536 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-22 04:50–05:15 CST
+证据路径：
+  .state/parallel-room-image/i05-timeout-tests-20261022.log
+实际覆盖的模式和失败分支：
+  HTTP 挂起 1s 超时；invalid agent token 非重试 isError；插件副本一致
+尚未验证项及明确原因：
+  并发双图通过同一 connector 的 JSON-RPC 顺序仍为单请求串行；真实宿主
+  （Claude Code/Codex/DeepSeek）手动发图未跑；V03 付费实验未授权
+下一张卡与依赖：I07 剩余竞态或 V03（等待授权）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移
