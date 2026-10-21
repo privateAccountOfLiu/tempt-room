@@ -91,6 +91,9 @@ export class ImageUploads {
     if (input.roomId && row.room_id !== input.roomId) throw new ProtocolError('upload_room_mismatch', '上传不属于此房间', 409);
     if (input.agentId && row.agent_id !== input.agentId) throw new ProtocolError('upload_agent_mismatch', '上传不属于此 Agent', 403);
     if (!this.roomActive(row.room_id)) throw new ProtocolError('room_inactive', '房间正在删除或已删除', 409);
+    const agent = this.store.get<any>('agents', row.agent_id);
+    if (!agent || agent.enabled === false) throw new ProtocolError('agent_unavailable', 'Agent 未启用', 403);
+    if (!this.store.room(row.room_id)?.members.includes(row.agent_id)) throw new ProtocolError('forbidden', 'Agent 已不在房间内', 403);
     if (body.state !== 'uploading') throw new ProtocolError('upload_not_pending', `上传状态为 ${body.state}`, 409);
     if (Date.parse(row.expires_at) <= Date.now()) {
       this.transition(row.id, 'expired');
@@ -275,7 +278,14 @@ export class ImageUploads {
   /** A deleting/deleted room immediately invalidates its pending uploads. */
   expireRoom(roomId: string): number {
     const rows = this.store.db.prepare("SELECT id FROM image_uploads WHERE room_id=? AND state='uploading'").all(roomId) as {id: string}[];
-    for (const row of rows) { try { this.expire(row.id); } catch { /* already terminal */ } }
+    for (const row of rows) {
+      try {
+        const {body} = this.body(row.id);
+        const next = {...body, state: 'expired' as const, updatedAt: new Date().toISOString()};
+        this.store.db.prepare("UPDATE image_uploads SET state='expired',body=? WHERE id=? AND state='uploading'").run(JSON.stringify(next), row.id);
+        this.removeParts(row.id);
+      } catch { /* already terminal */ }
+    }
     return rows.length;
   }
 

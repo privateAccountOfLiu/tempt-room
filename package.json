@@ -73,6 +73,7 @@
     "test:concurrency": "tsx --test tests/concurrency-conflict.test.ts",
     "verify:collaboration": "tsx scripts/verify-collaboration-baseline.ts",
     "verify:capabilities": "tsx scripts/verify-adapter-capabilities.ts",
+    "acceptance:room-images": "tsx scripts/acceptance-room-images.ts --check",
     "acceptance:parallel": "tsx scripts/acceptance-parallel-tasks.ts --check",
     "room:install-minimax": "node scripts/install-minimax-mcp.mjs"
   },

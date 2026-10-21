@@ -34,7 +34,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | I04 托管 bridge/host/AppContainer 传输 | in_progress | Worker executeTool/agentTool 已接上 begin/chunk/complete（托管 fence 与外部身份）并通过 3 个用例；bridge helper、toolchain 复制与真实 pipe chunk smoke 仍待实现 |
 | I05 外部 MCP、插件与 SDK 发图 | in_progress | Browser/Node SDK uploadImage/sendImage（Web Crypto、稳定 commandId、错误 stage）与 RoomAgentClient 方法已完成并通过 4 个用例；外部 MCP room_send_image、helper 与插件同步仍未接线 |
 | I06 安全内联路由与图片展示 | verified | 私有 `/api/artifacts/:id/image`（active/verified/hash/no-store）、缩略图、失败降级、键盘 Lightbox、纯图不渲染空 Markdown 已完成并通过 3 个接口用例与完整浏览器 E2E |
-| I07 跨功能竞态 | not_started | |
+| I07 跨功能竞态 | in_progress | 删房/移除成员/并行上传/丢回执重试/导出回放/删后审计 6 类竞态通过 6 个用例；`acceptance:room-images --check` 通过；托管取消、删除与最终 apply、最后房间重启组合仍未覆盖 |
 | V01 开发/发布报告分模式 | not_started | |
 | V02 CI/preflight 接入真实入口 | not_started | |
 | V03 固定版本真实 CLI 与三组对照 | not_started | |
@@ -1006,6 +1006,57 @@ delivery/image-upload 细节与全入口 assertActiveRoom 仍待补）
   浏览器 E2E 尚未自动构造已验真图片消息来点击缩略图/Lightbox/键盘关闭；
   cookie 过期与伪图文件降级未做浏览器级断言；多图/透明/竖图布局未做视觉快照
 下一张卡与依赖：I07（跨功能竞态）
+```
+
+## I07 — 图片链路跨功能竞态
+
+```
+卡号与状态：I07 / in_progress（6 类竞态 + 本地验收通过；剩余组合待补）
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 87f2292（I06 提交）；实现见本次提交
+修改文件和关键符号：
+  apps/server/src/image-uploads.ts
+    assertUsable 增加 Agent enabled、当前房间 member 检查；expireRoom 直接
+    条件更新 pending 状态并释放配额，不依赖旧 uploadId 绕过权限变化
+  tests/room-image-races.test.ts（新增 6 个用例）
+    1) begin 后 room.deleting：chunk 拒绝、expireRoom 释放预约、无图片消息；
+    2) 移除上传成员：旧 uploadId 的 chunk 被 forbidden 拒绝；
+    3) 两个成员并行上传：块/artifact/hash 不串线；
+    4) message.send 丢回执后同 commandId 重试：只一条消息；
+    5) 事件导出/回放：含 artifact 图片元数据与 message 引用，无 base64、
+       本地 state root、complete.bin；preview hash 与文件一致；
+    6) 完成上传后删除房间：artifact 审计元数据保留，房间进入 deleting
+  scripts/acceptance-room-images.ts（新增）
+    --check：固定 PNG，本地 Store + ImageUploads，零模型/零网络，
+    验证 artifact/verified 元数据/分块/预览 hash/attachment 消息/
+    事件无 base64 与本地路径/新 schema 存在
+  package.json
+    新增 `acceptance:room-images` 脚本
+变更前触发条件 / 变更后行为：
+  变更前：上传开始后删除房间、移除成员或并行上传缺少系统化回归；
+  没有独立的图片验收命令。
+  变更后：权限变化在每次 chunk/complete 重查并立即生效；并行上传隔离；
+  本地一条命令可重复验证图片消息主链路且不请求模型。
+接口/事件/迁移/兼容性：
+  无新事件/迁移；仅加强 operational 上传检查与测试/验收脚本。
+执行命令、cwd、环境、开始结束、退出码：
+  npm run typecheck                                            exit 0
+  npx tsx --test tests/room-image-races.test.ts                 exit 0（6 pass / 0 fail）
+  npm run acceptance:room-images                               exit 0（ok=true, modelRequests=0）
+  npm test                                                      exit 0（526 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-22 01:35–02:05 CST
+证据路径：
+  .state/parallel-room-image/i07-tests-20261022.log
+实际覆盖的模式和失败分支：
+  删房后 pending 上传拒绝与配额释放；成员移除后旧 uploadId 失效；双成员并行；
+  post 丢回执幂等；audit 导出无敏感/二进制；删房后 artifact 元数据保留；
+  固定图本地验收
+尚未验证项及明确原因：
+  complete 解码 await 期间删除（I03 已覆盖单例，但未做可控延迟注入）；
+  托管 Run 取消/任务版本/generation 变化的端到端图片提交未测；
+  删除与最终 project apply 并发、最后房间删除后 restart/重建列表未纳入本卡；
+  host/sandbox 真管道与 external stdio transport 证据仍由 I04/I05 补
+下一张卡与依赖：V01（开发/发布报告分模式）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移
