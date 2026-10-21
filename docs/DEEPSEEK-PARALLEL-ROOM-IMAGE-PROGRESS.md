@@ -26,8 +26,8 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | R01 Room schema/事件/迁移 | verified | room.ts 统一 schema/normalizeRoom；新增 room.configured/deleting/deletion.updated/deleted 与状态守卫；迁移整理为 v10→v18 有序升级；生成物更新 |
 | R02 单事务保存房间设置与成员 | verified | 纯规划 + 单事件 room.configured；revision CAS、成员去重/校验、忙成员移除拒绝、闲置会话结束、legacy 命令复用；5 个用例通过 |
 | R03 删除请求、停止执行与清理 | in_progress | afterCommit、短事务、finalizer、写入口拒绝、wake/input/inbox 清理、outbound delivery 在非 active 房间记录 aborted 且不再尝试；image-upload 失效由 Worker expireRoom 覆盖；全入口二次校验仍未系统覆盖 |
-| R04 API、WebSocket、SDK 与列表语义 | in_progress | activeRooms/410/WS 终态/owner 导出/artifact 防绕过/RoomClient 命令/删除房间导入新身份已通过 8 个用例；agent room_wait 删除即时结束直接测试已加；双窗口 WS 同步仍待浏览器级 |
-| R05 房间设置与删除 UI | in_progress | 设置单命令、冲突/忙保留表单、删除确认/空状态已完成；新增 Agent 自动预选并回到房间设置，浏览器新步骤通过；删除后双窗口同步仍待补 |
+| R04 API、WebSocket、SDK 与列表语义 | in_progress | activeRooms/410/WS 终态/owner 导出/artifact 防绕过/RoomClient 命令/删除房间导入新身份 8 用例；room_wait 删除即时结束 + 两个真实 WS 窗口都收到 room.deleting 后关闭的用例通过；浏览器双窗口 UI 同步仍待补 |
+| R05 房间设置与删除 UI | in_progress | 设置单命令、冲突/忙保留表单、删除确认/空状态；新增 Agent 自动预选并回到设置，浏览器新步骤通过；删除后双窗口仅协议级验证 |
 | I01 图片协议、工具参数与权限 | verified | images.ts 冻结分块/元数据/操作 ID；artifact 图片元数据；image 工具名与写权限映射；attachment-only 消息；7+3 个用例通过；真实上传实现归 I02/I05 |
 | I02 有界可恢复的上传临时状态 | verified | image_uploads/parts 表 + migration 19、分块状态机、配额/TTL、原子落盘、缺失块检测、GC 与 Worker image 工具/删除房间失效接线完成；重启进程 E2E 仍由 I04 覆盖 |
 | I03 解码验真、原图与安全预览 | verified | sharp 0.35.5 + 签名/结构检查 + 完整解码 + 1920 PNG 预览 + 原子落盘/稳定 artifactId；Worker 三个低层工具已接线并通过 3+3 用例；bridge/helper 归 I04 |
@@ -1580,6 +1580,34 @@ V03 付费真实 CLI 实验。
   双窗口同时打开时的删除同步/重连仍无浏览器级断言；房间设置保存时新 Agent
   是否在房执行成员校验由服务端已覆盖，但此 UI 流程只验证了预选。
 下一张卡：V03（等待付费授权）或双窗口浏览器竞态
+```
+
+## R04 — 两个真实 WebSocket 窗口的删除终态
+
+```
+卡号与状态：R04 补充切片 / in_progress
+基线 SHA：9899598（R04/R05 提交）；实现见本次提交
+修改文件和关键符号：
+  tests/room-api.test.ts（+1 用例）
+    对同一 room 建立两个真实 WebSocket 连接（room.v0.1 + room-token），
+    各自发送 subscribe after=0 并等待 subscribed；执行 room.delete 后：
+      两个窗口都收到 durable room.deleting 帧；
+      两个窗口都以 code=1000 reason=room_deleting 关闭；
+      不存在一个窗口先关闭导致另一个收不到终态的情况。
+执行命令、cwd、环境、开始结束、退出码：
+  npx tsc --noEmit                                               exit 0
+  npx tsx --test --test-name-pattern='two websocket windows' tests/room-api.test.ts  exit 0
+  npm test                                                        exit 0（544 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-22 08:20–08:45 CST
+证据路径：
+  .state/parallel-room-image/r04-ws-tests-20261022.log
+实际覆盖：
+  两个真实 WS 客户端的删除事件广播与终态关闭
+尚未验证：
+  浏览器两个真实页面窗口的 UI 同步仍无断言（当前是协议层真实 WS）；
+  客户端收到 room.deleting 后停止重连由 client SDK 代码覆盖，未做双窗口浏览器
+  断线重连计时断言。
+下一张卡：V03（等待付费授权）或 AppContainer 真图片 smoke
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移

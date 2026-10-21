@@ -146,3 +146,30 @@ test('websocket sends durable room.deleting and closes instead of reconnecting',
   assert.ok(frames.some(frame => frame.type === 'room.deleting'), 'durable room.deleting must be delivered before close');
   assert.ok(closeInfo);
 });
+
+test('two websocket windows both receive room.deleting and close terminally', async t => {
+  const ctx = await fixture(t);
+  const address = await ctx.app.listen({host: '127.0.0.1', port: 0});
+  const url = address.replace(/^http/, 'ws') + '/api/events';
+  const WebSocketImpl = (globalThis as any).WebSocket;
+  assert.ok(WebSocketImpl, 'Node WebSocket global is required for this route test');
+  const openWindow = async () => {
+    const socket = new WebSocketImpl(url, ['room.v0.1', `room-token.${ctx.token}`]);
+    const frames: any[] = [];
+    const closed = new Promise<{code: number; reason: string}>((resolve) => { socket.onclose = (event: any) => resolve({code: event.code, reason: event.reason}); });
+    await new Promise<void>((resolve, reject) => { socket.onopen = () => resolve(); socket.onerror = () => reject(new Error('ws open failed')); });
+    socket.onmessage = (message: any) => frames.push(JSON.parse(String(message.data)));
+    socket.send(JSON.stringify({version: '0.1', roomId: ctx.roomId, after: 0, clientType: 'browser'}));
+    const deadline = Date.now() + 5000;
+    while (!frames.some(frame => frame.type === 'subscribed')) { if (Date.now() > deadline) assert.fail('ws subscribed frame missing'); await new Promise(done => setTimeout(done, 20)); }
+    return {socket, frames, closed};
+  };
+  const [first, second] = await Promise.all([openWindow(), openWindow()]);
+  ctx.command('room.delete', {expectedRevision: 1});
+  for (const window of [first, second]) {
+    const closedInfo = await Promise.race([window.closed, new Promise<never>((_, reject) => setTimeout(() => reject(new Error('ws did not close after room.deleting')), 5000))]);
+    assert.equal(closedInfo.code, 1000);
+    assert.equal(closedInfo.reason, 'room_deleting');
+    assert.ok(window.frames.some(frame => frame.type === 'room.deleting'), 'each window must receive room.deleting before close');
+  }
+});
