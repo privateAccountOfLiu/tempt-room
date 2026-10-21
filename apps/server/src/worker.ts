@@ -26,6 +26,7 @@ import { dependencyInputs, dependencyRequirementsReady } from './dependencies.ts
 import { InboxService } from './inbox.ts';
 import { prepareHostChatWorkspace, hostStatus, hostChangeReport } from './host-workspace.ts';
 import { buildProjectManifest } from './project-manifest.ts';
+import { scanProjectFiles } from './project-files.ts';
 import { buildContextSegments } from './context-segments.ts';
 import { agentCapabilityFingerprint, capabilityEvidenceId, verifiedCapabilityState } from './adapter-capabilities.ts';
 import { authorizeTool } from './tool-authorization.ts';
@@ -77,6 +78,7 @@ export class Worker {
   private active = new Map<string, AbortController>();
   private executions=new Map<string,Readonly<RunFence>>();
   private readonly transport: AgentTransport;
+  private lastBaselineGc = 0;
   private steerWakeInFlight = new Set<string>();
   private toolApprovals = new Map<string,{roomId:string;agentId:string;tool:string;argsDigest:string;createdAt:string;resolve:(allow:boolean)=>void;timer:NodeJS.Timeout}>();
   private steerHandlers = new Map<string,{generation:number;executionId?:string;handler:(text:string)=>Promise<void>}>();
@@ -250,6 +252,7 @@ export class Worker {
     }
     this.processIntegrations();
     this.scanSubscriptions();
+    this.collectBaselines();
     this.cleanupStaging();
     expireResourceLeases(this.store);
     expireQuarantinedLeases(this.store,this.store.settings().resourceQuarantineTtlMs);
@@ -269,6 +272,19 @@ export class Worker {
       if(protectedDirs.has(path))continue;
       try{const mtime=statSync(path).mtimeMs;if(mtime<cutoff)rmSync(path,{recursive:true,force:true});}catch{/* A staging directory in use stays until the next scan. */}
     }
+  }
+  /**
+   * Remove immutable baselines no run/task/binding references any more.
+   * Freshly prepared baselines are protected by the age floor so a binding
+   * commit racing a tick can never delete its own input.
+   */
+  collectBaselines(minAgeMs = 60 * 60 * 1000): number {
+    if (minAgeMs === 60 * 60 * 1000 && Date.now() - this.lastBaselineGc < 60_000) return 0;
+    this.lastBaselineGc = Date.now();
+    const referenced = new Set<string>();
+    for (const binding of this.store.list<ProjectBinding>('project_bindings')) if (binding.baselineId) referenced.add(binding.baselineId);
+    for (const run of this.store.list<Run>('runs')) if (run.baselineId) referenced.add(run.baselineId);
+    return this.baselines.gc(referenced, minAgeMs);
   }
   private rollbackIntegration(integrationId:string,actor:any){
     const integration=this.store.get<Integration>('integrations',integrationId);
@@ -296,6 +312,20 @@ export class Worker {
     // The integration queue runs outside the tick: per-project admission and
     // asynchronous verification live in IntegrationRunner.
     this.integrations.tick();
+  }
+  /**
+   * Older bindings may have no immutable baseline. Re-create it only when the
+   * live source still matches the binding's recorded manifest; never freeze a
+   * moving directory silently.
+   */
+  private repairLegacyBinding(binding: ProjectBinding): ProjectBinding {
+    const scan = scanProjectFiles(binding.sourcePath);
+    if (scan.manifestHash !== binding.manifestHash) throw new ProtocolError('baseline_unavailable', '旧项目绑定缺少不可变基线，且当前源目录与绑定摘要不一致；请重新绑定项目', 409);
+    const baselineId = `baseline_legacy_${digest({ sourcePath: binding.sourcePath, manifestHash: scan.manifestHash }).slice(0, 32)}`;
+    const prepared = this.baselines.prepare(scan, binding.sourcePath, baselineId);
+    const repaired: ProjectBinding = { ...binding, baselineId: prepared.record.baselineId, manifestAlgorithm: prepared.record.manifestAlgorithm, updatedAt: now() };
+    this.store.put('project_bindings', repaired);
+    return repaired;
   }
   /** Canonical project directory an integration applies to. */
   private integrationSource(integration:Integration):string|undefined{
@@ -531,7 +561,7 @@ export class Worker {
       const task = run.taskId ? this.store.get<Task>('tasks', run.taskId) : undefined;
       const attached = agent.connectionMode === 'attach';
       const hostMode = agent.executionMode === 'host';
-      const taskBinding = task?.projectBindingId ? this.store.get<ProjectBinding>('project_bindings',task.projectBindingId) : undefined;
+      let taskBinding = task?.projectBindingId ? this.store.get<ProjectBinding>('project_bindings',task.projectBindingId) : undefined;
       const workspaceMode=this.workspaceModeFor(task);
       if(taskBinding){
         if(!taskBinding.allowedExecutionModes.includes(hostMode?'host':'sandbox'))throw new Error('项目绑定不允许当前执行模式');
@@ -539,9 +569,11 @@ export class Worker {
         run.projectBindingId=taskBinding.id;run.bindingVersion=taskBinding.version;run.sourceCommit=taskBinding.baseCommit;
         // The frozen baseline is the execution input. The mutable source is
         // never re-scanned here, so a binding always yields the same inputs.
-        const baselineManifest=taskBinding.baselineId?this.baselines.record(taskBinding.baselineId).manifestHash:buildProjectManifest(taskBinding.sourcePath).manifestHash;
+        if (!taskBinding.baselineId) taskBinding = this.repairLegacyBinding(taskBinding);
+        const binding = taskBinding;
+        const baselineManifest=this.baselines.record(binding.baselineId!).manifestHash;
         run.dirtyBaselineHash=baselineManifest;
-        if(!(run.externalReads??[]).some(read=>read.kind==='file'&&read.source===taskBinding.sourcePath&&read.hash===baselineManifest))run.externalReads=[...(run.externalReads??[]),{kind:'file',source:taskBinding.sourcePath,...(taskBinding.baseCommit?{version:taskBinding.baseCommit}:{}),hash:baselineManifest,fetchedAt:now()}];
+        if(!(run.externalReads??[]).some(read=>read.kind==='file'&&read.source===binding.sourcePath&&read.hash===baselineManifest))run.externalReads=[...(run.externalReads??[]),{kind:'file',source:binding.sourcePath,...(binding.baseCommit?{version:binding.baseCommit}:{}),hash:baselineManifest,fetchedAt:now()}];
       }
       let workspace:string, baseline:Map<string,string>|undefined;
       if (attached) {

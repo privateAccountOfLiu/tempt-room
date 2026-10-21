@@ -18,7 +18,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | G00 开工记录与测试隔离 | verified | 基线 SHA/状态/工具链已落盘；fixture 隔离要求写入本文件与后续卡 |
 | G01 两份外部 MCP 与防漂移 | verified | 语法错误在当前 HEAD 已修复；新增契约测试 15/15 与字节级同步闸门 |
 | P01 候选枚举不消耗容量 | verified | 候选不再提前占用房间容量；派发前二次校验；资源忙保持排队不判失败 |
-| P02 不可变基线与 host 独立目录 | in_progress | 共享扫描器 + 不可变基线 + host-isolated 已实现并验证；基线 GC、旧绑定补建、依赖产物叠入、UI 选择仍未覆盖 |
+| P02 不可变基线与 host 独立目录 | in_progress | 共享扫描器 + 不可变基线 + host-isolated + 基线 GC + 旧绑定补建已实现并验证；依赖产物叠入、attached isolated 真实模式仍未覆盖 |
 | P03 按 canonical 项目互斥、异步验收 | verified | 项目锁跨房间 canonical 互斥；验收异步化并纳入超时/输出上限/进程树清理；新增 4 个并发与 HTTP 用例 |
 | P04 staging 精确组合 | verified | staging 由当前已认可目标 + 候选组成；目标/候选/verifier 篡改与无关文件变化均在 apply 前拒绝；journal 记录目标前后摘要 |
 | P05 双启动屏障与真实派发 | verified | 可控 adapter 由真实 Worker 派发；两个 Run 同时进入后才释放，独立工作区、真实产物、owner 验收和 integration 全链路通过 |
@@ -161,12 +161,19 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
   legacy host-source 仍在真实目录执行并给出观察清单；
   未经准备基线的 project.bind 被拒绝
 尚未验证项及明确原因：
-  未覆盖：基线 GC 接线（gc() 已实现但未接入清理流程）；
-  未覆盖：旧绑定缺内容快照时按摘要一致性补建或返回 baseline_unavailable
-  （当前仍回退为扫描当前源目录）；
-  未覆盖：依赖产物叠入工作区前的冻结版本/hash 校验；
-  未覆盖：附着线程 + isolated 的 workspace_mode_unsupported（有代码分支，
+  未覆盖：依赖产物叠入工作区前的冻结版本/hash 校验（当前 dependencyInputs
+  已冻结依赖任务版本与 inputArtifacts，但尚未把产物内容叠入工作区；
+  附件路径使用运行目录下的副本，不承诺工作区组合）；
+  未覆盖：附着线程 + isolated 的 workspace_mode_unsupported（代码已显式拒绝，
   但真实附着模式需要 Codex 线程，本轮无该环境）
+P02 后续补充（第 5 轮已覆盖）：
+  基线 GC：ImmutableBaselines.gc(referenced, minAgeMs) 增加年龄下限；
+  Worker.collectBaselines() 汇总 binding/run 引用并在 tick 中限频调用，
+  新准备基线受年龄下限保护，避免与绑定提交竞态；
+  旧绑定补建：Worker.repairLegacyBinding() 仅在当前 source 的 manifestHash
+  与旧绑定一致时 prepare 基线并持久化 baselineId，否则抛 baseline_unavailable；
+  执行命令：npx tsx --test tests/baseline-gc-repair.test.ts exit 0（3 pass / 0 fail）；
+  npm test exit 0（468 pass / 0 fail）；2026-10-21 20:05–20:35 CST
 下一张卡与依赖：P03（按 canonical 项目互斥与异步集成验收）
 ```
 
