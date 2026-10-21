@@ -105,7 +105,8 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - 自动路由仍待接入：当前调度继续使用兼容能力提示，不会把未验证证据当成支持
 ### 运行环境状态（2026-10-20）
 
-- 按用户明确授权启动本地服务验证；服务运行于 http://127.0.0.1:4317（PID 25200；2026-10-21 09:38 重启到 Job launcher default 构建（已注入 DEEPSEEK_API_KEY）
+- 按用户明确授权启动本地服务验证；服务运行于 http://127.0.0.1:4317（PID 26196；2026-10-21 09:47 重启到 MCP approval bridge 构建（已注入 DEEPSEEK_API_KEY）
+- 实测 GET /api/tool-approvals 200，externalToolApprovalTimeoutMs 默认 0（直接拒绝）
 - 实测 POST /api/runs/未知/steer 返回 404
 - 实测 /api/outbound/audit 与 audit.csv 200
 - 实测篡改 exportHash 的导入返回 400
