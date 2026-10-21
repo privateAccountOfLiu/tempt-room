@@ -85,6 +85,7 @@ try {
   await step('production-smoke', ['run', 'test:production']);
   if (withNative) {
     await step('connectors', ['run', 'test:connectors']);
+    await step('native-image-pipe', ['run', 'test:room-images-native', '--', '--mode', 'host'], 300_000);
     await step('sandbox-probe', ['run', 'test:sandbox'], 900_000);
   } else {
     report.notVerified.push('native-image-pipe: run with --with-native on a machine with the Windows sandbox host');

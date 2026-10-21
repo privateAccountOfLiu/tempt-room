@@ -31,8 +31,8 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | I01 图片协议、工具参数与权限 | verified | images.ts 冻结分块/元数据/操作 ID；artifact 图片元数据；image 工具名与写权限映射；attachment-only 消息；7+3 个用例通过；真实上传实现归 I02/I05 |
 | I02 有界可恢复的上传临时状态 | verified | image_uploads/parts 表 + migration 19、分块状态机、配额/TTL、原子落盘、缺失块检测、GC 与 Worker image 工具/删除房间失效接线完成；重启进程 E2E 仍由 I04 覆盖 |
 | I03 解码验真、原图与安全预览 | verified | sharp 0.35.5 + 签名/结构检查 + 完整解码 + 1920 PNG 预览 + 原子落盘/稳定 artifactId；Worker 三个低层工具已接线并通过 3+3 用例；bridge/helper 归 I04 |
-| I04 托管 bridge/host/AppContainer 传输 | in_progress | Worker 三段式工具、room-image-transfer helper、bridge `room_send_image`、toolchain fingerprint/复制已接通并通过 3 个用例；真实 HostRoomPipe/AppContainer chunk smoke 仍待跑 |
-| I05 外部 MCP、插件与 SDK 发图 | in_progress | SDK 上传、外部 MCP `room_send_image`、路径边界/分块 helper、插件副本同步与 14 工具契约通过；真实 stdio→HTTP 丢回复/并发 e2e 仍待补 |
+| I04 托管 bridge/host/AppContainer 传输 | in_progress | Worker 三段式工具、helper、bridge `room_send_image`、toolchain 复制；真实 HostRoomPipe 固定图 smoke 通过（`test:room-images-native --mode host`）；AppContainer 模式明确 not_verified |
+| I05 外部 MCP、插件与 SDK 发图 | in_progress | SDK、外部 MCP room_send_image、插件同步；真实 stdio→HTTP 上传/丢回复同 operationId 重试 e2e 通过（2 个用例）；网络超时/错误码分类待补 |
 | I06 安全内联路由与图片展示 | verified | 私有 `/api/artifacts/:id/image`（active/verified/hash/no-store）、缩略图、失败降级、键盘 Lightbox、纯图不渲染空 Markdown 已完成并通过 3 个接口用例与完整浏览器 E2E |
 | I07 跨功能竞态 | in_progress | 删房/移除成员/并行上传/丢回执重试/导出回放/删后审计 6 类竞态通过 6 个用例；`acceptance:room-images --check` 通过；托管取消、删除与最终 apply、最后房间重启组合仍未覆盖 |
 | V01 开发/发布报告分模式 | in_progress | schemaVersion 2、sourceBefore/sourceAfter、tracked/working/untracked+lockfile hash、`--release --expected-head` 前置失败 not_run、source_changed 检测与 checksPassed/releaseEligible 已完成并通过 5 个用例；真实 release 运行与 expected-head 参数化脚本入口待补 |
@@ -1226,6 +1226,58 @@ delivery/image-upload 细节与全入口 assertActiveRoom 仍待补）
   （包括丢回复同 ID 重试、并发两张图）未跑；ROOM_IMAGE_ROOTS 各宿主注入
   仍由 adapter 配置工作；真实连接器发图需用户运行环境验证
 下一张卡与依赖：V03（固定版本真实 CLI 与三组对照，需付费授权）
+```
+
+## I04/I05 — 原生管道与外部 stdio 图片证据
+
+```
+卡号与状态：I04/I05 证据切片（host pipe smoke 已通过；AppContainer 明确 not_verified）
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 8418ac0（连接器 room_send_image 提交）；实现见本次提交
+修改文件和关键符号：
+  scripts/smoke-agent-images.ts（新增）
+    --mode host：真实 HostRoomPipe + spawn room-bridge.mjs MCP 进程；
+      固定 24×16 PNG，经 bridge room_send_image 分块上传；
+      校验 bridge initialize/tools/list、artifact.image verified、预览 hash、
+      只一条附件消息；零模型、零网络；
+    --mode sandbox：若 RoomSandbox exe 缺失则 ok=true/verified=false，
+      notVerified 明确写“不把缺失当 supported”，不伪造通过
+  tests/external-image-tools.test.ts（新增 2 个用例）
+    真实 createApp.listen + issueAgentToken + spawn room-agent-mcp.mjs；
+    initialize/tools/list/room_send_image 经真实 stdio→HTTP→Worker；
+    同一 operationId 丢回复重试：同一 artifactId/messageId、一条消息、
+    一个 artifact.created
+  scripts/preflight.ts
+    --with-native 增加 native-image-pipe host smoke（不再只跑旧 sandbox）；
+  package.json
+    新增 test:room-images-native；
+  .github/workflows/ci.yml
+    新增独立 native-image-pipe job（continue-on-error，真实 named pipe 固定图，
+    上传 .state/room-images-native 证据，不影响普通模拟 CI）
+变更前触发条件 / 变更后行为：
+  变更前：只有模块级测试，没有真实 named pipe 或外部 MCP stdio 证据。
+  变更后：host bridge 与外部 MCP 两条真实入口都有可重复、零模型的固定图
+  上传证据；AppContainer 缺失单列 not_verified，不混入 supported。
+执行命令、cwd、环境、开始结束、退出码：
+  npx tsc --noEmit                                                   exit 0
+  npm run test:room-images-native -- --mode host                     exit 0（verified=true）
+  npm run test:room-images-native -- --mode sandbox                  exit 0（verified=false, not_verified）
+  npx tsx --test tests/external-image-tools.test.ts                   exit 0（2 pass / 0 fail）
+  npm test                                                            exit 0（534 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-22 04:10–04:50 CST
+证据路径：
+  .state/parallel-room-image/i04-native-i05-e2e-tests-20261022.log
+  .state/parallel-room-image/i04-i05-final-tests-20261022.log
+  .state/room-images-native/latest.json
+实际覆盖的模式和失败分支：
+  host named pipe：bridge initialize/tools/list/room_send_image，verified artifact，
+  预览 hash，一条消息；外部 MCP：真实 stdio+HTTP，丢回复同 operationId 重试幂等；
+  sandbox 模式缺失明确 not_verified
+尚未验证项及明确原因：
+  AppContainer true pipe smoke 尚未实现（需要 RoomSandbox 运行环境）；
+  外部 MCP 网络超时/401/403/410 分类与并发双图 e2e 未补；CI native job 未实际
+  推送运行；V03 真实付费 CLI 实验仍未获授权
+下一张卡与依赖：V03（需明确付费授权）或 I07 剩余竞态
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移

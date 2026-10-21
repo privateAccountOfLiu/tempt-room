@@ -45,6 +45,30 @@ jobs:
       - name: Production build
         run: npm run build
 
+
+  native-image-pipe:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Host bridge native image smoke (real named pipe, fixed PNG, no model)
+        run: npm run test:room-images-native -- --mode host
+      - name: Upload native image evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-image-evidence
+          path: .state/room-images-native/**
+          if-no-files-found: warn
+          retention-days: 14
+
   release-preflight:
     needs: verify
     runs-on: windows-latest

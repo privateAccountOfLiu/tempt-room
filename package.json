@@ -49,6 +49,7 @@
     "test:deepseek": "tsx scripts/smoke-deepseek.ts",
     "test:external-mcp": "node scripts/check-external-mcp.mjs",
     "test:mcp-connectors": "tsx --test tests/mcp-connector-contract.test.ts",
+    "test:room-images-native": "tsx scripts/smoke-agent-images.ts",
     "sync:room-plugin": "node scripts/sync-room-agent-plugin.mjs",
     "check:room-plugin": "node scripts/sync-room-agent-plugin.mjs --check",
     "test:team-host": "tsx scripts/smoke-team-host.ts",
