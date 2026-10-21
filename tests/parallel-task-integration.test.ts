@@ -170,3 +170,21 @@ test('two candidates changing the same file keep the applied result and both pat
   assert.equal(existsSync(join(ctx.root, 'artifacts', bArtifact.id)), true);
   assert.equal(ctx.store.get<Artifact>('artifacts', bArtifact.id)?.applied, undefined);
 });
+
+test('deleting a room blocks an accepted ready_to_apply integration before any file is applied', async t => {
+  const ctx = await fixture(t);
+  const {taskId, run, command} = createTask(ctx, 'accepted integration delete race', combinedReject);
+  const artifact = publish(ctx, taskId, run, 'a.txt');
+  const integrated = command('artifact.integrate', {artifactId: artifact.id, requireAuthorization: true}) as any;
+  const integrationId = integrated.result.integrationId as string;
+  ctx.worker.tick();
+  await waitIntegration(ctx, integrationId, ['ready_to_apply']);
+  assert.equal(ctx.store.get<Integration>('integrations', integrationId)?.status, 'ready_to_apply');
+  command('room.delete', {expectedRevision: 1});
+  const blocked = ctx.store.get<Integration>('integrations', integrationId)!;
+  assert.equal(blocked.status, 'blocked');
+  assert.equal(blocked.errorCode, 'room_deleting');
+  await assert.rejects(async () => command('artifact.apply', {artifactId: artifact.id}), /房间|删除/);
+  assert.equal(readFileSync(join(ctx.project, 'a.txt'), 'utf8'), '0\n');
+  assert.equal(ctx.store.get<Artifact>('artifacts', artifact.id)?.applied, undefined);
+});
