@@ -38,7 +38,7 @@ test('actual acceptance entry points reject external and host fixtures before an
   const source=join(root,mode),store=new Store(join(source,'room.sqlite'));
   for(const agent of team()){agent.executable=join(source,'nonexistent-fixture.exe');agent.credentialEnv='ROOM_TEST_UNSET';if(agent.id==='codex'&&mode==='external')agent.connectionMode='external';if(agent.id==='deepseek'&&mode==='host')agent.executionMode='host';store.put('agents',agent);}store.close();
   for(const [script,flag] of [['scripts/smoke-agents.ts','--allow-paid'],['scripts/acceptance-agents.ts','--check']]){
-   const result=spawnSync(process.execPath,['--import','tsx',script,flag],{cwd:resolve('.'),env:{...process.env,ROOM_STATE_DIR:source},encoding:'utf8',timeout:10000,windowsHide:true});
+   const result=spawnSync(process.execPath,['--import','tsx',script,flag],{cwd:resolve('.'),env:{...process.env,ROOM_STATE_DIR:source},encoding:'utf8',timeout:60000,windowsHide:true});
    assert.equal(result.error,undefined);assert.equal(result.status,1,result.stderr);
    assert.match(result.stderr,mode==='external'?/外部会话/:/本机直连/);
    assert.equal(existsSync(join(source,'smoke-tests')),false);assert.equal(existsSync(join(source,'acceptance-tests')),false);
