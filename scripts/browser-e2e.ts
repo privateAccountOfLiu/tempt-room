@@ -488,6 +488,12 @@ try {
     const agentName = `浏览器自建助手 ${Date.now() % 1000000}`;
     if (await clickByText('button', 'Agent 连接') !== 'ok') fail('找不到 Agent 连接入口');
     await waitFor('Agent 连接列表', async () => (await bodyText()).includes('添加 Agent'), 10000);
+    await waitFor('Agent 连接列表图标', async () => { const info = await evaluate(`(() => ({icons:document.querySelectorAll('.connection-list button .avatar svg').length,owner:Boolean(document.querySelector('.owner .avatar.human svg'))}))()`) as any; return info.icons>=3 && info.owner; }, 10000);
+    const providerIconInfo = await evaluate(`(() => ({icons:document.querySelectorAll('.connection-list button .avatar svg').length,owner:Boolean(document.querySelector('.owner .avatar.human svg')),chats:[...document.querySelectorAll('.connection-list button')].some(item=>item.textContent.includes('ChatGPT'))}))()`) as any;
+    if (!providerIconInfo.owner || providerIconInfo.icons < 3 || !providerIconInfo.chats) fail('Agent/owner 品牌图标未正确渲染');
+    step('ui-provider-icons', providerIconInfo);
+    const providerIconShot=await send('Page.captureScreenshot',{format:'png'},sessionId),providerIconShotPath=join(runDir,'provider-icons.png');writeFileSync(providerIconShotPath,Buffer.from(providerIconShot.data,'base64'));report.screenshots.push(providerIconShotPath);
+    step('ui-provider-icons-visible',{screenshot:providerIconShotPath});
     if (await clickByText('button', '添加 Agent') !== 'ok') fail('找不到添加 Agent 入口');
     await waitFor('添加 Agent 表单', async () => { const text = await bodyText(); return text.includes('Agent 类型') && text.includes('能力证据'); }, 10000);
     if (await setSelectByLabel('Agent 类型', 'api') !== 'ok') fail('无法选择 Agent 类型');

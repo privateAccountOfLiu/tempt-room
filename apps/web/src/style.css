@@ -245,3 +245,6 @@
 .unfinished-list{padding:0}
 .unfinished-list[hidden]{display:none}
 .unfinished-list .run-error{margin:8px 0 0}
+
+.avatar svg{display:block}
+.avatar-initial{font-family:'IBM Plex Mono',monospace;font-size:inherit}

@@ -228,11 +228,11 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：8/8 通过（`.state/preflight/run-ME2qmw/report.json`，194.4s）
+- `npm run test:preflight`：8/8 通过（`.state/preflight/run-VUoN9k/report.json`，187.0s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（.state/browser-e2e/run-4VOpKe/report.json`）
+- 浏览器 E2E：45/45 通过（.state/browser-e2e/run-MxM8m2/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
@@ -750,7 +750,7 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 ## Job launcher 构建依赖闭环（第 132 轮）
 
 - 新增 scripts/build-job-launcher.mjs：有 dotnet 自动 publish，无 dotnet 警告并 exit 0
-- npm run build 与 preflight 新增 job-launcher 步骤；preflight 8/8 PASS（run-ME2qmw，185.1s）
+- npm run build 与 preflight 新增 job-launcher 步骤；preflight 8/8 PASS（run-VUoN9k，185.1s）
 - npm run check:job-launcher 检查构建状态；ROOM_JOB_LAUNCHER_REQUIRED=1 可强制缺失即失败
 - 回退验证：模拟缺 dotnet → fallback exit 0；required → exit 1；恢复后 built
 - 新增 docs/JOB-LAUNCHER.md
@@ -763,4 +763,13 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - 尺寸对齐：未完成运行卡片使用与 usage-history 相同的 box（margin-left 46px、padding 12px、border、font-size 11px），未修改 settings.css/workbench.css 中的 usage-history 样式
 - 浏览器 E2E 在折叠态断言两卡片的 width/left/height 一致
 
-- 最终验证：preflight 8/8（run-ME2qmw，194.4s）；浏览器 E2E 45/45（run-4VOpKe）；折叠卡片 width/left/height 对齐断言通过
+- 最终验证：preflight 8/8（run-VUoN9k，194.4s）；浏览器 E2E 45/45（run-4VOpKe）；折叠卡片 width/left/height 对齐断言通过
+
+## 品牌图标与用户控件（第 132 轮）
+
+- owner 控件左侧由汉字「你」替换为人形图标
+- Agent 头像改为官方品牌 SVG：OpenAI（ChatGPT）、Claude、DeepSeek 鲸鱼
+- 默认 codex agent 显示名改为 ChatGPT（seed 与实时 DB 均已更新）；provider 标签改为 ChatGPT App Server
+- 浏览器 E2E 新增 owner/品牌图标断言与 provider-icons.png 截图
+
+- 品牌图标验证：浏览器 E2E 通过并生成 provider-icons.png（ChatGPT/Claude/DeepSeek 官方图标）；preflight 8/8（run-VUoN9k，187.0s）

@@ -302,7 +302,7 @@ CREATE TABLE IF NOT EXISTS capability_evidence_history(id TEXT PRIMARY KEY, room
   private seed() {
     if (this.list('agents').length === 0) {
       for (const agent of [
-        { id: 'codex', name: 'Codex', provider: 'codex', role: '开发实现与测试', color: 'green', executable: 'codex.exe' },
+        { id: 'codex', name: 'ChatGPT', provider: 'codex', role: '开发实现与测试', color: 'green', executable: 'codex.exe' },
         { id: 'claude', name: 'Claude', provider: 'claude', role: '架构设计与代码审查', color: 'orange', executable: 'claude.exe' },
         { id: 'deepseek', name: 'DeepSeek', provider: 'deepseek', role: '分析问题并提出独立方案', color: 'blue', executable: '' },
         { id: 'api', name: '自建助手', provider: 'api', role: '自定义 API 助手', color: 'purple' },
