@@ -23,7 +23,7 @@ import { InboxService } from './inbox.ts';
 import { prepareHostChatWorkspace, hostStatus, hostChangeReport } from './host-workspace.ts';
 import { buildProjectManifest } from './project-manifest.ts';
 import { buildContextSegments } from './context-segments.ts';
-import { agentCapabilityFingerprint, verifiedCapabilityState } from './adapter-capabilities.ts';
+import { agentCapabilityFingerprint, capabilityEvidenceId, verifiedCapabilityState } from './adapter-capabilities.ts';
 import { authorizeTool } from './tool-authorization.ts';
 import { acquireResource, expireQuarantinedLeases, expireResourceLeases, quarantineResource, recoverResourceLeases, releaseResource } from './resource-manager.ts';
 import { cleanupProofComplete } from './cleanup-proof.ts';
@@ -686,6 +686,8 @@ export class Worker {
     if(!entry||entry.generation!==(run.generation??1)||(entry.executionId&&run.executionId&&entry.executionId!==run.executionId))throw new ProtocolError('steer_unavailable','当前运行没有可用的 steer 通道',409);
     await entry.handler(text);
     this.store.event(run.roomId,'audit.recorded',SYSTEM,{action:'run.steer:'+runId+':'+digest(text).slice(0,12)},null,runId);
+    const agent=this.store.get<AgentDescriptor>('agents',run.agentId);
+    if(agent){const fingerprint=agentCapabilityFingerprint(agent),capabilityEvidence={id:capabilityEvidenceId(fingerprint,'steerDuringRun'),fingerprint,capability:'steerDuringRun',state:'verified_supported' as const,mode:'runtime-steer',testedAt:now(),suiteVersion:'steer-runtime-v1',evidenceHash:digest({runId,text}),evidenceLocation:'runtime:run.steer'};this.store.event(run.roomId,'capability.verified',SYSTEM,{capabilityEvidence});}
     return {accepted:true};
   }
 

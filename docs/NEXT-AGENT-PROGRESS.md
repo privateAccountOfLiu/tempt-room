@@ -23,11 +23,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: f776e8f03fddb9582fa2bcb839a86e571d3f99db (dirty)
+source HEAD: aa4a115ab8d655cddb805d7b60d2bae406b3e322 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-21T00-38-29-766Z-83f113e1/report.json
+report: .state/collaboration-baseline/run-2026-10-21T00-45-15-760Z-38ff545b/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -225,19 +225,19 @@ report: .state/collaboration-baseline/run-2026-10-21T00-38-29-766Z-83f113e1/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-MjUEZ1/report.json`，171.5s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-DPyElb/report.json`，171.3s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-wrfCDT/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-wuJQmb/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-21T00-38-29-766Z-83f113e1/report.json`
-- `.state/collaboration-baseline/run-2026-10-21T00-38-29-766Z-83f113e1/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-21T00-38-29-766Z-83f113e1/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-21T00-38-29-766Z-83f113e1/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-21T00-45-15-760Z-38ff545b/report.json`
+- `.state/collaboration-baseline/run-2026-10-21T00-45-15-760Z-38ff545b/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-21T00-45-15-760Z-38ff545b/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-21T00-45-15-760Z-38ff545b/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 

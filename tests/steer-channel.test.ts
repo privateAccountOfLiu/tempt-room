@@ -22,6 +22,7 @@ test('worker steers an active run through its registered adapter channel', async
   assert.deepEqual(result, {accepted: true});
   assert.deepEqual(received, ['please focus on tests']);
   assert.ok(store.events(roomId).some(event => event.type === 'audit.recorded' && String((event.payload as any).action).startsWith('run.steer:')));
+  assert.equal(store.list<any>('capability_evidence', roomId).find(item => item.capability === 'steerDuringRun')?.state, 'verified_supported');
   assert.equal((await worker.steer(run.id, 'again')).accepted, true);
   assert.equal(received.length, 2);
 });
