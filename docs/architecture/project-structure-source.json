@@ -1,0 +1,56 @@
+{
+  "generatedAtShanghai": "2026-10-21 16:16",
+  "scope": "local source layout only; not a deployment or acceptance claim",
+  "sources": [
+    {
+      "path": "apps/web/src/main.tsx",
+      "sha256": "58c82af6b8dba7699d2612953c2c89763e377c8559519b2064b584416fea1851"
+    },
+    {
+      "path": "apps/server/src/main.ts",
+      "sha256": "01ef88a0d2ec4fe09ad1e1828cd86aaec371131353462fb505e99f501449c40e"
+    },
+    {
+      "path": "apps/server/src/app.ts",
+      "sha256": "a435c2e141aa69cc550a35025f89ab62bbeafd0ee3cce8d75e99dc3226c8dd4a"
+    },
+    {
+      "path": "apps/server/src/service.ts",
+      "sha256": "dd6c31c23df2e406258affbb63d336b238b476c832087f54dde538ad26fdce93"
+    },
+    {
+      "path": "apps/server/src/worker.ts",
+      "sha256": "698b3eabe983b6f9eba7643b21f89cf518d85cf1d34f69a3ec12064b0c7999a6"
+    },
+    {
+      "path": "apps/server/src/store.ts",
+      "sha256": "5757eaf003f69e0a3663fd825fe678077a108af74802310d5ef85b5ff1a75025"
+    },
+    {
+      "path": "apps/server/src/context.ts",
+      "sha256": "5435af23cfc51656efab54b79af99fb0be6e40cf78bc4f97afad37e594b133b9"
+    },
+    {
+      "path": "apps/server/src/adapters.ts",
+      "sha256": "5fe5c0428544bb92d1c2d2b5b3d98143680fe40e4d103076cae8654c464089ed"
+    },
+    {
+      "path": "packages/protocol/src/index.ts",
+      "sha256": "65a6a0a7e93d4e673a539a62b6797598c3d7650cbeeea459efb1bb354c0a389f"
+    },
+    {
+      "path": "packages/client/src/index.ts",
+      "sha256": "9a5fdbdd125fdc9852c3cfa8a6ecdd78e6a03646a68ed8cb9664a0ab4448fd78"
+    },
+    {
+      "path": "scripts/room-agent-mcp.mjs",
+      "sha256": "e6211aa908531e8cff2742cee14edaa467d6ecb8d31364b36990579601d4983d"
+    },
+    {
+      "path": "sandbox/RoomSandbox/Program.cs",
+      "sha256": "1beacd7c064b0446df48444f932faeed238bd9fe48fcef1c679c06b393669eae"
+    }
+  ],
+  "boxes": 19,
+  "flows": 16
+}

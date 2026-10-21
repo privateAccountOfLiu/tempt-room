@@ -41,6 +41,17 @@ import type { RunFence,AgentOutput }  from '../../../packages/protocol/src/index
 /** A hard budget stop is a failed run, not a user cancellation. */
 class BudgetExceeded extends Error {}
 
+/**
+ * Result of one dispatch attempt.
+ *
+ * `resource_busy` is recoverable: the run stays queued and a later tick may
+ * retry it. `admission_denied` means the queued work itself is no longer
+ * valid for this room or agent.
+ */
+type AdmissionResult =
+  | { started: true }
+  | { started: false; reason: 'resource_busy' | 'admission_denied' | 'failed'; errorCode: string };
+
 import type { CodexRunState } from '../../../packages/protocol/src/index.ts';
 
 /**
@@ -215,11 +226,16 @@ export class Worker {
       const dependencies=task?.dependencies.map(id=>this.store.get<Task>('tasks',id))??[];
       if(!task||dependencies.some(t=>!t||['failed','canceled','superseded','interrupted','unknown'].includes(t.status)))this.finish(run,'failed','依赖任务未成功');
     }
+    // A candidate that cannot be admitted stays queued and is skipped for the
+    // rest of this tick. The next tick may retry it with fresh evidence.
+    const attempted=new Set<string>();
     while(this.active.size<settings.concurrency){
-      const candidates=this.dispatchCandidates();
+      const candidates=this.dispatchCandidates(attempted);
       const next=this.scheduler.pick(candidates,this.schedulerWeights(),settings.maxBypassDispatches);
       if(!next)break;
-      if(this.startRun(next,settings))this.scheduler.recordServed(next);
+      const admission=this.startRun(next,settings);
+      if(admission.started)this.scheduler.recordServed(next);
+      else attempted.add(next.id);
     }
     this.processIntegrations();
     this.scanSubscriptions();
@@ -324,14 +340,24 @@ export class Worker {
       try{this.inbox.scan(subscription.roomId,subscription.agentSessionId);this.inboxScanHeads.set(subscription.id,this.store.room(subscription.roomId)?.seq??head);}catch{/* Inbox pressure cannot stop dispatch; the pending cursor remains retryable. */}
     }
   }
-  private dispatchCandidates():Run[]{
+  /**
+   * Queued runs that may be dispatched right now.
+   *
+   * Room capacity is measured from real active runs and unreleased resources.
+   * A candidate never consumes capacity by being enumerated: the scheduler
+   * must see the complete eligible set, otherwise one room can hide the other
+   * runs that would be picked next.
+   */
+  private dispatchCandidates(skip:ReadonlySet<string> = new Set()):Run[]{
     const runs=this.store.list<Run>('runs'),candidates:Run[]=[];
     const roomLimit=this.store.settings().maxConcurrentRunsPerRoom;
     const activeRoomCounts=new Map<string,number>();
     for(const run of runs)if(['running','waiting_input'].includes(run.status))activeRoomCounts.set(run.roomId,(activeRoomCounts.get(run.roomId)??0)+1);
     const roomCount=(roomId:string)=>activeRoomCounts.get(roomId)??0;
     for(const run of runs){
-      if(run.status!=='queued'||this.active.has(run.id))continue;
+      if(run.status!=='queued'||this.active.has(run.id)||skip.has(run.id))continue;
+      if(!this.roomActive(run.roomId))continue;
+      if(!this.agentAdmissible(run.roomId,run.agentId))continue;
       if(roomCount(run.roomId)>=roomLimit)continue;
       if(run.discussionId&&run.discussionRole!=='summary'){const discussion=this.store.get<Discussion>('discussions',run.discussionId);if(!discussion||discussion.status!=='active')continue;}
       const thread=this.threadKey(run);
@@ -341,30 +367,62 @@ export class Worker {
       if(projectKey&&[...this.active.keys()].some(id=>this.hostProjectKey(this.store.get<Run>('runs',id))===projectKey))continue;
       if(run.taskId){
         const task=this.store.get<Task>('tasks',run.taskId);if(!task)continue;
+        if(task.version!==run.taskVersion)continue;
         const dependencies=task.dependencies.map(id=>this.store.get<Task>('tasks',id));
         if(dependencies.some(t=>!t||['failed','canceled','superseded','interrupted','unknown'].includes(t.status)))continue;
         if(dependencies.some(t=>t?.status!=='completed'))continue;
         if(task.dependencyRequirements?.length&&!dependencyRequirementsReady(task,this.store.list<Task>('tasks',run.roomId),this.store.list<Integration>('integrations',run.roomId)).ready)continue;
       }
       candidates.push(run);
-      activeRoomCounts.set(run.roomId,roomCount(run.roomId)+1);
     }
     return candidates;
   }
-  private startRun(run:Run,settings:ExecutionSettings):boolean{
+  /** A room is active unless a lifecycle status says otherwise. */
+  private roomActive(roomId:string):boolean{
+    const room=this.store.room(roomId);
+    if(!room)return false;
+    const status=(room as {status?:string}).status;
+    return status===undefined||status==='active';
+  }
+  /** The member must still exist, be enabled and belong to the room. */
+  private agentAdmissible(roomId:string,agentId:string):boolean{
+    const room=this.store.room(roomId);
+    if(!room||!room.members.includes(agentId))return false;
+    const agent=this.store.get<AgentDescriptor>('agents',agentId);
+    return Boolean(agent&&agent.enabled);
+  }
+  private startRun(run:Run,settings:ExecutionSettings):AdmissionResult{
+    // Admission is re-checked here: the queue may have changed between
+    // enumeration and dispatch, and no resource is reserved before these checks.
+    if(!this.roomActive(run.roomId))return{started:false,reason:'admission_denied',errorCode:'room_inactive'};
+    if(!this.agentAdmissible(run.roomId,run.agentId))return{started:false,reason:'admission_denied',errorCode:'agent_not_admissible'};
     if(run.taskId){
-      const task=this.store.get<Task>('tasks',run.taskId)!;
-      try{const inputs=dependencyInputs(this.store,task);run.dependencyVersions=inputs.versions;run.inputArtifacts=inputs.artifacts;}catch(error){this.finish(run,'failed',(error as Error).message);return false;}
+      const task=this.store.get<Task>('tasks',run.taskId);
+      if(!task)return{started:false,reason:'admission_denied',errorCode:'task_missing'};
+      if(task.version!==run.taskVersion)return{started:false,reason:'admission_denied',errorCode:'stale_task_version'};
+      try{const inputs=dependencyInputs(this.store,task);run.dependencyVersions=inputs.versions;run.inputArtifacts=inputs.artifacts;}catch(error){this.finish(run,'failed',(error as Error).message);return{started:false,reason:'failed',errorCode:'dependency_inputs_invalid'};}
     }
+    const activeInRoom=this.store.list<Run>('runs',run.roomId).filter(item=>item.id!==run.id&&['running','waiting_input'].includes(item.status)).length;
+    if(activeInRoom>=settings.maxConcurrentRunsPerRoom)return{started:false,reason:'resource_busy',errorCode:'room_capacity'};
+    const thread=this.threadKey(run);
+    if(thread&&this.store.list<Run>('runs').some(other=>other.id!==run.id&&this.threadKey(other)===thread&&(this.active.has(other.id)||(other.codex&&!['completed','canceled'].includes(other.codex.phase)&&['unknown','interrupted'].includes(other.status)))))return{started:false,reason:'resource_busy',errorCode:'thread_busy'};
     let sessionLeaseId:string|undefined;
     if(run.agentSessionId){
       try{const lease=acquireResource(this.store,{roomId:run.roomId,kind:'session',key:`agent-session:${run.roomId}:${run.agentSessionId}`,run,capacity:1});sessionLeaseId=lease.id;run.sessionLeaseId=lease.id;}
-      catch{return false;}
+      catch(error){return{started:false,reason:'resource_busy',errorCode:(error as any)?.code??'resource_busy'};}
     }
     const resourceKey=this.hostProjectKey(run);
     if(resourceKey){
       try{const lease=acquireResource(this.store,{roomId:run.roomId,kind:'project',key:resourceKey,run,capacity:1});run.resourceLeaseId=lease.id;}
-      catch(error){if(sessionLeaseId)try{releaseResource(this.store,run.roomId,sessionLeaseId,{checkedAt:now(),remainingProcesses:0,evidence:'startup-abort'});}catch{}this.finish(run,'failed',(error as Error).message);return false;}
+      catch(error){
+        // Only the lease taken by this attempt is released; other holders keep theirs.
+        if(sessionLeaseId)try{releaseResource(this.store,run.roomId,sessionLeaseId,{checkedAt:now(),remainingProcesses:0,evidence:'startup-abort'});}catch{}
+        delete run.sessionLeaseId;
+        const code=(error as any)?.code as string|undefined;
+        if(code==='resource_quarantined'){this.finish(run,'failed',(error as Error).message);return{started:false,reason:'failed',errorCode:code};}
+        // A busy resource is recoverable: the run stays queued for a later tick.
+        return{started:false,reason:'resource_busy',errorCode:code??'resource_busy'};
+      }
     }
     const controller = new AbortController(); this.active.set(run.id, controller);
     // Legacy queued work keeps its original authorization: no implicit extra
@@ -381,7 +439,7 @@ export class Worker {
     void this.execute(run, controller).catch(error=>{
       try{const current=assertRunFence(this.store,fence,{allowTerminal:true,allowStaleTask:true});if(!terminalStates.has(current.status)){const agent=this.store.get<AgentDescriptor>('agents',current.agentId);this.finish(current,'unknown',redactDiagnostic(error,[agent?.credentialEnv?process.env[agent.credentialEnv]:undefined]));}}catch{/* Never settle another generation from an old supervisor. */}
     }).finally(() => { this.executions.delete(fence.executionId);if(this.active.get(run.id)===controller)this.active.delete(run.id); });
-    return true;
+    return{started:true};
   }
   private schedulerWeights(){const weights=new Map<string,number>();for(const agent of this.store.list<AgentDescriptor>('agents'))weights.set(agent.id,agent.schedulerWeight??1);return weights;}
   /** Real project directory touched by a host-mode task run, if any. */
