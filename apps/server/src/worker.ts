@@ -59,6 +59,7 @@ export class Worker {
   readonly workspaces: Workspaces;
   private active = new Map<string, AbortController>();
   private executions=new Map<string,Readonly<RunFence>>();
+  private steerHandlers = new Map<string,{generation:number;executionId?:string;handler:(text:string)=>Promise<void>}>();
   private operations:ToolOperations;
   private inbox:InboxService;
   private inboxScanHeads = new Map<string,number>();
@@ -428,7 +429,7 @@ export class Worker {
         if(current.status!=='cancel_requested')current.status='running';
         current.updatedAt=now();this.store.atomic(()=>{this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);});
       };
-      for await (const output of (this.options.adapter??runAdapter)({ onNativeEvidence:nativeIntent?evidence=>this.nativeOperations.observe(nativeIntent!,evidence):undefined, executionId:fence.executionId,agent, run, prompt, workspace, home, stateRoot: this.root, hostMode, onRoomTool: hostMode ? (request:any) => this.executeTool(run.id, request, fence) : undefined, nativeSession: attached?undefined:this.store.session(scope), signal: controller.signal, host: this.host, saveCodexState, requestInput:(question,signal)=>this.requestInput(run,question,signal?AbortSignal.any([controller.signal,signal]):controller.signal),onToolPermission:async(request:any)=>{const authMode=this.store.settings().toolAuthorizationMode;if(authMode==='off')return true;const fingerprint=agentCapabilityFingerprint(agent),evidence=this.store.list('capability_evidence',run.roomId).filter((item:any)=>item.fingerprint===fingerprint) as any,state=verifiedCapabilityState(fingerprint,evidence,'preToolGate'),allowed=state==='verified_supported';try{this.store.event(run.roomId,'tool.authorization.recorded',{id:run.agentId,kind:'agent'},{runId:run.id,tool:'acp.permission',authorizationDecision:allowed?'allow':'deny',...(allowed?{}:{reason:'capability_unverified'}),argumentDigest:digest({toolCall:request?.toolCall??null}),fingerprint,authorizationMode:authMode},null,run.id);}catch{}return authMode==='warn'?true:allowed;},onExternalRead:(evidence:{kind:'file'|'database'|'network';source:string;version?:string;hash?:string;fetchedAt:string})=>{const current=this.store.get<Run>('runs',run.id);if(!current||terminalStates.has(current.status))return;const exists=(current.externalReads??[]).some(read=>read.kind===evidence.kind&&read.source===evidence.source&&read.version===evidence.version&&read.hash===evidence.hash);if(exists)return;current.externalReads=[...(current.externalReads??[]),evidence];current.updatedAt=now();this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);},onCleanupProof:(proof)=>{const current=this.store.get<Run>('runs',run.id);if(!current||terminalStates.has(current.status))return;current.cleanupProof={checkedAt:proof.checkedAt,remainingProcesses:proof.remainingProcesses,evidence:proof.evidence};current.updatedAt=now();this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);} })) {
+      for await (const output of (this.options.adapter??runAdapter)({ onNativeEvidence:nativeIntent?evidence=>this.nativeOperations.observe(nativeIntent!,evidence):undefined, executionId:fence.executionId,agent, run, prompt, workspace, home, stateRoot: this.root, hostMode, onRoomTool: hostMode ? (request:any) => this.executeTool(run.id, request, fence) : undefined, nativeSession: attached?undefined:this.store.session(scope), signal: controller.signal, host: this.host, saveCodexState, requestInput:(question,signal)=>this.requestInput(run,question,signal?AbortSignal.any([controller.signal,signal]):controller.signal),onToolPermission:async(request:any)=>{const authMode=this.store.settings().toolAuthorizationMode;if(authMode==='off')return true;const fingerprint=agentCapabilityFingerprint(agent),evidence=this.store.list('capability_evidence',run.roomId).filter((item:any)=>item.fingerprint===fingerprint) as any,state=verifiedCapabilityState(fingerprint,evidence,'preToolGate'),allowed=state==='verified_supported';try{this.store.event(run.roomId,'tool.authorization.recorded',{id:run.agentId,kind:'agent'},{runId:run.id,tool:'acp.permission',authorizationDecision:allowed?'allow':'deny',...(allowed?{}:{reason:'capability_unverified'}),argumentDigest:digest({toolCall:request?.toolCall??null}),fingerprint,authorizationMode:authMode},null,run.id);}catch{}return authMode==='warn'?true:allowed;},onExternalRead:(evidence:{kind:'file'|'database'|'network';source:string;version?:string;hash?:string;fetchedAt:string})=>{const current=this.store.get<Run>('runs',run.id);if(!current||terminalStates.has(current.status))return;const exists=(current.externalReads??[]).some(read=>read.kind===evidence.kind&&read.source===evidence.source&&read.version===evidence.version&&read.hash===evidence.hash);if(exists)return;current.externalReads=[...(current.externalReads??[]),evidence];current.updatedAt=now();this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);},onCleanupProof:(proof)=>{const current=this.store.get<Run>('runs',run.id);if(!current||terminalStates.has(current.status))return;current.cleanupProof={checkedAt:proof.checkedAt,remainingProcesses:proof.remainingProcesses,evidence:proof.evidence};current.updatedAt=now();this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);},registerSteer:(handler)=>{this.steerHandlers.set(run.id,{generation:run.generation??1,executionId:run.executionId,handler});} })) {
         assertRunIdentity(this.store,run);
         if(!attached||run.codex?.nativeStatus!=='completed')controller.signal.throwIfAborted();
         if (output.type === 'text') {
@@ -633,6 +634,7 @@ export class Worker {
       }
     });
     this.toolCalls.delete(run.id);
+    this.steerHandlers.delete(run.id);
     const stored=this.store.get<Run>('runs',run.id);
     if(stored&&this.shouldAutoRetry(stored))queueMicrotask(()=>this.autoRetry(stored));
   }
@@ -673,6 +675,18 @@ export class Worker {
         }
       }
     }catch{/* delivery attempts remain auditable; the next tick retries pending items */}finally{this.outboundInFlight=false;}
+  }
+
+  /** Deliver owner steering input to the adapter's live turn channel. */
+  async steer(runId:string,text:string):Promise<{accepted:true}>{
+    const run=this.store.get<Run>('runs',runId);
+    if(!run)throw new ProtocolError('not_found','运行不存在',404);
+    if(!['running','waiting_input'].includes(run.status))throw new ProtocolError('invalid_state','运行已结束，不能补投',409);
+    const entry=this.steerHandlers.get(runId);
+    if(!entry||entry.generation!==(run.generation??1)||(entry.executionId&&run.executionId&&entry.executionId!==run.executionId))throw new ProtocolError('steer_unavailable','当前运行没有可用的 steer 通道',409);
+    await entry.handler(text);
+    this.store.event(run.roomId,'audit.recorded',SYSTEM,{action:'run.steer:'+runId+':'+digest(text).slice(0,12)},null,runId);
+    return {accepted:true};
   }
 
   private consumeToolCall(run:Run){const max=this.store.settings().maxToolCallsPerRun,used=this.toolCalls.get(run.id)??0;if(used>=max)throw new ProtocolError('tool_budget_exceeded',`单次运行工具调用已达上限（${max}）`,429);this.toolCalls.set(run.id,used+1);}

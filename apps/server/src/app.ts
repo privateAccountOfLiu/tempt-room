@@ -225,6 +225,7 @@ export async function createApp(options: AppOptions = {}) {
   });
   app.get('/api/capabilities',request=>({version:VERSION,supportedVersions:[VERSION],clientType:request.headers['room-client-type']==='browser'?'browser':'sdk',actor:OWNER,commands:Object.keys(payloadSchemas),messageFormats:['text/plain','application/json'],visibility:['room-public'],transports:['http','websocket']} satisfies ServerCapabilities));
   app.get('/api/settings',()=>store.settings());
+  app.post<{Params:{id:string};Body:{text?:string}}>('/api/runs/:id/steer',request=>worker.steer(request.params.id,z.string().min(1).max(10000).parse(request.body?.text)));
   app.get<{Params:{id:string}}>('/api/runs/:id/context-segments',request=>{
     const run=store.get<Run>('runs',request.params.id);if(!run)throw new ProtocolError('not_found','运行不存在',404);
     const task=run.taskId?store.get<Task>('tasks',run.taskId):undefined;

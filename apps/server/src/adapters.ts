@@ -23,7 +23,7 @@ import {NativeEvidenceParser,type NativeEvidence} from './native-evidence.ts';
 import {nativeExecutionStream} from './native-stream.ts';
 export { ExecutionUnknown, RemoteCanceled } from './errors.ts';
 
-export interface AdapterContext { onNativeEvidence?:(evidence:NativeEvidence)=>void; onExternalRead?: (evidence:{kind:'file'|'database'|'network';source:string;version?:string;hash?:string;fetchedAt:string})=>void; onCleanupProof?: (proof:{checkedAt:string;remainingProcesses:number;trackedProcesses:number;evidence:'taskkill-tree-scan'})=>void; executionId?:string; agent: AgentDescriptor; run: Run; prompt: string; workspace: string; home: string; stateRoot: string; nativeSession?: string; signal: AbortSignal; host: SandboxHost; hostMode?: boolean; onRoomTool?: (request:any)=>Promise<any>; requestInput?: (question:string,signal?:AbortSignal)=>Promise<string>; transport?:typeof remoteRequest; onToolPermission?: (request:any)=>boolean|Promise<boolean>; saveCodexState?:(state:CodexRunState)=>void }
+export interface AdapterContext { onNativeEvidence?:(evidence:NativeEvidence)=>void; onExternalRead?: (evidence:{kind:'file'|'database'|'network';source:string;version?:string;hash?:string;fetchedAt:string})=>void; onCleanupProof?: (proof:{checkedAt:string;remainingProcesses:number;trackedProcesses:number;evidence:'taskkill-tree-scan'})=>void; registerSteer?: (handler:(text:string)=>Promise<void>)=>void; executionId?:string; agent: AgentDescriptor; run: Run; prompt: string; workspace: string; home: string; stateRoot: string; nativeSession?: string; signal: AbortSignal; host: SandboxHost; hostMode?: boolean; onRoomTool?: (request:any)=>Promise<any>; requestInput?: (question:string,signal?:AbortSignal)=>Promise<string>; transport?:typeof remoteRequest; onToolPermission?: (request:any)=>boolean|Promise<boolean>; saveCodexState?:(state:CodexRunState)=>void }
 export type AgentAdapter = ProtocolAdapter<AdapterContext,SandboxHost>;
 const native = new Set(['codex', 'claude', 'deepseek']);
 export async function diagnose(agent: AgentDescriptor, host: SandboxHost): Promise<Diagnostic> {
@@ -360,6 +360,7 @@ export function nativeRun(input:AdapterContext):AsyncIterable<AgentOutput> {
         threadId=thread.thread.id;output.push({type:'session',id:threadId!});
         const started=await channel.request('turn/start',{threadId,input:[{type:'text',text:ctx.prompt}],approvalPolicy:'never',sandboxPolicy:{type:'externalSandbox',networkAccess:'enabled'}});
         turnId=started.turn?.id;if(turnId)cancelProtocol=()=>channel.request('turn/interrupt',{threadId,turnId}).then(()=>{});
+        if(turnId)ctx.registerSteer?.(async text=>{const result=await channel.request('turn/steer',{threadId,expectedTurnId:turnId,clientUserMessageId:uid('steer'),input:[{type:'text',text}]});if(result?.turnId&&result.turnId!==turnId)throw new Error('Codex steer accepted a different active turn');});
         let finished=false;
         for await(const frame of channel.frames){
           if(frame.method==='turn/completed'&&frame.params?.threadId===threadId&&frame.params?.turn?.id===turnId){finished=true;const status=frame.params?.turn?.status;if(status==='failed')throw new NativeExecutionFailed('Codex turn failed');if(status!=='completed')throw new Error(`Codex turn ${status}`);break;}
