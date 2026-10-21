@@ -856,6 +856,35 @@ try {
     step('mobile-layout', {path: mobileShotPath, width: 390, height: 844});
     await send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
 
+    // Second browser window: deletion must terminate its live WS without reconnect.
+    const secondWindowTarget = await send('Target.createTarget', {url: 'about:blank'});
+    const secondWindowAttached = await send('Target.attachToTarget', {targetId: secondWindowTarget.targetId, flatten: true});
+    const secondSession = secondWindowAttached.sessionId;
+    await send('Page.enable', {}, secondSession);
+    await send('Runtime.enable', {}, secondSession);
+    const secondEvaluate = async (expression: string) => {
+      const result = await send('Runtime.evaluate', {expression, returnByValue: true, awaitPromise: true}, secondSession);
+      if (result.exceptionDetails) fail(`第二窗口脚本异常：${result.exceptionDetails.text ?? ''}`);
+      return result.result?.value;
+    };
+    const secondBodyText = () => secondEvaluate('document.body ? document.body.innerText : ""') as Promise<string>;
+    const secondLoaded = waitEvent('Page.loadEventFired');
+    await send('Page.navigate', {url: `${base}/?room=${visualRoom}`}, secondSession);
+    await secondLoaded;
+    await waitFor('第二浏览器窗口进入房间', async () => { const text = await secondBodyText(); return text.includes('工作台设计') && text.includes('实时连接'); }, 20000);
+    const settingsForDelete = await evaluate(`(() => { const button = document.querySelector('button[aria-label="房间设置"]'); if (!button) return 'missing'; button.click(); return 'ok'; })()`);
+    if (settingsForDelete !== 'ok') fail('找不到删除房间前的设置入口');
+    await waitFor('删除确认入口', async () => (await bodyText()).includes('删除房间'), 10000);
+    if (await clickByText('dialog.modal button', '删除房间…') !== 'ok') fail('找不到删除房间按钮');
+    await waitFor('删除二次确认', async () => (await bodyText()).includes('确认删除'), 10000);
+    if (await clickByText('dialog.modal button', '确认删除') !== 'ok') fail('无法确认删除房间');
+    await waitFor('删除后关闭房间设置', async () => !(await bodyText()).includes('确认删除'), 15000);
+    await waitFor('第二窗口停止实时连接', async () => !(await secondBodyText()).includes('实时连接'), 15000);
+    await sleep(2000);
+    if ((await secondBodyText()).includes('实时连接')) fail('房间删除后第二窗口重新连接了实时 WS');
+    step('two-window-delete-sync', {room: visualRoom});
+    await send('Target.closeTarget', {targetId: secondWindowTarget.targetId});
+
     report.consoleErrors = consoleErrors;
     if (consoleErrors.length) fail(`页面出现 ${consoleErrors.length} 条控制台错误/异常：${consoleErrors.slice(0, 3).join(' | ')}`);
     report.ok = true;

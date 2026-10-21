@@ -26,8 +26,8 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | R01 Room schema/事件/迁移 | verified | room.ts 统一 schema/normalizeRoom；新增 room.configured/deleting/deletion.updated/deleted 与状态守卫；迁移整理为 v10→v18 有序升级；生成物更新 |
 | R02 单事务保存房间设置与成员 | verified | 纯规划 + 单事件 room.configured；revision CAS、成员去重/校验、忙成员移除拒绝、闲置会话结束、legacy 命令复用；5 个用例通过 |
 | R03 删除请求、停止执行与清理 | in_progress | afterCommit、短事务、finalizer、写入口拒绝、wake/input/inbox 清理、outbound delivery 在非 active 房间记录 aborted 且不再尝试；image-upload 失效由 Worker expireRoom 覆盖；全入口二次校验仍未系统覆盖 |
-| R04 API、WebSocket、SDK 与列表语义 | in_progress | activeRooms/410/WS 终态/owner 导出/artifact 防绕过/RoomClient 命令/删除房间导入新身份 8 用例；room_wait 删除即时结束 + 两个真实 WS 窗口都收到 room.deleting 后关闭的用例通过；浏览器双窗口 UI 同步仍待补 |
-| R05 房间设置与删除 UI | in_progress | 设置单命令、冲突/忙保留表单、删除确认/空状态；新增 Agent 自动预选并回到设置，浏览器新步骤通过；删除后双窗口仅协议级验证 |
+| R04 API、WebSocket、SDK 与列表语义 | verified | activeRooms/410/WS 终态/owner 导出/artifact 防绕过/RoomClient 命令/删除房间导入新身份 8 用例；room_wait 删除即时结束、两个真实 WS 窗口终态、两浏览器窗口删除同步均通过 |
+| R05 房间设置与删除 UI | in_progress | 设置单命令、冲突/忙保留表单、删除确认/空状态；新增 Agent 自动预选、设置内删除按钮+二次确认、双浏览器窗口删除同步均通过；最后房间空状态浏览器断言待补 |
 | I01 图片协议、工具参数与权限 | verified | images.ts 冻结分块/元数据/操作 ID；artifact 图片元数据；image 工具名与写权限映射；attachment-only 消息；7+3 个用例通过；真实上传实现归 I02/I05 |
 | I02 有界可恢复的上传临时状态 | verified | image_uploads/parts 表 + migration 19、分块状态机、配额/TTL、原子落盘、缺失块检测、GC 与 Worker image 工具/删除房间失效接线完成；重启进程 E2E 仍由 I04 覆盖 |
 | I03 解码验真、原图与安全预览 | verified | sharp 0.35.5 + 签名/结构检查 + 完整解码 + 1920 PNG 预览 + 原子落盘/稳定 artifactId；Worker 三个低层工具已接线并通过 3+3 用例；bridge/helper 归 I04 |
@@ -1620,6 +1620,20 @@ V03 付费真实 CLI 实验。
 两个 artifact.created 与各自一条附件消息。
 npm test 545/545；证据 .state/parallel-room-image/i05-concurrent-tests-20261022.log。
 未验证：真实 Claude/Codex/DeepSeek 宿主手动发图。
+下一张卡：V03（等待付费授权）或 AppContainer 真图片 smoke
+```
+
+## R04/R05 — 双浏览器窗口删除同步
+
+```
+基线 SHA：5f7e932；实现见本次提交
+修改：scripts/browser-e2e.ts（+1 步 two-window-delete-sync）
+在当前视觉房间建立第二个真实浏览器 target/session，导航同一 room；
+第一个窗口通过房间设置“删除房间…”→“确认删除”走真实 UI；
+第二个窗口等待 room.deleting 终态后不再显示“实时连接”，2 秒后仍不重连。
+验证：npm run test:browser PASS（含 two-window-delete-sync）；npm test 545/545。
+证据：.state/parallel-room-image/r05-two-window-browser-20261022.log。
+未验证：最后房间删除后的空状态浏览器断言。
 下一张卡：V03（等待付费授权）或 AppContainer 真图片 smoke
 ```
 
