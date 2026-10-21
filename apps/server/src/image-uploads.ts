@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, sep } from 'node:path';
-import { IMAGE_CHUNK_BYTES, IMAGE_MAX_BYTES, ProtocolError, normalizeRoom } from '../../../packages/protocol/src/index.ts';
+import { IMAGE_CHUNK_BYTES, IMAGE_MAX_BYTES, ProtocolError, normalizeRoom, type Artifact, type ImageMediaType } from '../../../packages/protocol/src/index.ts';
+import { installArtifactFiles } from './artifact-files.ts';
+import { validateAndPreview } from './image-validation.ts';
 import type { Store } from './store.ts';
 
 export interface ImageUploadFence {
@@ -67,7 +69,9 @@ export class ImageUploads {
   readonly root: string;
   private locks = new Map<string, Promise<unknown>>();
 
+  readonly stateRoot: string;
   constructor(private store: Store, stateRoot: string) {
+    this.stateRoot = stateRoot;
     this.root = join(stateRoot, 'uploads');
     mkdirSync(this.root, { recursive: true });
   }
@@ -192,6 +196,8 @@ export class ImageUploads {
   async complete(uploadId: string, identity: {roomId: string; agentId: string; fence?: ImageUploadFence}): Promise<{uploadId: string; state: 'completed'; size: number; sha256: string; artifactId?: string}> {
     return this.exclusive(uploadId, async () => {
       const {body, row} = this.body(uploadId);
+      if (row.room_id !== identity.roomId || row.agent_id !== identity.agentId) throw new ProtocolError('upload_owner_mismatch', '上传不属于此 Agent', 403);
+      if (body.state === 'completed' && body.completedHash && body.completedBytes !== undefined) return {uploadId, state: 'completed' as const, size: body.completedBytes, sha256: body.completedHash, ...(body.artifactId ? {artifactId: body.artifactId} : {})};
       this.assertUsable(row, body, identity);
       const parts = this.store.db.prepare('SELECT part_index,byte_length,sha256 FROM image_upload_parts WHERE upload_id=? ORDER BY part_index').all(uploadId) as {part_index: number; byte_length: number; sha256: string}[];
       if (parts.length !== body.expectedParts) throw new ProtocolError('upload_incomplete', `缺少分块（${parts.length}/${body.expectedParts}）`, 409);
@@ -210,9 +216,40 @@ export class ImageUploads {
       if (total !== body.size) throw new ProtocolError('upload_size_mismatch', '上传总字节与声明值不一致', 409);
       const contentHash = sha(Buffer.concat(chunks));
       if (contentHash !== body.sha256) throw new ProtocolError('upload_hash_mismatch', '整图摘要与 begin 声明不一致', 409);
+      writeFileSync(join(directory, 'complete.bin'), Buffer.concat(chunks));
       this.transition(uploadId, 'completed', {completedBytes: total, completedHash: contentHash});
       return {uploadId, state: 'completed', size: total, sha256: contentHash};
     });
+  }
+
+  /** Decode/verify the completed image and install original + preview files, then persist one artifact. */
+  async finalize(uploadId: string, identity: {roomId: string; agentId: string; fence?: ImageUploadFence}): Promise<{artifactId: string; uploadId: string; mediaType: ImageMediaType; width: number; height: number; size: number; contentHash: string; reused: boolean}> {
+    const completed = await this.complete(uploadId, identity);
+    const {body, row} = this.body(uploadId);
+    if (row.room_id !== identity.roomId || row.agent_id !== identity.agentId) throw new ProtocolError('upload_owner_mismatch', '上传不属于此 Agent', 403);
+    const artifactId = body.artifactId ?? `artifact_${sha(Buffer.from(`${uploadId}\0${completed.sha256}`)).slice(0, 32)}`;
+    if (body.artifactId && body.completedHash) {
+      const artifact = this.store.get<Artifact>('artifacts', body.artifactId);
+      if (artifact) return {artifactId: artifact.id, uploadId, mediaType: artifact.mediaType as ImageMediaType, width: artifact.image?.width ?? 1, height: artifact.image?.height ?? 1, size: artifact.size, contentHash: body.completedHash, reused: true};
+    }
+    const completeFile = join(this.directory(uploadId), 'complete.bin');
+    if (!existsSync(completeFile)) throw new ProtocolError('upload_incomplete', '完成的上传文件缺失', 409);
+    const bytes = readFileSync(completeFile);
+    if (bytes.byteLength !== completed.size || sha(bytes) !== completed.sha256) throw new ProtocolError('upload_hash_mismatch', '完成文件摘要不一致', 409);
+    const decoded = await validateAndPreview(bytes, body.alt);
+    // Re-check authority after the awaited decode: a room/member change must win.
+    if (!this.roomActive(identity.roomId)) throw new ProtocolError('room_inactive', '房间正在删除或已删除', 409);
+    const agent = this.store.get<any>('agents', identity.agentId);
+    if (!agent || agent.enabled === false) throw new ProtocolError('agent_unavailable', 'Agent 已停用', 403);
+    if (!this.store.room(identity.roomId)?.members.includes(identity.agentId)) throw new ProtocolError('forbidden', 'Agent 已不在房间内', 403);
+    const files = installArtifactFiles(this.stateRoot, artifactId, bytes, decoded.preview);
+    const artifact: Artifact = {id: artifactId, roomId: identity.roomId, name: body.name, kind: 'file', mediaType: decoded.mediaType, size: bytes.byteLength, createdAt: new Date().toISOString(), contentHash: decoded.contentHash, image: {verified: true, width: decoded.width, height: decoded.height, ...(body.alt ? {alt: body.alt} : {}), previewMediaType: 'image/png', previewHash: files.previewHash, previewSize: decoded.previewSize}};
+    const nextBody: UploadBody = {...body, artifactId, state: 'completed'};
+    this.store.atomic(() => {
+      this.store.event(identity.roomId, 'artifact.created', {id: identity.agentId, kind: 'agent'}, {artifact});
+      this.store.db.prepare('UPDATE image_uploads SET state=?,body=? WHERE id=?').run('completed', JSON.stringify(nextBody), uploadId);
+    });
+    return {artifactId, uploadId, mediaType: decoded.mediaType, width: decoded.width, height: decoded.height, size: bytes.byteLength, contentHash: decoded.contentHash, reused: false};
   }
 
   abort(uploadId: string, identity: {roomId: string; agentId: string; fence?: ImageUploadFence}): void {

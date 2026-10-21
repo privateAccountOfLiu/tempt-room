@@ -30,7 +30,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | R05 房间设置与删除 UI | in_progress | 设置改为单条 room.configure（带 revision）、冲突/忙错误保留表单、删除确认与空状态已实现；新增 Agent 自动回填与删除后双窗口浏览器验收仍待补 |
 | I01 图片协议、工具参数与权限 | verified | images.ts 冻结分块/元数据/操作 ID；artifact 图片元数据；image 工具名与写权限映射；attachment-only 消息；7+3 个用例通过；真实上传实现归 I02/I05 |
 | I02 有界可恢复的上传临时状态 | in_progress | image_uploads/parts 表 + migration 19、分块状态机、配额/TTL、原子落盘、缺失块检测、GC 已实现并通过 5 个用例；Worker/API 接线与定时 GC 仍待补 |
-| I03 解码验真、原图与安全预览 | not_started | |
+| I03 解码验真、原图与安全预览 | in_progress | sharp 0.35.5 + 签名/结构检查 + 完整解码 + 1920 PNG 预览 + 原子落盘/稳定 artifactId 已通过 3 个用例；Worker/API 接线与 I02 定时 GC 仍待补 |
 | I04 托管 bridge/host/AppContainer 传输 | not_started | |
 | I05 外部 MCP、插件与 SDK 发图 | not_started | |
 | I06 安全内联路由与图片展示 | not_started | |
@@ -810,6 +810,57 @@ delivery/image-upload 细节与全入口 assertActiveRoom 仍待补）
   503）；定时 GC 尚未接入 Worker tick；I03 的图片解码/验真/预览落盘未实现；
   重启后完整恢复流程只覆盖模块级件，未做进程重启 E2E
 下一张卡与依赖：I03（实际解码验真、原图与安全预览落盘）
+```
+
+## I03 — 实际解码验真、原图与安全预览落盘
+
+```
+卡号与状态：I03 / in_progress（解码/验真/预览/落盘主路径完成；Worker/API 接线与 I02 GC 待补）
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 c9d5ee1（I02 提交）；实现见本次提交
+修改文件和关键符号：
+  package.json / package-lock.json
+    新增 sharp@0.35.5（libvips 8.18.7）；提交 lockfile，不手改依赖图
+  apps/server/src/image-validation.ts（新增）
+    detectStaticImageType：PNG 签名 + 标准 chunk 遍历（拒绝 acTL）、JPEG SOI、
+      RIFF/WEBP（拒绝 VP8X 动画位与 ANIM/ANMF）、拒绝 SVG/XML/HTML；
+    validateAndPreview：sharp({failOn:'warning', limitInputPixels:16M})，
+      完整解码 metadata + 实际像素解码，格式必须与签名一致，pages<=1，
+      width/height 正整数且最长边<=8192；生成最长边<=1920 的静态 PNG 预览
+      （rotate 应用方向、不放大），限制预览字节；最多 2 个并发解码、队列上限
+  apps/server/src/artifact-files.ts（新增）
+    artifact/preview 受管路径；tmp+rename 安装原图与预览；已存在同 ID 文件
+    只按 SHA256 复用，不同内容 409；删除前检查 canonical 根
+  apps/server/src/image-uploads.ts
+    complete 保存 complete.bin 并支持已完成幂等返回；
+    finalize：校验完成文件 hash，await 解码/预览，await 后重查 room active/
+    agent enabled/member，稳定 artifactId（uploadId+contentHash 派生），
+    安装原图+预览文件后在短 Store.atomic 内写 artifact.created 并记账
+  tests/image-validation.test.ts（新增 3 个用例）
+变更前触发条件 / 变更后行为：
+  变更前：I02 只验证分块和整图 hash，不确认字节是真实静态图片，也没有预览。
+  变更后：服务端用真实解码器验真，拒绝动画/伪装/损坏/超像素；原图和
+  安全预览以受管文件名落盘，artifact 只引用服务端计算的 hash 与尺寸。
+接口/事件/迁移/兼容性：
+  无新事件/迁移；artifact.created 继续使用既有事件，新增 contentHash/image
+  可选元数据；pending 上传完成前不产生可见 artifact。
+执行命令、cwd、环境、开始结束、退出码：
+  npm run typecheck                                            exit 0
+  node -e "require('sharp')"                                    exit 0（libvips 8.18.7）
+  npx tsx --test tests/image-validation.test.ts                   exit 0（3 pass / 0 fail）
+  npm test                                                      exit 0（510 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-21 23:40–00:10 CST
+证据路径：
+  .state/parallel-room-image/i03-tests-20261021.log
+实际覆盖的模式和失败分支：
+  静态 PNG/JPEG/WebP 真解码；原图+PNG 预览落盘与 hash 一致；重复 finalize
+  复用同一 artifactId 且只发一次 artifact.created；APNG acTL、动画 WebP、
+  截断 PNG、SVG 文本均被拒绝；解码期间房间进入 deleting 时拒绝提交
+尚未验证项及明确原因：
+  Worker image_upload_begin/chunk/complete 工具与 owner HTTP 上传路由仍未接线；
+  I02 的定时 GC 尚未接入 Worker tick；并发解码队列/磁盘满/SQL rollback 的
+  失败注入未做；I04/I05 的托管/外部传输与房间消息发布仍待实现
+下一张卡与依赖：I04（托管 bridge、host 和 AppContainer 传输）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移
