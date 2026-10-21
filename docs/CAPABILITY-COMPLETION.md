@@ -40,7 +40,7 @@
 | --- | --- | --- |
 | 真实 CLI 能力验证 | 能力状态机、指纹失效、缺口原因 | 真实 codex/claude/deepseek 会话尚未在授权环境跑通 |
 | 宿主权限拦截 | ACP `session/request_permission` 已按策略允许/拒绝；MCP 写入走工具授权 | 原生 CLI 自带权限 UI 不可拦截；已在 `interceptionGaps` 明示 |
-| 进程树清理 | AppContainer jobEmpty；remote/demo no-local；incomplete 证明隔离 | native host 真实进程树采集需要 Job Object / 原生 helper |
+| 进程树清理 | AppContainer jobEmpty；remote/demo no-local；native host Job Object kill-on-close（tools/job-launcher）+ taskkill/CIM 扫描 | 可选：无 dotnet 环境需先构建 launcher |
 | 外部读取证据 | file/db/network 自动采集 + owner 显式命令 | artifact 内容不做秘密扫描；网络证据依赖响应头 |
 | 房间导出/导入 | 事件、artifact、脱敏、ID remap | 导入的 seq/throughSeq 引用按原顺序近似；不含导入后的敏感字段重扫 |
 | 真实 steer | Codex turn/steer 已真实端到端验证（docs/B06-REAL-STEER.md）；ACP/Claude 暂无 steer 协议 | 需要 DeepSeek ACP/Claude 侧协议支持 |

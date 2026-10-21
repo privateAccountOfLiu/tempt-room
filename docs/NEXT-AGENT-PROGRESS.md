@@ -105,7 +105,7 @@ report: .state/collaboration-baseline/run-2026-10-21T01-33-51-656Z-86be3061/repo
 - 自动路由仍待接入：当前调度继续使用兼容能力提示，不会把未验证证据当成支持
 ### 运行环境状态（2026-10-20）
 
-- 按用户明确授权启动本地服务验证；服务运行于 http://127.0.0.1:4317（PID 8296；2026-10-21 09:24 重启到 job-launcher opt-in 构建（已注入 DEEPSEEK_API_KEY）
+- 按用户明确授权启动本地服务验证；服务运行于 http://127.0.0.1:4317（PID 25200；2026-10-21 09:38 重启到 Job launcher default 构建（已注入 DEEPSEEK_API_KEY）
 - 实测 POST /api/runs/未知/steer 返回 404
 - 实测 /api/outbound/audit 与 audit.csv 200
 - 实测篡改 exportHash 的导入返回 400
@@ -721,7 +721,7 @@ report: .state/collaboration-baseline/run-2026-10-21T01-33-51-656Z-86be3061/repo
 - job-launcher 单测：仅杀 helper（非 /T）时孙进程退出；HostChannel cleanupProof=job-object-kill-on-close
 - 真实 Codex host 冒烟：默认路径 completed，消息 HOST_OK，cleanupProof=taskkill-tree-scan remaining=0
 - 真实 Codex 经 job-launcher 路径出现 initialize 超时，说明 stdio 代理尚未可靠；因此保持 ROOM_JOB_LAUNCHER=1 opt-in，默认不使用
-- C04b 剩余：修复 launcher stdio 代理后再启用 Job Object 硬保证
+- C04b 完成：launcher stdin 使用 GetStdHandle + 手动 pump 修复；真实 Codex 经 launcher completed，cleanupProof=job-object-kill-on-close
 
 ### C04b 真实 Job Object 验证
 
