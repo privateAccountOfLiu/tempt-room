@@ -43,7 +43,7 @@
 | 进程树清理 | AppContainer jobEmpty；remote/demo no-local；incomplete 证明隔离 | native host 真实进程树采集需要 Job Object / 原生 helper |
 | 外部读取证据 | file/db/network 自动采集 + owner 显式命令 | artifact 内容不做秘密扫描；网络证据依赖响应头 |
 | 房间导出/导入 | 事件、artifact、脱敏、ID remap | 导入的 seq/throughSeq 引用按原顺序近似；不含导入后的敏感字段重扫 |
-| 真实 steer | attach 消息桥接、取消/输入投递 | 没有运行中向原生 CLI 注入 steer 的真实通道 |
+| 真实 steer | Codex turn/steer 已真实端到端验证（docs/B06-REAL-STEER.md）；ACP/Claude 暂无 steer 协议 | 需要 DeepSeek ACP/Claude 侧协议支持 |
 | 多 Agent 真实辩论 | 讨论轮次、窗口、迟到结果、配额 | 真实模型双 Agent 实验未授权运行 |
 
 ## 未完成 / 需要授权
