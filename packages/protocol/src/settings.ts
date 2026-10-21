@@ -12,6 +12,7 @@ export const executionSettingsSchema=z.object({
   maxProcesses:z.number().int().min(1).max(128).default(64),
   taskTimeoutMs:z.number().int().min(1000).max(7200000).default(1800000),
   chatTimeoutMs:z.number().int().min(1000).max(7200000).default(300000),
+  discussionTimeoutMs:z.number().int().min(1000).max(7200000).default(900000),
   taskLeaseMs:z.number().int().min(5000).max(86400000).default(600000),
   tokenBudget:z.number().int().min(0).max(100000000).default(0),
   costBudgetUsd:z.number().min(0).max(1000000).default(0),

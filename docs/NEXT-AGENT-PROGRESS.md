@@ -783,3 +783,12 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - 顺带修复：live DB 中 ChatGPT agent role 因先前 PowerShell API 编码产生的问号，已用 UTF-8 请求恢复为「开发实现与测试」
 
 - 讨论修复最终验证：421/421 测试；preflight 8/8（.state/preflight/run-RLF17Z，184.7s）；实时服务 PID 12364
+
+## 讨论超时修复：讨论响应使用独立超时（第 132 轮）
+
+- 现象：房间「Agent 并行与实时协作研讨」新讨论 no_quorum；Codex run 5 分钟被「运行达到时间上限」取消，Claude 同步未完成，只有 DeepSeek 完成
+- 根因：讨论响应 run 无 taskId，沿用 chatTimeoutMs=300000；三位 host Agent 阅读代码/评审需要超过 5 分钟
+- 修复：新增 settings.discussionTimeoutMs（默认 900000=15 分钟，范围 1s–2h）；讨论响应 run 使用该超时，普通聊天仍用 chatTimeoutMs；运行设置表单新增「讨论响应超时（分钟）」
+- 测试：tests/discussion-timeout.test.ts 断言讨论 run=discussionTimeoutMs、聊天 run=chatTimeoutMs
+- 真实回归：room_046d0d633a45437686f338c84c2c508b / disc_6afae40245a64f7a9f0164554acecd77，Codex+Claude+DeepSeek 全部 completed（timeoutMs=900000），讨论 completed，3 条评审消息
+- 说明：此前已 stopped 的讨论不会自动恢复；需重新发起讨论

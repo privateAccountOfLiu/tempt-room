@@ -572,7 +572,7 @@ export class RoomService {
     if(backlog.filter(run=>run.agentId===agentId).length>=settings.maxQueuedRunsPerAgent)throw new ProtocolError('agent_queue_full',`该成员的待处理运行已达上限（${settings.maxQueuedRunsPerAgent}）`,429);
     const roomBudget=roomBudgetError(settings,this.store.list<Run>('runs',roomId));if(roomBudget)throw new ProtocolError('room_budget_exhausted',roomBudget,429);
     const recentRuns=this.store.list<Run>('runs',roomId).filter(run=>run.agentId===agentId&&Date.now()-Date.parse(run.createdAt)<60000);if(recentRuns.length>=settings.maxAgentRunsPerMinute)throw new ProtocolError('agent_rate_limited',`该成员一分钟内启动的运行已达上限（${settings.maxAgentRunsPerMinute}）`,429);
-    const baseTimeoutMs=fields.taskId?settings.taskTimeoutMs:settings.chatTimeoutMs;
+    const baseTimeoutMs=fields.taskId?settings.taskTimeoutMs:fields.discussionId?settings.discussionTimeoutMs:settings.chatTimeoutMs;
     const timeoutMs=settings.adaptiveTimeouts?adaptiveTimeoutMs(this.store.list<Run>('runs',roomId),agentId,fields.taskId?'task':'chat',baseTimeoutMs):baseTimeoutMs;
     const run: Run = { ...(this.activeTraceId?{traceId:this.activeTraceId}:{}), id: uid('run'), roomId, agentId, prompt, effectScope:['demo','api'].includes(executionAgent.provider)?'conversation-only':'unrestricted', basedOnSeq, status: 'queued',lifecycleVersion:1,generation:1,contextPolicy:structuredClone(settings.contextPolicy), createdAt: now(), updatedAt: now(),contextId:fields.contextId??this.saveContext(roomId,basedOnSeq),limits:{memoryMb:settings.memoryMb,maxProcesses:settings.maxProcesses,timeoutMs,tokenBudget:settings.tokenBudget,costBudgetUsd:settings.costBudgetUsd}, ...fields };
      this.reserveBudgetForRun(run);
