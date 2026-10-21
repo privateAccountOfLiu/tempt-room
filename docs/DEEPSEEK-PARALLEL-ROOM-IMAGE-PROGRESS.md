@@ -8,7 +8,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 状态取值：`not_started / in_progress / blocked / verified`。未验证的能力不得改写为完成。
 
 - 实施顺序：G00–G01 → P01–P06 → R01–R05 → I01–I07 → V01–V04（共 24 张卡）
-- 本轮执行者：mavis（MiniMax Code）
+- 本轮执行者：DeepSeek；此前 G00–P02 由 mavis（MiniMax Code）完成
 - 基线记录：`.state/parallel-room-image/20261021-162400/baseline.json`（ignored，不进入提交）
 
 ## 批次状态总览
@@ -19,7 +19,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | G01 两份外部 MCP 与防漂移 | verified | 语法错误在当前 HEAD 已修复；新增契约测试 15/15 与字节级同步闸门 |
 | P01 候选枚举不消耗容量 | verified | 候选不再提前占用房间容量；派发前二次校验；资源忙保持排队不判失败 |
 | P02 不可变基线与 host 独立目录 | in_progress | 共享扫描器 + 不可变基线 + host-isolated 已实现并验证；基线 GC、旧绑定补建、依赖产物叠入、UI 选择仍未覆盖 |
-| P03 按 canonical 项目互斥、异步验收 | not_started | |
+| P03 按 canonical 项目互斥、异步验收 | verified | 项目锁跨房间 canonical 互斥；验收异步化并纳入超时/输出上限/进程树清理；新增 4 个并发与 HTTP 用例 |
 | P04 staging 精确组合 | not_started | |
 | P05 双启动屏障与真实派发 | not_started | |
 | P06 M1 七项可失败用例 | not_started | |
@@ -168,6 +168,69 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
   未覆盖：附着线程 + isolated 的 workspace_mode_unsupported（有代码分支，
   但真实附着模式需要 Codex 线程，本轮无该环境）
 下一张卡与依赖：P03（按 canonical 项目互斥与异步集成验收）
+```
+
+## P03 — 按 canonical 项目互斥与异步验收
+
+```
+卡号与状态：P03 / verified（P03 新增并发/异步用例全部通过；未覆盖项见下）
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 03a5cb0（P02 提交）；实现见本次提交
+修改文件和关键符号：
+  apps/server/src/integration-runner.ts（新增）
+    IntegrationRunner.tick()：按 createdAt 排队逐项尝试准入，一个项目忙不阻塞其它项目
+    项目键使用 canonicalProjectKey()（realpath + Windows 大小写/分隔符规范化）
+    验收命令改为异步 spawn：windowsHide、120s 超时、1 MiB 输出上限、AbortSignal
+    超时/取消/正常退出都调用 killProcessTreeWithProof()；剩余进程 >0 或无证据时
+    不释放项目租约，改为 quarantine
+    update() 使用期望状态做短事务 CAS；apply 前重新读取 integration/room/artifact
+    验收期间事件循环不被占用；Worker.close() 等待本 Runner 的 verifier
+  apps/server/src/resource-manager.ts
+    新增 canonicalProjectKey()；项目容量与 quarantine 检查改为全 store 范围，
+    因此不同 room/binding 指向同一 source 时仍然互斥
+  apps/server/src/worker.ts
+    processIntegrations() 删除全局 active 阻塞，交给 IntegrationRunner；
+    staging 清理保护 in-flight 与持久 validating/testing/applying/unknown/ready_to_apply 目录；
+    hostProjectKey() 改用 canonicalProjectKey()
+  scripts/acceptance-parallel-tasks.ts
+    验收等待改为异步让出事件循环，避免同步 tick 循环饿死 verifier
+  tests/integration-queue.test.ts
+    11 个既有用例改为等待异步 integration 状态；覆盖原同步实现的全部语义
+  tests/parallel-integration-runner.test.ts（新增）
+    - 无关项目被阻塞时，另一个项目的 integration 照常完成
+    - 两个不同项目的 verifier 在并发上限内真实重叠
+    - 同一 source 跨 room 的 verifier 不重叠（项目锁全局互斥）
+    - verifier 运行期间 HTTP 命令仍可正常返回
+变更前触发条件 / 变更后行为：
+  变更前：processIntegrations() 在 active.size>0 时直接 return；同一时间只跑一个
+  集成且验收 spawnSync 阻塞 tick；资源租约查找只看单房间。
+  变更后：tick 只做项目准入并立即返回；不同项目可并行验收，上限默认 2；
+  同源跨房间仍然串行；验收进程超时/取消会清理整棵进程树并留下 proof。
+接口/事件/迁移/兼容性：
+  未新增协议事件或数据库迁移；integration 状态机沿用既有枚举。
+  资源租约的跨房间查询会改变“同 key 不同房间可同时占用”的旧行为，属于 P03
+  要求的修正；acquire/release/quarantine 事件结构不变。
+执行命令、cwd、环境、开始结束、退出码：
+  npm run typecheck                                         exit 0
+  npx tsx --test tests/integration-queue.test.ts            exit 0（11 pass / 0 fail）
+  npx tsx --test tests/parallel-integration-runner.test.ts   exit 0（4 pass / 0 fail）
+  npm run acceptance:parallel -- --check                    exit 0（全部检查通过）
+  npm test                                                  exit 0（455 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-21 18:49–19:20 CST
+证据路径：
+  .state/parallel-room-image/p03-tests-20261021.log
+  .state/parallel-room-image/p03-acceptance-20261021.log
+实际覆盖的模式和失败分支：
+  无关项目长时间占用；两个 verifier 并发重叠；同项目跨 room 串行；
+  verifier 运行期间 HTTP 命令可返回；验收失败/拒绝后源目录不变；
+  无 acceptance 的 quick path 直接 ready_to_apply；waiting 授权后再 apply；
+  重复 integrate 幂等；daemon 重启时 applying/unknown 恢复
+尚未验证项及明确原因：
+  未覆盖：verifier argv/清单的冻结 manifest hash（计划归入 P04 的 verifierManifestHash）
+  未覆盖：verifier 进程尚未纳入统一 CLI 进程硬顶，只由 maxConcurrentVerifications=2 限流
+  未覆盖：进程树清理对“父进程已退出、子进程被重新挂接”的场景只能尽力扫描；
+  失败时租约保持 active/quarantined，不会伪报 released
+下一张卡与依赖：P04（staging 精确组合）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移

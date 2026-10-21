@@ -89,7 +89,10 @@ export async function runAcceptance(options: {root?: string} = {}): Promise<{rep
       report.integrations.push({artifactId: artifact.id, integrationId: integration.result.integrationId as string, status: integration.result.status as string});
     }
     const deadline = Date.now() + 30000;
-    while (Date.now() < deadline && report.integrations.some(item => store!.get<Integration>('integrations', item.integrationId)?.status !== 'applied')) worker.tick();
+    while (Date.now() < deadline && report.integrations.some(item => store!.get<Integration>('integrations', item.integrationId)?.status !== 'applied')) {
+      worker.tick();
+      await new Promise(done => setTimeout(done, 25));
+    }
     for (const item of report.integrations) item.status = store.get<Integration>('integrations', item.integrationId)!.status;
     const finalPlanner = readFileSync(join(project, 'planner.txt'), 'utf8'), finalReviewer = readFileSync(join(project, 'reviewer.txt'), 'utf8'), readme = readFileSync(join(project, 'README.md'), 'utf8');
     report.finalFiles = {'planner.txt': finalPlanner, 'reviewer.txt': finalReviewer, 'README.md': readme};

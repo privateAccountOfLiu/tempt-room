@@ -12,6 +12,7 @@ import type { EventStore } from './ports/event-store.ts';
 import { LocalAdapterTransport, localAgentTransport, type AgentTransport } from './ports/agent-transport.ts';
 import { Workspaces, safePath } from './workspaces.ts';
 import { ImmutableBaselines } from './immutable-baselines.ts';
+import { IntegrationRunner } from './integration-runner.ts';
 import { chatWorkspace,sessionKey } from './sessions.ts';
 import { redactDiagnostic } from './diagnostics.ts';
 import { runContext } from './context.ts';
@@ -28,7 +29,7 @@ import { buildProjectManifest } from './project-manifest.ts';
 import { buildContextSegments } from './context-segments.ts';
 import { agentCapabilityFingerprint, capabilityEvidenceId, verifiedCapabilityState } from './adapter-capabilities.ts';
 import { authorizeTool } from './tool-authorization.ts';
-import { acquireResource, expireQuarantinedLeases, expireResourceLeases, quarantineResource, recoverResourceLeases, releaseResource } from './resource-manager.ts';
+import { acquireResource, canonicalProjectKey, expireQuarantinedLeases, expireResourceLeases, quarantineResource, recoverResourceLeases, releaseResource } from './resource-manager.ts';
 import { cleanupProofComplete } from './cleanup-proof.ts';
 import { validateOutboundUrl } from './outbound.ts';
 import { redactExport } from './export-redaction.ts';
@@ -72,6 +73,7 @@ export class Worker {
   readonly host: SandboxHost;
   readonly workspaces: Workspaces;
   readonly baselines: ImmutableBaselines;
+  readonly integrations: IntegrationRunner;
   private active = new Map<string, AbortController>();
   private executions=new Map<string,Readonly<RunFence>>();
   private readonly transport: AgentTransport;
@@ -97,6 +99,12 @@ export class Worker {
     this.host = new SandboxHost(root, resolve('sandbox/RoomSandbox/bin/Release/net10.0-windows/RoomSandbox.exe'));
     this.workspaces = new Workspaces(root);
     this.baselines = new ImmutableBaselines(root);
+    this.integrations = new IntegrationRunner({
+      store,
+      root,
+      apply: id => this.apply(id),
+      projectSource: integration => this.integrationSource(integration),
+    });
     service.onCancel = id => this.active.get(id)?.abort(new Error('用户取消'));
     service.onInput = (id, text) => {
       const input=this.inputs.get(id);if(!input)throw new Error('输入通道已断开，请修改目标后重新启动');
@@ -251,9 +259,15 @@ export class Worker {
     const stagingRoot=join(this.root,'staging');if(!existsSync(stagingRoot))return;
     const retention=this.store.settings().stagingRetentionMs;if(retention<=0)return;
     const cutoff=Date.now()-retention;
+    // A staging directory that an integration is using, or that a persisted
+    // integration state still references, must survive the retention sweep.
+    const protectedDirs=new Set(this.integrations.protectedStaging());
+    for(const integration of this.store.list<Integration>('integrations'))if(['validating','staging','testing','applying','unknown','ready_to_apply'].includes(integration.status))protectedDirs.add(join(stagingRoot,integration.id));
     for(const entry of readdirSync(stagingRoot,{withFileTypes:true})){
       if(!entry.isDirectory())continue;
-      try{const path=join(stagingRoot,entry.name),mtime=statSync(path).mtimeMs;if(mtime<cutoff)rmSync(path,{recursive:true,force:true});}catch{/* A staging directory in use stays until the next scan. */}
+      const path=join(stagingRoot,entry.name);
+      if(protectedDirs.has(path))continue;
+      try{const mtime=statSync(path).mtimeMs;if(mtime<cutoff)rmSync(path,{recursive:true,force:true});}catch{/* A staging directory in use stays until the next scan. */}
     }
   }
   private rollbackIntegration(integrationId:string,actor:any){
@@ -279,62 +293,15 @@ export class Worker {
     return {integrationId:next.id,status:next.status,artifactId:artifact.id};
   }
   private processIntegrations(){
-    if(this.active.size>0)return;
-    const integration=this.store.list<Integration>('integrations').filter(item=>item.status==='queued'||(item.status==='ready_to_apply'&&item.authorization==='authorized')).sort((a,b)=>a.createdAt.localeCompare(b.createdAt))[0];
-    if(!integration)return;
-    const update=(status:Integration['status'],extra:Partial<Integration>={})=>{const next:Integration={...integration,...extra,status,updatedAt:now()};this.store.atomic(()=>{this.store.event(integration.roomId,'integration.updated',SYSTEM,{integration:next});});return next;};
-    let artifactHash=integration.artifactHash,verificationId=integration.verificationId,verificationExitCode=integration.verificationExitCode,verificationOutputHash=integration.verificationOutputHash,verificationEnvironment=integration.verificationEnvironment;
-    const verificationFields=()=>{const fields:Partial<Integration>={};if(artifactHash)fields.artifactHash=artifactHash;if(verificationId)fields.verificationId=verificationId;if(verificationExitCode!==undefined)fields.verificationExitCode=verificationExitCode;if(verificationOutputHash)fields.verificationOutputHash=verificationOutputHash;if(verificationEnvironment)fields.verificationEnvironment=verificationEnvironment;return fields;};
-    try{
-      if(integration.status==='queued'){
-        update('validating');
-        const artifact=this.store.get<Artifact>('artifacts',integration.artifactId);
-        const task=artifact?.taskId?this.store.get<Task>('tasks',artifact.taskId):undefined;
-        const changes=JSON.parse(readFileSync(join(this.root,'artifacts',integration.artifactId+'.changes.json'),'utf8'));
-        artifactHash=digest(changes);
-        const checks=task?.contract?.acceptance??[];
-        if(checks.length){
-          update('testing',{artifactHash});
-          const staging=join(this.root,'staging',integration.id);mkdirSync(staging,{recursive:true});
-          for(const [filePath,file] of Object.entries<any>(changes.manifest.files??{})){
-            const target=safePath(staging,filePath);mkdirSync(dirname(target),{recursive:true});writeFileSync(target,Buffer.from(file.content,'base64'));
-          }
-          for(const change of changes.changes as any[]){
-            const target=safePath(staging,change.path);
-            if(change.after===null){if(existsSync(target))unlinkSync(target);continue;}
-            mkdirSync(dirname(target),{recursive:true});writeFileSync(target,Buffer.from(change.after,'base64'));
-          }
-          let failed:number|undefined,outputs='';
-          const allowedVerificationExecutables=new Set(['node','npm','npx','git','python','python3','dotnet']);
-          for(const check of checks){
-            let result;
-            if(check.argv?.length){
-              const executable=basename(check.argv[0]).replace(/\.(exe|cmd|bat)$/i,'').toLowerCase();
-              if(!allowedVerificationExecutables.has(executable)){verificationId='verification_'+integration.id;update('verification_failed',{artifactHash,verificationId,errorCode:'verification_command_rejected'});return;}
-              result=spawnSync(check.argv[0],check.argv.slice(1),{cwd:staging,encoding:'utf8',timeout:60000,windowsHide:true});
-            } else {
-              result=spawnSync(check.command,{shell:true,cwd:staging,encoding:'utf8',timeout:60000,windowsHide:true});
-            }
-            outputs+=(result.stdout??'')+(result.stderr??'');
-            if(result.status!==0){failed=result.status??1;break;}
-          }
-          const environment={node:process.version,platform:process.platform,arch:process.arch,npm:spawnSync('npm',['--version'],{shell:true,encoding:'utf8',windowsHide:true,timeout:15000}).stdout?.trim()??undefined,git:spawnSync('git',['--version'],{encoding:'utf8',windowsHide:true,timeout:15000}).stdout?.trim()??undefined},outputHash=digest(outputs);
-          verificationEnvironment=environment;verificationOutputHash=outputHash;
-          if(failed!==undefined){verificationExitCode=failed;verificationId='verification_'+integration.id;update('verification_failed',{...verificationFields(),errorCode:'verification_exit_'+failed});return;}
-          verificationExitCode=0;verificationId='verification_'+integration.id;
-        }
-        const ready=update('ready_to_apply',verificationFields());
-        if(ready.authorization==='waiting')return;
-      }
-      update('applying',verificationFields());
-      const result=this.apply(integration.artifactId);
-      update('applied',{...verificationFields(),journalId:result.journalId});
-      try{rmSync(join(this.root,'staging',integration.id),{recursive:true,force:true});}catch{/* Keep artifacts if cleanup is denied. */}
-    }catch(error){
-      const code=(error as any)?.code as string|undefined;
-      const status:Integration['status']=code==='already_applied'?'applied':['apply_conflict','source_changed','stale_generation','stale_artifact','stale_dependency','artifact_binding_invalid','run_not_completed'].includes(code??'')?'conflict':code==='recovery_required'?'blocked':'unknown';
-      update(status,{...verificationFields(),...(code?{errorCode:code}:{})});
-    }
+    // The integration queue runs outside the tick: per-project admission and
+    // asynchronous verification live in IntegrationRunner.
+    this.integrations.tick();
+  }
+  /** Canonical project directory an integration applies to. */
+  private integrationSource(integration:Integration):string|undefined{
+    const artifact=this.store.get<Artifact>('artifacts',integration.artifactId);
+    const task=artifact?.taskId?this.store.get<Task>('tasks',artifact.taskId):undefined;
+    return task?.projectPath?resolve(task.projectPath):undefined;
   }
   private scanSubscriptions(){
     for(const subscription of this.store.list<Subscription>('subscriptions')){
@@ -476,7 +443,7 @@ export class Worker {
     // An isolated host run works in its own directory and must not take the
     // exclusive lock of the real project. Applying its patch locks the source.
     if(this.workspaceModeFor(task)==='isolated')return undefined;
-    return resolve(task.projectPath);
+    return canonicalProjectKey(task.projectPath);
   }
   private context(run: Run, attachmentContext = '') {
     const inboundBatch=run.inputBatchId?this.store.get<InputBatch>('input_batches',run.inputBatchId):undefined;
@@ -1110,6 +1077,9 @@ export class Worker {
     this.closed = true; if (this.timer) clearInterval(this.timer);
     for (const controller of this.active.values()) controller.abort(new Error('服务关闭'));
     this.host.close();
+    // Verifiers owned by this worker are stopped and awaited before the
+    // process reports a clean shutdown.
+    await this.integrations.close();
     const end = Date.now() + 12000; while (this.active.size && Date.now() < end) await new Promise(r => setTimeout(r, 50));
   }
 }

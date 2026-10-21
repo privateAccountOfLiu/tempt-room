@@ -24,18 +24,28 @@ async function fixture(t: import('node:test').TestContext, acceptance?: Acceptan
   const snapshot = worker.workspaces.snapshot(project, run.id); writeFileSync(join(snapshot.workspace, 'answer.txt'), 'candidate\n');
   const changes = worker.workspaces.changes(run.id), artifact = worker.publishArtifact(run, 'fixture.patch', changes.patch, 'text/x-diff', 'patch');
   writeFileSync(join(root, 'artifacts', artifact.id + '.changes.json'), JSON.stringify(changes)); worker.finish(run, 'completed');
-  return {root, project, app, store, service, worker, roomId, command, artifact, run, taskId};
+  const waitIntegration = async (integrationId: string, statuses: Integration['status'][], timeoutMs = 20000) => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const current = store.get<Integration>('integrations', integrationId);
+      if (current && statuses.includes(current.status)) return current;
+      await new Promise(done => setTimeout(done, 25));
+    }
+    const current = store.get<Integration>('integrations', integrationId);
+    assert.fail(`integration ${integrationId} did not reach ${statuses.join('/')} (current ${current?.status ?? 'missing'})`);
+  };
+  return {root, project, app, store, service, worker, roomId, command, artifact, run, taskId, waitIntegration};
 }
 
 test('artifact.integrate enqueues one durable integration and applies it asynchronously once', async t => {
-  const {project, store, worker, roomId, command, artifact} = await fixture(t);
+  const {project, store, worker, roomId, command, artifact, waitIntegration} = await fixture(t);
   const queued = command('artifact.integrate', {artifactId: artifact.id});
   assert.equal(queued.result.status, 'queued');
   assert.ok(queued.result.integrationId);
   assert.equal(store.get<Artifact>('artifacts', artifact.id)!.applied, undefined);
   assert.equal(readFileSync(join(project, 'answer.txt'), 'utf8'), 'original\n');
   worker.tick();
-  const integration = store.get<Integration>('integrations', queued.result.integrationId as string)!;
+  const integration = await waitIntegration(queued.result.integrationId as string, ['applied']);
   assert.equal(integration.status, 'applied');
   assert.ok(integration.journalId);
   assert.equal(store.get<Artifact>('artifacts', artifact.id)!.applied, true);
@@ -49,11 +59,11 @@ test('artifact.integrate enqueues one durable integration and applies it asynchr
 });
 
 test('stale source changes move an integration to conflict without touching the source', async t => {
-  const {project, store, worker, command, artifact} = await fixture(t);
+  const {project, store, worker, command, artifact, waitIntegration} = await fixture(t);
   const queued = command('artifact.integrate', {artifactId: artifact.id});
   writeFileSync(join(project, 'answer.txt'), 'user edit\n');
   worker.tick();
-  const integration = store.get<Integration>('integrations', queued.result.integrationId as string)!;
+  const integration = await waitIntegration(queued.result.integrationId as string, ['conflict']);
   assert.equal(integration.status, 'conflict');
   assert.equal(integration.errorCode, 'apply_conflict');
   assert.equal(readFileSync(join(project, 'answer.txt'), 'utf8'), 'user edit\n');
@@ -65,7 +75,7 @@ test('owner-approved acceptance commands run in staging; failure leaves the sour
   const failedFixture = await fixture(t, 'node -e "process.exit(1)"');
   const failed = failedFixture.command('artifact.integrate', {artifactId: failedFixture.artifact.id});
   failedFixture.worker.tick();
-  const failedIntegration = failedFixture.store.get<Integration>('integrations', failed.result.integrationId as string)!;
+  const failedIntegration = await failedFixture.waitIntegration(failed.result.integrationId as string, ['verification_failed']);
   assert.equal(failedIntegration.status, 'verification_failed');
   assert.equal(failedIntegration.errorCode, 'verification_exit_1');
   assert.equal(readFileSync(join(failedFixture.project, 'answer.txt'), 'utf8'), 'original\n');
@@ -74,7 +84,7 @@ test('owner-approved acceptance commands run in staging; failure leaves the sour
   const passedFixture = await fixture(t, 'node -e "process.exit(0)"');
   const passed = passedFixture.command('artifact.integrate', {artifactId: passedFixture.artifact.id});
   passedFixture.worker.tick();
-  const passedIntegration = passedFixture.store.get<Integration>('integrations', passed.result.integrationId as string)!;
+  const passedIntegration = await passedFixture.waitIntegration(passed.result.integrationId as string, ['applied']);
   assert.equal(passedIntegration.status, 'applied');
   assert.match(passedIntegration.verificationId ?? '', /^verification_/);
   assert.equal(readFileSync(join(passedFixture.project, 'answer.txt'), 'utf8'), 'candidate\n');
@@ -94,10 +104,10 @@ test('restart marks in-flight integrations unknown and blocks blind re-enqueue',
 });
 
 test('ready_to_apply waits for explicit owner authorization and records verification metadata', async t => {
-  const {store, project, worker, command, artifact} = await fixture(t, 'node -e "process.exit(0)"');
+  const {store, project, worker, command, artifact, waitIntegration} = await fixture(t, 'node -e "process.exit(0)"');
   const queued = command('artifact.integrate', {artifactId: artifact.id, requireAuthorization: true});
   worker.tick();
-  const waiting = store.get<Integration>('integrations', queued.result.integrationId as string)!;
+  const waiting = await waitIntegration(queued.result.integrationId as string, ['ready_to_apply']);
   assert.equal(waiting.status, 'ready_to_apply');
   assert.equal(waiting.authorization, 'waiting');
   assert.equal(waiting.verificationExitCode, 0);
@@ -107,15 +117,16 @@ test('ready_to_apply waits for explicit owner authorization and records verifica
   const authorized = command('integration.authorize', {integrationId: waiting.id});
   assert.equal(authorized.result.authorization, 'authorized');
   worker.tick();
+  await waitIntegration(waiting.id, ['applied']);
   assert.equal(store.get<Integration>('integrations', waiting.id)!.status, 'applied');
   assert.equal(readFileSync(join(project, 'answer.txt'), 'utf8'), 'candidate\n');
 });
 
 test('argc-argv verification passes without a shell and removes staging after apply', async t => {
-  const {root, store, worker, command, artifact} = await fixture(t, {command: 'argv verification', argv: ['node', '-e', 'process.exit(0)']});
+  const {root, store, worker, command, artifact, waitIntegration} = await fixture(t, {command: 'argv verification', argv: ['node', '-e', 'process.exit(0)']});
   const queued = command('artifact.integrate', {artifactId: artifact.id});
   worker.tick();
-  const integration = store.get<Integration>('integrations', queued.result.integrationId as string)!;
+  const integration = await waitIntegration(queued.result.integrationId as string, ['applied']);
   assert.equal(integration.status, 'applied');
   assert.equal(integration.verificationExitCode, 0);
   assert.ok(integration.verificationEnvironment?.npm);
@@ -124,10 +135,10 @@ test('argc-argv verification passes without a shell and removes staging after ap
 });
 
 test('verification argv allowlist rejects an unapproved executable before staging', async t => {
-  const {project, store, worker, command, artifact} = await fixture(t, {command: 'rejected verification', argv: ['unapproved-tool', '--version']});
+  const {project, store, worker, command, artifact, waitIntegration} = await fixture(t, {command: 'rejected verification', argv: ['unapproved-tool', '--version']});
   const queued = command('artifact.integrate', {artifactId: artifact.id});
   worker.tick();
-  const integration = store.get<Integration>('integrations', queued.result.integrationId as string)!;
+  const integration = await waitIntegration(queued.result.integrationId as string, ['verification_failed']);
   assert.equal(integration.status, 'verification_failed');
   assert.equal(integration.errorCode, 'verification_command_rejected');
   assert.equal(readFileSync(join(project, 'answer.txt'), 'utf8'), 'original\n');
@@ -151,7 +162,7 @@ test('restart recovery classifies an applying integration from its apply journal
 });
 
 test('unknown integration can be retried by owner and then requires authorization', async t => {
-  const {store, project, worker, command, artifact, roomId, service, root} = await fixture(t);
+  const {store, project, worker, command, artifact, roomId, service, root, waitIntegration} = await fixture(t);
   const queued = command('artifact.integrate', {artifactId: artifact.id});
   const broken = {...store.get<Integration>('integrations', queued.result.integrationId as string)!, status: 'applying' as const, updatedAt: new Date().toISOString()};
   store.event(roomId, 'integration.updated', {id: 'system', kind: 'system'}, {integration: broken});
@@ -164,10 +175,12 @@ test('unknown integration can be retried by owner and then requires authorizatio
   assert.equal(retried.result.status, 'queued');
   assert.equal(retried.result.authorization, 'waiting');
   worker.tick();
+  await waitIntegration(recovered.id, ['ready_to_apply']);
   assert.equal(store.get<Integration>('integrations', recovered.id)!.status, 'ready_to_apply');
   assert.equal(readFileSync(join(project, 'answer.txt'), 'utf8'), 'original\n');
   command('integration.authorize', {integrationId: recovered.id});
   worker.tick();
+  await waitIntegration(recovered.id, ['applied']);
   assert.equal(store.get<Integration>('integrations', recovered.id)!.status, 'applied');
 });
 
@@ -175,6 +188,7 @@ test('applied integration can be rolled back only while source still matches the
   const first = await fixture(t);
   const queued = first.command('artifact.integrate', {artifactId: first.artifact.id});
   first.worker.tick();
+  await first.waitIntegration(queued.result.integrationId as string, ['applied']);
   assert.equal(first.store.get<Integration>('integrations', queued.result.integrationId as string)!.status, 'applied');
   assert.equal(readFileSync(join(first.project, 'answer.txt'), 'utf8'), 'candidate\n');
   const rolled = first.command('integration.rollback', {integrationId: queued.result.integrationId});
@@ -186,6 +200,7 @@ test('applied integration can be rolled back only while source still matches the
   const second = await fixture(t);
   const secondQueued = second.command('artifact.integrate', {artifactId: second.artifact.id});
   second.worker.tick();
+  await second.waitIntegration(secondQueued.result.integrationId as string, ['applied']);
   writeFileSync(join(second.project, 'answer.txt'), 'user edit\n');
   const conflicted = second.command('integration.rollback', {integrationId: secondQueued.result.integrationId});
   assert.equal(conflicted.result.status, 'blocked');

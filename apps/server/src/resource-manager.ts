@@ -1,4 +1,5 @@
 import { ProtocolError, type CleanupProof, type ResourceLease, type Run } from '../../../packages/protocol/src/index.ts';
+import { realpathSync } from 'node:fs';
 import { now, Store, SYSTEM, uid } from './store.ts';
 import type { EventStore } from './ports/event-store.ts';
 
@@ -14,7 +15,10 @@ export interface AcquireInput {
 export function acquireResource(store: EventStore, input: AcquireInput): ResourceLease {
   return store.atomic(() => {
     const canonicalKey = normalizeResourceKey(input.key);
-    const existing = store.list<ResourceLease>('resource_leases', input.roomId).filter(item => item.canonicalKey === canonicalKey && ['active', 'quarantined'].includes(item.status));
+    // The same canonical project can be targeted from several rooms. Capacity
+    // and quarantine state are therefore checked across the whole store, not
+    // only in the requesting room.
+    const existing = store.list<ResourceLease>('resource_leases').filter(item => item.canonicalKey === canonicalKey && ['active', 'quarantined'].includes(item.status));
     if (existing.some(item => item.status === 'quarantined')) throw new ProtocolError('resource_quarantined', `资源仍处于隔离状态：${canonicalKey}`, 409);
     if (existing.length >= (input.capacity ?? 1)) throw new ProtocolError('resource_busy', `资源已被其他运行占用：${canonicalKey}`, 409);
     const lease: ResourceLease = {
@@ -79,6 +83,10 @@ export function expireResourceLeases(store: EventStore): number {
     expired++;
   }
   return expired;
+}
+
+export function canonicalProjectKey(path: string): string {
+  try { return normalizeResourceKey(realpathSync.native(path)); } catch { return normalizeResourceKey(path); }
 }
 
 export function normalizeResourceKey(key: string): string {
