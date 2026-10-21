@@ -29,7 +29,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | R04 API、WebSocket、SDK 与列表语义 | in_progress | activeRooms/410/WS 终态/owner 导出/artifact 防绕过/RoomClient 命令/删除房间导入新身份已通过 8 个用例；agent room_wait 直接测试与双窗口 WS 同步仍未覆盖 |
 | R05 房间设置与删除 UI | in_progress | 设置改为单条 room.configure（带 revision）、冲突/忙错误保留表单、删除确认与空状态已实现；新增 Agent 自动回填与删除后双窗口浏览器验收仍待补 |
 | I01 图片协议、工具参数与权限 | verified | images.ts 冻结分块/元数据/操作 ID；artifact 图片元数据；image 工具名与写权限映射；attachment-only 消息；7+3 个用例通过；真实上传实现归 I02/I05 |
-| I02 有界可恢复的上传临时状态 | not_started | |
+| I02 有界可恢复的上传临时状态 | in_progress | image_uploads/parts 表 + migration 19、分块状态机、配额/TTL、原子落盘、缺失块检测、GC 已实现并通过 5 个用例；Worker/API 接线与定时 GC 仍待补 |
 | I03 解码验真、原图与安全预览 | not_started | |
 | I04 托管 bridge/host/AppContainer 传输 | not_started | |
 | I05 外部 MCP、插件与 SDK 发图 | not_started | |
@@ -762,6 +762,54 @@ delivery/image-upload 细节与全入口 assertActiveRoom 仍待补）
   讨论运行中图片消息的完整副作用（只允许总结人发布文本报告的限制）
   仍需在 I02/I04 后做端到端回归
 下一张卡与依赖：I02（有界、可恢复的上传临时状态）
+```
+
+## I02 — 有界、可恢复的上传临时状态
+
+```
+卡号与状态：I02 / in_progress（上传状态机与持久临时状态已完成；工具/API 接线与定时 GC 待补）
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 406a977（I01 提交）；实现见本次提交
+修改文件和关键符号：
+  apps/server/src/image-uploads.ts（新增）ImageUploads
+    .state/uploads/<uploadId>/parts/ 原子写入（tmp + rename），不 append；
+    begin：room active / agent enabled、external operation_key（room+agent+root）、
+      metadata_hash 冲突 409、每 Agent 2 / 每房间 4 个 pending、房间 32MiB /
+      全局 128MiB 待传字节硬顶、30 分钟 TTL、uploadId 不含用户路径
+    chunk：严格重查 room/agent/run fence/state/TTL；index/size/hash 校验；
+      相同 index+hash+len 幂等、不同内容 409；DB/文件两侧不一致分别
+      补记或返回 chunk_missing；每 upload 内存互斥
+    complete：全部块存在且逐块 hash/长度校验、总字节与整图 SHA256 校验；
+      状态条件更新为 completed；不在此步解码图片（I03）
+    abort/expire 释放 pending 配额；gc 清理过期/终态上传目录，
+      completed receipt 不随 pending parts 过早删除；删除前检查 canonical 根
+  apps/server/src/store.ts
+    DATABASE_VERSION 18→19；新增 migration 19 image_uploads /
+    image_upload_parts operational 表与 expiry 索引；不进入可回放投影
+  tests/image-uploads.test.ts（新增 5 个用例）
+变更前触发条件 / 变更后行为：
+  变更前：图片上传只有协议和 503 占位，没有可恢复的服务器端状态。
+  变更后：服务器持有有界、可恢复的 pending 上传记录与分块元数据；
+  崩溃后可按 uploadId 补块；配额与 TTL 在 begin/chunk 重查并只能释放一次。
+接口/事件/迁移/兼容性：
+  新增两张 operational 表，不属于 event-sourced projection；不新增事件类型；
+  重放 artifact/message 不依赖 pending 上传；completed 上传保留可恢复 receipt。
+执行命令、cwd、环境、开始结束、退出码：
+  npm run typecheck                                            exit 0
+  npx tsx --test tests/image-uploads.test.ts                     exit 0（5 pass / 0 fail）
+  npm test                                                      exit 0（507 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-21 23:10–23:40 CST
+证据路径：
+  .state/parallel-room-image/i02-tests-20261021.log
+实际覆盖的模式和失败分支：
+  begin 幂等/元数据冲突；chunk 顺序/长度/hash/index/重复；complete 缺块/
+  整图摘要不一致；跨 Agent/跨 room/fence 变化；quota 上限与 abort/过期释放；
+  DB 有记录文件缺失；文件存在 DB 未记账的补记
+尚未验证项及明确原因：
+  Worker 的 image_upload_* 工具与 owner HTTP 上传路由尚未接线（当前仍返回
+  503）；定时 GC 尚未接入 Worker tick；I03 的图片解码/验真/预览落盘未实现；
+  重启后完整恢复流程只覆盖模块级件，未做进程重启 E2E
+下一张卡与依赖：I03（实际解码验真、原图与安全预览落盘）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移

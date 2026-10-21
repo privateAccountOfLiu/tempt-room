@@ -5,7 +5,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { VERSION, capabilitiesFor, executionSettingsSchema,eventSchema,eventMetadata,EventContractError,projectionTableNames,normalizeRoom,ProtocolError,type ProjectionTable,type ExecutionSettings, type Actor, type AgentDescriptor, type Room, type RoomEvent, type RoomSnapshot, type Run, type Task, type Discussion,type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { MemoryProjectionSink,SqlProjectionSink,projectEvent,projectionJson } from './event-projections.ts';
 import type { EventStore } from './ports/event-store.ts';
-export const DATABASE_VERSION=18;
+export const DATABASE_VERSION=19;
 
 export const uid = (prefix = 'id') => `${prefix}_${randomUUID().replaceAll('-', '')}`;
 export const now = () => new Date().toISOString();
@@ -120,6 +120,7 @@ if(version<15)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS resource
 if(version<16)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS capability_evidence_history(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS capability_evidence_history_room ON capability_evidence_history(room_id); PRAGMA user_version=16;`);});
     if(version<17)this.atomic(()=>this.db.exec('PRAGMA user_version=17'));
     if(version<18)this.atomic(()=>this.db.exec('PRAGMA user_version=18'));
+    if(version<19)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS image_uploads(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, agent_id TEXT NOT NULL, operation_key TEXT NOT NULL UNIQUE, metadata_hash TEXT NOT NULL, state TEXT NOT NULL, body TEXT NOT NULL, expires_at TEXT NOT NULL); CREATE INDEX IF NOT EXISTS image_uploads_expiry ON image_uploads(state, expires_at); CREATE TABLE IF NOT EXISTS image_upload_parts(upload_id TEXT NOT NULL, part_index INTEGER NOT NULL, byte_length INTEGER NOT NULL, sha256 TEXT NOT NULL, PRIMARY KEY(upload_id, part_index)); PRAGMA user_version=19;`);});
     this.seed();
     this.atomic(() => {
       for (const run of this.list<Run>('runs')) if (['running', 'waiting_input', 'cancel_requested'].includes(run.status) || (run.status==='queued' && run.codex)) {
