@@ -885,6 +885,18 @@ try {
     step('two-window-delete-sync', {room: visualRoom});
     await send('Target.closeTarget', {targetId: secondWindowTarget.targetId});
 
+    // Last room: deleting all remaining rooms must show the empty state after reload.
+    const remainingRooms = appHandle!.store.activeRooms();
+    for (const room of remainingRooms) {
+      await command(room.id, 'room.delete', {expectedRevision: appHandle!.store.room(room.id)!.revision});
+    }
+    await waitFor('所有房间进入删除', async () => appHandle!.store.activeRooms().length === 0, 15000);
+    const emptyLoaded = waitEvent('Page.loadEventFired');
+    await send('Page.navigate', {url: base + '/'}, sessionId);
+    await emptyLoaded;
+    await waitFor('最后房间删除后空状态', async () => { const text = await bodyText(); return text.includes('还没有房间') && text.includes('创建房间'); }, 15000);
+    step('last-room-empty-state');
+
     report.consoleErrors = consoleErrors;
     if (consoleErrors.length) fail(`页面出现 ${consoleErrors.length} 条控制台错误/异常：${consoleErrors.slice(0, 3).join(' | ')}`);
     report.ok = true;
