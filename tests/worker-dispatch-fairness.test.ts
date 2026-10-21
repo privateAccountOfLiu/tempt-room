@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { Store, uid } from '../apps/server/src/store.ts';
+import { Store, SYSTEM, uid } from '../apps/server/src/store.ts';
 import { RoomService } from '../apps/server/src/service.ts';
 import { Worker } from '../apps/server/src/worker.ts';
 import { acquireResource } from '../apps/server/src/resource-manager.ts';
@@ -114,7 +114,9 @@ test('房间成员被移除后不调用适配器，失败准入不计作已服�
   const { store, worker, roomId, command, entries } = fixture(t);
   command('settings.update', { ...store.settings(), concurrency: 1, maxConcurrentRunsPerRoom: 1 });
   command('task.create', { title: 'Removed member task', agentId: 'demo-planner' });
-  command('room.members.set', { members: store.room(roomId)!.members.filter(member => member !== 'demo-planner') });
+  // This fixture bypasses the R02 busy-member guard deliberately: it needs a
+  // room whose member disappeared while the task was already queued.
+  store.event(roomId, 'room.members.updated', SYSTEM, {members: store.room(roomId)!.members.filter(member => member !== 'demo-planner')});
 
   worker.tick();
   await new Promise(done => setTimeout(done, 50));

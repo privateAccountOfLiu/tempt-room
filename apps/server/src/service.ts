@@ -17,6 +17,7 @@ import { summarizeOutboundDeliveries } from './outbound-summary.ts';
 import {acquireResource,releaseResource} from './resource-manager.ts';
 import {canonicalProjectPath,projectBaseCommit} from './project-manifest.ts';
 import type { PreparedProjectBinding } from './command-executor.ts';
+import { planRoomConfiguration, retireRemovedMembers } from './room-lifecycle.ts';
 import {taskVerificationRecordSchema} from '../../../packages/protocol/src/index.ts';
 
 /** External (non-managed) claims must heartbeat within this window or the worker recycles the task. */
@@ -65,8 +66,15 @@ export class RoomService {
         const room = { id: uid('room'), ...input, members: [...new Set(input.members)], revision: 1, status: 'active' as const, createdAt: now(), seq: 0 }; this.store.putRoom(room,actor); return { roomId: room.id };
       }
       case 'room.configure': {
-        // R02 owns the transactional settings/members update.
-        throw new ProtocolError('not_implemented', '房间设置命令尚未启用', 409);
+        if (actor.kind !== 'human') throw new ProtocolError('forbidden', '只有 owner 可以修改房间设置', 403);
+        const roomId = this.requireRoom(command), room = this.store.room(roomId)!;
+        const input = z.object({name:z.string().trim().min(1).max(80),description:z.string().max(300).default(''),members:z.array(z.string().min(1).max(128)).max(30),expectedRevision:z.number().int().positive()}).strict().parse(p);
+        const plan = planRoomConfiguration(this.store, room, input);
+        if (plan.changed) {
+          retireRemovedMembers(this.store, roomId, plan.removedMemberIds, actor);
+          this.store.event(roomId, 'room.configured', actor, {room: plan.next, addedMemberIds: plan.addedMemberIds, removedMemberIds: plan.removedMemberIds}, command.commandId);
+        }
+        return {roomId, revision: plan.revision, changed: plan.changed, addedMemberIds: plan.addedMemberIds, removedMemberIds: plan.removedMemberIds};
       }
       case 'room.delete': {
         // R03 owns deletion request/cleanup.
@@ -74,13 +82,20 @@ export class RoomService {
       }
       case 'room.update': {
         const roomId = this.requireRoom(command), room = this.store.room(roomId)!;
-        const input = z.object({ name: z.string().trim().min(1).max(80), description: z.string().max(300).default('') }).parse(p);
-        Object.assign(room, input); this.store.event(roomId, 'room.updated', actor, { room }); return { roomId };
+        const input = z.object({ name: z.string().trim().min(1).max(80), description: z.string().max(300).default(''), expectedRevision: z.number().int().positive().optional() }).parse(p);
+        const plan = planRoomConfiguration(this.store, room, {name: input.name, description: input.description, members: room.members, expectedRevision: input.expectedRevision ?? (room.revision ?? 1)});
+        if (plan.changed) this.store.event(roomId, 'room.updated', actor, { room: plan.next }, command.commandId);
+        return { roomId, revision: plan.revision };
       }
       case 'room.members.set': {
-        const roomId = this.requireRoom(command), members = z.array(z.string()).max(30).parse(p.members);
-        for (const id of members) if (!this.store.get('agents', id)) throw new ProtocolError('invalid_member', '成员不存在');
-        const room = this.store.room(roomId)!; room.members = [...new Set(members)]; this.store.event(roomId, 'room.members.updated', actor, { members: room.members }); return {};
+        const roomId = this.requireRoom(command), room = this.store.room(roomId)!;
+        const input = z.object({members:z.array(z.string()).max(30),expectedRevision:z.number().int().positive().optional()}).parse(p);
+        const plan = planRoomConfiguration(this.store, room, {name: room.name, description: room.description, members: input.members, expectedRevision: input.expectedRevision ?? (room.revision ?? 1)});
+        if (plan.changed) {
+          retireRemovedMembers(this.store, roomId, plan.removedMemberIds, actor);
+          this.store.event(roomId, 'room.members.updated', actor, { room: plan.next, members: plan.next.members }, command.commandId);
+        }
+        return {revision: plan.revision};
       }
       case 'agent.save': {
         const agent = agentSchema.parse(p); if (agent.provider === 'demo' && !agent.id.startsWith('demo-')) throw new ProtocolError('invalid_agent', '保留的演示类型');

@@ -34,7 +34,7 @@ export function projectEvent(sink:ProjectionSink,event:RoomEvent){
       const previous=sink.room();
       const value=payload.room??(previous?{...previous,members:payload.members}:undefined);
       if(!value||value.id!==event.roomId)throw new Error('Room projection identity mismatch');
-      if(event.schemaVersion!==0&&previous){
+      if(event.schemaVersion!==0&&previous&&event.seq>=(previous.seq??0)){
         const before=normalizeRoom(previous),after=normalizeRoom(value);
         if(after.revision<before.revision)throw new Error('Room revision cannot decrease');
         if(before.status==='deleted'&&after.status!=='deleted')throw new Error('Deleted room cannot become active again');

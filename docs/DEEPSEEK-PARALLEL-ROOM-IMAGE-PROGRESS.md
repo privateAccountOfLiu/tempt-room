@@ -24,7 +24,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | P05 双启动屏障与真实派发 | verified | 可控 adapter 由真实 Worker 派发；两个 Run 同时进入后才释放，独立工作区、真实产物、owner 验收和 integration 全链路通过 |
 | P06 M1 七项可失败用例 | in_progress | 1–6 的模拟切片已覆盖（并发=1 负例、共同基线、整体组合、局部失败/重试、幂等/fence、同文件冲突保留双方 patch）；第 7 项真实 CLI 对照依赖 V03 尚未执行 |
 | R01 Room schema/事件/迁移 | verified | room.ts 统一 schema/normalizeRoom；新增 room.configured/deleting/deletion.updated/deleted 与状态守卫；迁移整理为 v10→v18 有序升级；生成物更新 |
-| R02 单事务保存房间设置与成员 | not_started | |
+| R02 单事务保存房间设置与成员 | verified | 纯规划 + 单事件 room.configured；revision CAS、成员去重/校验、忙成员移除拒绝、闲置会话结束、legacy 命令复用；5 个用例通过 |
 | R03 删除请求、停止执行与清理 | not_started | |
 | R04 API、WebSocket、SDK 与列表语义 | not_started | |
 | R05 房间设置与删除 UI | not_started | |
@@ -465,6 +465,66 @@ P02 后续补充（第 5 轮已覆盖）：
   room.configure/room.delete 的真实事务行为、API/WS/SDK 语义与 UI 在 R02–R05；
   本卡只保证 schema/事件/迁移地基可用，不宣称房间设置/删除已对用户开放
 下一张卡与依赖：R02（一个事务保存房间设置与成员）
+```
+
+## R02 — 一个事务保存房间设置与成员
+
+```
+卡号与状态：R02 / verified
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 c63c6d2（R01 提交）；实现见本次提交
+修改文件和关键符号：
+  apps/server/src/room-lifecycle.ts（新增）
+    memberBusyReasons()：活动 Run / 活动 Task / 活动 Discussion / 未释放
+    resource lease；纯校验，不写库
+    planRoomConfiguration()：active 检查、expectedRevision CAS、成员去重与
+    全局 Agent 存在校验、added/removed 计算、忙成员整体拒绝、无变化不追加事件
+    retireRemovedMembers()：闲置 agent_session 发 agent_session.ended，
+    相关 subscription 写 enabled=false
+  apps/server/src/service.ts
+    room.configure（human owner）：一次 Store.atomic 内完成规划、会话结束和
+    单条 room.configured；返回 revision/changed/added/removed
+    room.update / room.members.set：先构造完整输入复用同一规划与 busy/active
+    校验；expectedRevision 可选，旧客户端省略时不宣传 CAS 保证
+  packages/protocol/src/index.ts
+    room.update / room.members.set 增加可选 expectedRevision；room.configure /
+    room.delete 已在 R01 command schema 中
+  apps/server/src/event-projections.ts
+    生命周期守卫只在正向 live 追加时执行；rebuild 从旧事件重放时不会把已有
+    新投影误判为 revision 倒退
+  tests/worker-dispatch-fairness.test.ts
+    该 fixture 故意跳过 R02 忙碌成员守卫，用直接事件模拟“成员在任务排队后
+    消失”的场景，保留原调度断言
+  tests/room-configuration.test.ts（新增）5 个用例
+变更前触发条件 / 变更后行为：
+  变更前：room.configure 只有 schema/事件地基，命令会 not_implemented；
+  room.update/members.set 直接改投影对象，不校验 revision 与忙碌成员。
+  变更后：一次配置 = 一次校验 + 一条 room.configured 事件；未知成员或忙碌
+  移除会让名称/描述/成员全部回滚；聊天推进 seq 不造成 revision 假冲突；
+  闲置成员移除后旧 actor 的 message.send 被拒绝。
+接口/事件/迁移/兼容性：
+  新事件 room.configured 携带 addedMemberIds/removedMemberIds；旧
+  room.updated/room.members.updated 仍可回放，并复用同一规划（members.set
+  事件附带 room 以保存 revision）。不自动 enqueue 新成员、不改现有 Discussion
+  participants。room.delete 业务仍由 R03 实现。
+执行命令、cwd、环境、开始结束、退出码：
+  npm run typecheck                                                exit 0
+  npx tsx --test tests/room-configuration.test.ts                    exit 0（5 pass / 0 fail）
+  npx tsx --test tests/room-lifecycle.test.ts                        exit 0（5 pass / 0 fail）
+  npm test                                                         exit 0（478 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-21 20:35–21:05 CST
+证据路径：
+  .state/parallel-room-image/r02-tests-20261021.log
+实际覆盖的模式和失败分支：
+  名称+描述+加成员单事件成功；未知成员整体回滚；同 revision 第二窗口 409；
+  聊天推进不产生假冲突；成员去重；空成员房间可保存；无变化不追加事件；
+  忙成员移除拒绝且名称不变；闲置成员移除结束 session/订阅并拒绝旧 actor；
+  加成员不消耗模型额度；rebuild 后名称/成员/revision 一致
+尚未验证项及明确原因：
+  R04 API/WebSocket/SDK 与 R05 UI 尚未接入 room.configure；
+  R03 删除请求/清理；pending inbox/batch 的专用过期事件未新增，
+  当前由会话/订阅终止与现有交付状态机处理
+下一张卡与依赖：R03（删除请求、停止执行与持久清理）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移
