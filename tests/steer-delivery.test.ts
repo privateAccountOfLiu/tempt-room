@@ -1,0 +1,35 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { Store, SYSTEM, uid } from '../apps/server/src/store.ts';
+import { RoomService } from '../apps/server/src/service.ts';
+import { Worker } from '../apps/server/src/worker.ts';
+import { agentCapabilityFingerprint } from '../apps/server/src/adapter-capabilities.ts';
+import type { AgentDescriptor, Run } from '../packages/protocol/src/index.ts';
+
+const parent = resolve('.state/test-data');
+test('pending steer wake intents attach to the active run instead of a new turn', async t => {
+  mkdirSync(parent, {recursive: true});
+  const root = mkdtempSync(join(parent, 'steer-delivery-')), store = new Store(join(root, 'room.sqlite')), service = new RoomService(store), worker = new Worker(store, service, root, {adapter: async function* () {}}), roomId = store.rooms()[0].id, at = new Date().toISOString();
+  t.after(async () => { await worker.close(); store.close(); rmSync(root, {recursive: true, force: true}); });
+  const agent = store.get<AgentDescriptor>('agents', 'demo-planner')!, fingerprint = agentCapabilityFingerprint(agent);
+  store.event(roomId, 'capability.verified', SYSTEM, {capabilityEvidence: {id: 'cap_steer_test', fingerprint, capability: 'steerDuringRun', state: 'verified_supported', mode: 'test', testedAt: at, suiteVersion: 'test', evidenceHash: 'a'.repeat(64)}});
+  const session = {id: 'session_steer_delivery', roomId, agentId: 'demo-planner', status: 'active' as const, createdAt: at, updatedAt: at};
+  store.event(roomId, 'agent_session.created', SYSTEM, {agentSession: session});
+  const taskId = (service.execute({version: '0.1', commandId: uid(), roomId, type: 'task.create', payload: {title: 'Steer delivery', agentId: 'demo-planner'}}).result as any).taskId as string;
+  const queued = store.list<Run>('runs', roomId).find(item => item.taskId === taskId)!;
+  store.event(roomId, 'run.started', SYSTEM, {run: {...queued, status: 'running', generation: 1, executionId: 'exec_steer_delivery', agentSessionId: session.id, startedAt: at, updatedAt: at}});
+  store.event(roomId, 'chat.message.created', {id: 'owner', kind: 'human'}, {message: {id: 'msg_steer_delivery', roomId, actor: {id: 'owner', kind: 'human'}, text: 'focus on edge cases', mentions: ['demo-planner'], attachments: [], createdAt: at}});
+  const messageSeq = store.room(roomId)!.seq;
+  store.event(roomId, 'wake.requested', SYSTEM, {wakeIntent: {id: 'wake_steer_delivery', scopeKey: 'steer-test', agentSessionId: session.id, sourceEventId: 'msg_steer_delivery', sourceSeq: messageSeq, deliveryMode: 'steer', status: 'pending'}, reason: 'test'});
+  service.dispatchPendingWakes();
+  assert.equal(store.get<any>('wake_intents', 'wake_steer_delivery')!.status, 'pending');
+  const received: string[] = [];
+  (worker as any).steerHandlers.set(queued.id, {generation: 1, executionId: 'exec_steer_delivery', handler: async (text: string) => { received.push(text); }});
+  await worker.deliverSteerWakes();
+  assert.deepEqual(received, ['focus on edge cases']);
+  const intent = store.get<any>('wake_intents', 'wake_steer_delivery')!;
+  assert.equal(intent.status, 'assigned');
+  assert.equal(intent.runId, queued.id);
+});

@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash, createHmac } from 'node:crypto';
 import { basename, dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
-import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type AgentSession, type Artifact, type Discussion, type UsageSample, type ExecutionSettings, type Subscription, type InputBatch, type InboxDelivery, type ProjectBinding, type Integration, type Message, type Run, type Task, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
+import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type AgentSession, type Artifact, type Discussion, type UsageSample, type ExecutionSettings, type Subscription, type InputBatch, type InboxDelivery, type ProjectBinding, type Integration, type Message, type Run, type Task, type WakeIntent, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { diagnose, ExecutionUnknown, RemoteCanceled, runAdapter } from './adapters.ts';
 import { SandboxHost } from './sandbox.ts';
 import { digest, now, Store, SYSTEM, uid } from './store.ts';
@@ -59,6 +59,7 @@ export class Worker {
   readonly workspaces: Workspaces;
   private active = new Map<string, AbortController>();
   private executions=new Map<string,Readonly<RunFence>>();
+  private steerWakeInFlight = new Set<string>();
   private steerHandlers = new Map<string,{generation:number;executionId?:string;handler:(text:string)=>Promise<void>}>();
   private operations:ToolOperations;
   private inbox:InboxService;
@@ -200,6 +201,7 @@ export class Worker {
       }
     });
     this.service.dispatchPendingWakes();
+    void this.deliverSteerWakes();
     const runs = this.store.list<Run>('runs');
     const settings=this.store.settings();
     for(const run of runs){
@@ -677,6 +679,25 @@ export class Worker {
     }catch{/* delivery attempts remain auditable; the next tick retries pending items */}finally{this.outboundInFlight=false;}
   }
 
+  /** Attach pending steer wake intents to the live turn instead of opening a new Run. */
+  async deliverSteerWakes(){
+    for(const intent of this.store.list<WakeIntent>('wake_intents').filter(item=>item.status==='pending'&&item.deliveryMode==='steer'&&!this.steerWakeInFlight.has(item.id))){
+      const session=this.store.get<AgentSession>('agent_sessions',intent.agentSessionId);
+      if(!session||session.status!=='active')continue;
+      const run=this.store.list<Run>('runs',session.roomId).find(item=>item.agentSessionId===session.id&&['running','waiting_input'].includes(item.status));
+      if(!run)continue;
+      const event=this.store.events(session.roomId,Math.max(0,intent.sourceSeq-1),1).find(item=>item.seq===intent.sourceSeq);
+      const text=(event?.payload as any)?.message?.text??(event?.payload as any)?.task?.title;
+      if(typeof text!=='string'||!text.trim())continue;
+      this.steerWakeInFlight.add(intent.id);
+      try{
+        await this.steer(run.id,text);
+        const current=this.store.get<WakeIntent>('wake_intents',intent.id);
+        if(current&&current.status==='pending'){current.status='assigned';current.runId=run.id;this.store.event(session.roomId,'wake.assigned',SYSTEM,{wakeIntent:current});}
+      }catch{/* leave pending: a later tick retries while the turn is active */}finally{this.steerWakeInFlight.delete(intent.id);}
+    }
+  }
+
   /** Deliver owner steering input to the adapter's live turn channel. */
   async steer(runId:string,text:string):Promise<{accepted:true}>{
     const run=this.store.get<Run>('runs',runId);
@@ -687,7 +708,7 @@ export class Worker {
     await entry.handler(text);
     this.store.event(run.roomId,'audit.recorded',SYSTEM,{action:'run.steer:'+runId+':'+digest(text).slice(0,12)},null,runId);
     const agent=this.store.get<AgentDescriptor>('agents',run.agentId);
-    if(agent){const fingerprint=agentCapabilityFingerprint(agent),capabilityEvidence={id:capabilityEvidenceId(fingerprint,'steerDuringRun'),fingerprint,capability:'steerDuringRun',state:'verified_supported' as const,mode:'runtime-steer',testedAt:now(),suiteVersion:'steer-runtime-v1',evidenceHash:digest({runId,text}),evidenceLocation:'runtime:run.steer'};this.store.event(run.roomId,'capability.verified',SYSTEM,{capabilityEvidence});}
+    if(agent){const fingerprint=agentCapabilityFingerprint(agent),existing=this.store.list<any>('capability_evidence',run.roomId).find(item=>item.fingerprint===fingerprint&&item.capability==='steerDuringRun');if(existing?.state!=='verified_supported'){const capabilityEvidence={id:existing?.id??capabilityEvidenceId(fingerprint,'steerDuringRun'),fingerprint,capability:'steerDuringRun',state:'verified_supported' as const,mode:'runtime-steer',testedAt:now(),suiteVersion:'steer-runtime-v1',evidenceHash:digest({runId,text}),evidenceLocation:'runtime:run.steer'};this.store.event(run.roomId,'capability.verified',SYSTEM,{capabilityEvidence});}}
     return {accepted:true};
   }
 

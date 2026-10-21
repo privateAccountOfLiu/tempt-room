@@ -715,6 +715,7 @@ export class RoomService {
           const fingerprint=agentCapabilityFingerprint(agent),state=verifiedCapabilityState(fingerprint,this.store.list<CapabilityEvidence>('capability_evidence',session.roomId).filter(item=>item.fingerprint===fingerprint),requiredCapability);
           if(state!=='verified_supported'){wakeIntent.status='suppressed';wakeIntent.suppressionReason=requiredCapability==='steerDuringRun'?'steer_unverified':'pre_tool_gate_unverified';this.store.event(session.roomId,'wake.suppressed',SYSTEM,{wakeIntent});continue;}
         }
+        if(wakeIntent.deliveryMode==='steer'&&this.store.list<Run>('runs',session.roomId).some(run=>run.agentSessionId===session.id&&['running','waiting_input'].includes(run.status)))continue;
         if(this.store.list<Run>('runs',session.roomId).some(run=>run.agentSessionId===session.id&&!terminalStates.has(run.status)))continue;
         const event=this.store.events(session.roomId,Math.max(0,wakeIntent.sourceSeq-1),1).find(item=>item.seq===wakeIntent.sourceSeq);
         const message=(event?.payload as any)?.message, task=(event?.payload as any)?.task;
