@@ -13,6 +13,8 @@ import { LocalAdapterTransport, localAgentTransport, type AgentTransport } from 
 import { Workspaces, safePath } from './workspaces.ts';
 import { ImmutableBaselines } from './immutable-baselines.ts';
 import { IntegrationRunner } from './integration-runner.ts';
+import { ImageUploads } from './image-uploads.ts';
+import { imageUploadBeginSchema, imageUploadChunkSchema, imageUploadCompleteSchema } from '../../../packages/protocol/src/index.ts';
 import { chatWorkspace,sessionKey } from './sessions.ts';
 import { redactDiagnostic } from './diagnostics.ts';
 import { runContext } from './context.ts';
@@ -75,10 +77,12 @@ export class Worker {
   readonly workspaces: Workspaces;
   readonly baselines: ImmutableBaselines;
   readonly integrations: IntegrationRunner;
+  readonly imageUploads: ImageUploads;
   private active = new Map<string, AbortController>();
   private executions=new Map<string,Readonly<RunFence>>();
   private readonly transport: AgentTransport;
   private lastBaselineGc = 0;
+  private lastImageGc = 0;
   private deletionNotices = new Map<string, {reasons: string; at: number}>();
   private steerWakeInFlight = new Set<string>();
   private toolApprovals = new Map<string,{roomId:string;agentId:string;tool:string;argsDigest:string;createdAt:string;resolve:(allow:boolean)=>void;timer:NodeJS.Timeout}>();
@@ -102,6 +106,7 @@ export class Worker {
     this.host = new SandboxHost(root, resolve('sandbox/RoomSandbox/bin/Release/net10.0-windows/RoomSandbox.exe'));
     this.workspaces = new Workspaces(root);
     this.baselines = new ImmutableBaselines(root);
+    this.imageUploads = new ImageUploads(store as any, root);
     this.integrations = new IntegrationRunner({
       store,
       root,
@@ -256,6 +261,7 @@ export class Worker {
     this.finalizeDeletions();
     this.scanSubscriptions();
     this.collectBaselines();
+    if (Date.now() - this.lastImageGc > 5 * 60 * 1000) { this.lastImageGc = Date.now(); try { this.imageUploads.gc(); } catch { /* retry next tick */ } }
     this.cleanupStaging();
     expireResourceLeases(this.store);
     expireQuarantinedLeases(this.store,this.store.settings().resourceQuarantineTtlMs);
@@ -266,6 +272,7 @@ export class Worker {
     for (const room of this.store.rooms()) {
       const status = (room as {status?: string}).status;
       if (status !== 'deleting') continue;
+      try { this.imageUploads.expireRoom(room.id); } catch { /* GC retries */ }
       const reasons: string[] = [];
       const activeRuns = this.store.list<Run>('runs', room.id).filter(run => ['running', 'waiting_input', 'cancel_requested'].includes(run.status));
       if (activeRuns.some(run => this.active.has(run.id))) reasons.push('active_process');
@@ -975,6 +982,26 @@ export class Worker {
       this.consumeToolCall(run);
       const commandId=fence?'tool_'+digest([run.id,fence.generation,request?.operationId]).slice(0,64):uid('tool');
       const scope={runId:run.id,...(fence?{generation:fence.generation,executionId:fence.executionId}:{})};
+      const imageFence = fence ? {runId: run.id, generation: fence.generation, executionId: fence.executionId, ...(run.taskId ? {taskId: run.taskId, taskVersion: run.taskVersion} : {})} : undefined;
+      const imageIdentity = {roomId: run.roomId, agentId: run.agentId, ...(imageFence ? {fence: imageFence} : {})};
+      if(name==='image_upload_begin'){
+        const input=imageUploadBeginSchema.parse(args);
+        const view=this.imageUploads.begin({...input,roomId:run.roomId,agentId:run.agentId,rootOperationId:String(request?.operationId??commandId),...(imageFence?{fence:imageFence}:{})});
+        this.store.event(run.roomId,'run.tool.completed',actor,{runId:run.id,generation:run.generation??1,executionId:run.executionId,name:String(name),success:true},null,run.id);
+        return view;
+      }
+      if(name==='image_upload_chunk'){
+        const input=imageUploadChunkSchema.parse(args);
+        const result=await this.imageUploads.chunk(input.uploadId,input.index,Buffer.from(input.dataBase64,'base64'),input.sha256,imageIdentity);
+        this.store.event(run.roomId,'run.tool.completed',actor,{runId:run.id,generation:run.generation??1,executionId:run.executionId,name:String(name),success:true},null,run.id);
+        return result;
+      }
+      if(name==='image_upload_complete'){
+        const input=imageUploadCompleteSchema.parse(args);
+        const result=await this.imageUploads.finalize(input.uploadId,imageIdentity);
+        this.store.event(run.roomId,'run.tool.completed',actor,{runId:run.id,generation:run.generation??1,executionId:run.executionId,name:String(name),success:true},null,run.id);
+        return result;
+      }
       let action:()=>unknown;
       if(name==='room_read'){
         action=()=>{const snapshot=runContext(this.store,run);return {roomId:run.roomId,contextStatus:{providedThroughSeq:contextSeqOf(run),headSeq:this.store.room(run.roomId)!.seq,requiresReconciliation:Boolean(contextDelta(this.store,run))},fromSeq:snapshot.fromSeq,throughSeq:snapshot.throughSeq,members:snapshot.members,messages:snapshot.messages.map(message=>({...message,text:message.text.slice(0,6000),truncated:message.text.length>6000})),decisions:snapshot.decisions};};
@@ -1139,7 +1166,19 @@ export class Worker {
       }
       return { roomId, fromSeq: startSeq, throughSeq: cursor, timeout: true, messages: [], head:this.store.room(roomId)!.seq, historyFloor, resetRequired:startSeq<historyFloor };
     }
-    if (['image_upload_begin','image_upload_chunk','image_upload_complete'].includes(String(name))) throw new ProtocolError('image_upload_unavailable','图片上传通道尚未启用',503);
+    const imageIdentity = {roomId, agentId};
+    if (name === 'image_upload_begin') {
+      const input = imageUploadBeginSchema.parse(args);
+      return this.imageUploads.begin({...input, roomId, agentId, rootOperationId: commandId});
+    }
+    if (name === 'image_upload_chunk') {
+      const input = imageUploadChunkSchema.parse(args);
+      return this.imageUploads.chunk(input.uploadId, input.index, Buffer.from(input.dataBase64, 'base64'), input.sha256, imageIdentity);
+    }
+    if (name === 'image_upload_complete') {
+      const input = imageUploadCompleteSchema.parse(args);
+      return this.imageUploads.finalize(input.uploadId, imageIdentity);
+    }
     throw new Error('不支持的房间工具');
   }
   async close() {

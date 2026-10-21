@@ -272,6 +272,13 @@ export class ImageUploads {
     try { if (existsSync(parts)) rmSync(parts, {recursive: true, force: true}); } catch { /* retry next GC */ }
   }
 
+  /** A deleting/deleted room immediately invalidates its pending uploads. */
+  expireRoom(roomId: string): number {
+    const rows = this.store.db.prepare("SELECT id FROM image_uploads WHERE room_id=? AND state='uploading'").all(roomId) as {id: string}[];
+    for (const row of rows) { try { this.expire(row.id); } catch { /* already terminal */ } }
+    return rows.length;
+  }
+
   /** Remove expired/pending uploads older than the retention while preserving completed receipts. */
   gc(retentionMs = 24 * 60 * 60 * 1000): number {
     const cutoff = new Date(Date.now() - retentionMs).toISOString();

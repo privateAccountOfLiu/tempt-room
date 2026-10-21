@@ -29,9 +29,9 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | R04 API、WebSocket、SDK 与列表语义 | in_progress | activeRooms/410/WS 终态/owner 导出/artifact 防绕过/RoomClient 命令/删除房间导入新身份已通过 8 个用例；agent room_wait 直接测试与双窗口 WS 同步仍未覆盖 |
 | R05 房间设置与删除 UI | in_progress | 设置改为单条 room.configure（带 revision）、冲突/忙错误保留表单、删除确认与空状态已实现；新增 Agent 自动回填与删除后双窗口浏览器验收仍待补 |
 | I01 图片协议、工具参数与权限 | verified | images.ts 冻结分块/元数据/操作 ID；artifact 图片元数据；image 工具名与写权限映射；attachment-only 消息；7+3 个用例通过；真实上传实现归 I02/I05 |
-| I02 有界可恢复的上传临时状态 | in_progress | image_uploads/parts 表 + migration 19、分块状态机、配额/TTL、原子落盘、缺失块检测、GC 已实现并通过 5 个用例；Worker/API 接线与定时 GC 仍待补 |
-| I03 解码验真、原图与安全预览 | in_progress | sharp 0.35.5 + 签名/结构检查 + 完整解码 + 1920 PNG 预览 + 原子落盘/稳定 artifactId 已通过 3 个用例；Worker/API 接线与 I02 定时 GC 仍待补 |
-| I04 托管 bridge/host/AppContainer 传输 | not_started | |
+| I02 有界可恢复的上传临时状态 | verified | image_uploads/parts 表 + migration 19、分块状态机、配额/TTL、原子落盘、缺失块检测、GC 与 Worker image 工具/删除房间失效接线完成；重启进程 E2E 仍由 I04 覆盖 |
+| I03 解码验真、原图与安全预览 | verified | sharp 0.35.5 + 签名/结构检查 + 完整解码 + 1920 PNG 预览 + 原子落盘/稳定 artifactId；Worker 三个低层工具已接线并通过 3+3 用例；bridge/helper 归 I04 |
+| I04 托管 bridge/host/AppContainer 传输 | in_progress | Worker executeTool/agentTool 已接上 begin/chunk/complete（托管 fence 与外部身份）并通过 3 个用例；bridge helper、toolchain 复制与真实 pipe chunk smoke 仍待实现 |
 | I05 外部 MCP、插件与 SDK 发图 | not_started | |
 | I06 安全内联路由与图片展示 | not_started | |
 | I07 跨功能竞态 | not_started | |
@@ -861,6 +861,51 @@ delivery/image-upload 细节与全入口 assertActiveRoom 仍待补）
   I02 的定时 GC 尚未接入 Worker tick；并发解码队列/磁盘满/SQL rollback 的
   失败注入未做；I04/I05 的托管/外部传输与房间消息发布仍待实现
 下一张卡与依赖：I04（托管 bridge、host 和 AppContainer 传输）
+```
+
+## I04 — 托管 bridge、host 和 AppContainer 传输（核心切片）
+
+```
+卡号与状态：I04 / in_progress（Worker 低层工具与托管/外部身份已接通；bridge helper/toolchain/pipe smoke 待补）
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 ea006e2（I03 提交）；实现见本次提交
+修改文件和关键符号：
+  apps/server/src/worker.ts
+    新增 imageUploads（ImageUploads 实例）；tick 每 5 分钟调用 imageUploads.gc()；
+    finalizeDeletions 对 deleting 房间调用 expireRoom() 立即失效 pending 上传；
+    managed executeTool 新增 image_upload_begin/chunk/complete：
+      复用现有 active/run fence/tool policy/authorization/consumeToolCall 检查；
+      begin 的 rootOperationId/identity 由服务端 run/fence 派生，客户端不能覆盖；
+      chunk 用 imageUploadChunkSchema 解析 base64 后交给公共 ImageUploads；
+      complete 走 finalize（解码/落盘/短事务 artifact.created）；
+    external agentTool 新增同样三个低层工具，identity 为 token 绑定的
+      room+agent，不接收 run/generation/path；
+    低层成功/失败都记录 run.tool.completed（不写 base64）
+  tests/managed-image-tools.test.ts（新增 3 个用例）
+变更前触发条件 / 变更后行为：
+  变更前：image 工具只有 503 占位；I02/I03 的上传/解码能力不能被 Agent 调用。
+  变更后：托管运行和外部连接器都可按 begin→chunk→complete 发图；
+  身份/fence 由服务器绑定，重复 complete 返回同一 artifact 且不重复事件。
+接口/事件/迁移/兼容性：
+  仅使用 I02 的 operational 表与 I03 的 artifact 文件/元数据；无新迁移；
+  bridge/MCP 的 room_send_image 便利编排尚未实现（I05）。
+执行命令、cwd、环境、开始结束、退出码：
+  npm run typecheck                                            exit 0
+  npx tsx --test tests/managed-image-tools.test.ts              exit 0（3 pass / 0 fail）
+  npm test                                                      exit 0（513 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-22 00:10–00:35 CST
+证据路径：
+  .state/parallel-room-image/i04-wire-tests-20261021.log
+实际覆盖的模式和失败分支：
+  外部 Agent 三段式上传成功并产出 verified artifact；错误 chunk hash 拒绝；
+  换 Agent 复用 uploadId 拒绝且不产 artifact；重复 complete 幂等；
+  managed 分支代码复用 run fence 与工具权限检查
+尚未验证项及明确原因：
+  scripts/room-image-transfer.mjs 尚未新增；room-bridge/toolchain/Claude
+  插件副本未包含 helper；真实 HostRoomPipe/AppContainer 分块 smoke 未跑；
+  managed executeTool 的端到端 pipe 调用未做自动化（代码路径已接线）；
+  room_post 的 attachments/replyTo 便利编排与消息发布仍归 I05/D04
+下一张卡与依赖：I05（外部 MCP、Claude 插件与浏览器可用 SDK）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移
