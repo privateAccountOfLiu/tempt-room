@@ -105,7 +105,8 @@ report: .state/collaboration-baseline/run-2026-10-21T00-22-19-639Z-60433526/repo
 - 自动路由仍待接入：当前调度继续使用兼容能力提示，不会把未验证证据当成支持
 ### 运行环境状态（2026-10-20）
 
-- 按用户明确授权启动本地服务验证；服务运行于 http://127.0.0.1:4317（PID 1296；2026-10-21 00:55 重启到 import integrity 构建（已注入 DEEPSEEK_API_KEY）
+- 按用户明确授权启动本地服务验证；服务运行于 http://127.0.0.1:4317（PID 17600；2026-10-21 08:26 重启到 outbound audit 构建（已注入 DEEPSEEK_API_KEY）
+- 实测 /api/outbound/audit 与 audit.csv 200
 - 实测篡改 exportHash 的导入返回 400
 - 实测 E02 房间 export?includeArtifacts=1&redact=1 返回 artifacts 与 redactions
 - 实测 GET /api/rooms/:id/wake-intents 返回 200
