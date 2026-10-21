@@ -26,7 +26,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | R01 Room schema/事件/迁移 | verified | room.ts 统一 schema/normalizeRoom；新增 room.configured/deleting/deletion.updated/deleted 与状态守卫；迁移整理为 v10→v18 有序升级；生成物更新 |
 | R02 单事务保存房间设置与成员 | verified | 纯规划 + 单事件 room.configured；revision CAS、成员去重/校验、忙成员移除拒绝、闲置会话结束、legacy 命令复用；5 个用例通过 |
 | R03 删除请求、停止执行与清理 | in_progress | afterCommit、room.delete 短事务、Worker finalizer、写入口拒绝、pending wake/input-batch/inbox delivery 清理已通过 6 个用例；outbound delivery 停止、image-upload 失效、全入口二次校验仍未覆盖 |
-| R04 API、WebSocket、SDK 与列表语义 | not_started | |
+| R04 API、WebSocket、SDK 与列表语义 | in_progress | activeRooms/410/WS 终态/owner includeDeleted 导出/artifact 防绕过/RoomClient 命令已通过 7 个用例；agent room_wait 即时结束、REST gap 410 停重连、导入导出生命周期映射仍未覆盖 |
 | R05 房间设置与删除 UI | not_started | |
 | I01 图片协议、工具参数与权限 | not_started | |
 | I02 有界可恢复的上传临时状态 | not_started | |
@@ -585,6 +585,61 @@ delivery/image-upload 细节与全入口 assertActiveRoom 仍待补）
   未逐一覆盖；迟到 adapter 输出在 commit 后的二次校验仍未系统化；
   room.delete API/WS/SDK/UI 属 R04/R05
 下一张卡与依赖：R04（API、WebSocket、SDK 与列表语义）
+```
+
+## R04 — API、WebSocket、SDK 与列表语义（核心切片）
+
+```
+卡号与状态：R04 / in_progress（列表/410/WS 终态/SDK 命令已通过；导入导出与部分重连语义待补）
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 622cefa（R03 清理提交）；实现见本次提交
+修改文件和关键符号：
+  apps/server/src/store.ts
+    rooms()/room() 保持 raw 语义；新增 activeRooms() 与 requireActiveRoom()
+    （deleted→room_deleted 410、deleting→room_deleting 409）
+  apps/server/src/ports/event-store.ts
+    可选 activeRooms/requireActiveRoom 端口能力
+  apps/server/src/app.ts
+    /api/rooms 只返回 activeRooms
+    /api/rooms/:id、/snapshot：deleted 返回 410 room_deleted；deleting 仍可读，
+      UI 可展示清理中状态
+    /events：deleted 返回 410
+    /audit/export：deleted 需显式 includeDeleted=1（仍走 owner 鉴权）
+    /api/artifacts/:id 与 /preview：所属房间 deleted 时 410，不能凭 artifactId 绕过
+    /api/agent/tool：房间 deleted 410、deleting 409，先于工具执行拒绝
+    WS 握手遇 deleted 以 1008 room_deleted 关闭；订阅中持久 room.deleting/
+    room.deleted 先发送，再以 1000 关闭
+  packages/client/src/index.ts
+    新增 configureRoom(roomId,input,commandId?) / deleteRoom(roomId,revision,commandId?)
+    底层仍走 /api/commands；WS 收到 room.deleted 或 room_deleted/room_deleting
+    关闭原因时停止重连
+  tests/room-api.test.ts（新增）7 个用例
+变更前触发条件 / 变更后行为：
+  变更前：/api/rooms 返回 deleted/deleting 房间；snapshot/events/artifact URL
+  对已删除房间仍可读；WS 删除后无限重连；客户端没有房间设置/删除方法。
+  变更后：侧栏只列 active 房间；已删除房间普通读取 410；owner 历史导出需
+  显式 includeDeleted；WS 先收到终态事件再停止；客户端停止对终态房间重连。
+接口/事件/迁移/兼容性：
+  复用 R01/R03 生命周期事件；无迁移。deleted 的 audit 导出仍需 owner 显式参数，
+  Agent token 不因此获得历史读权限。
+执行命令、cwd、环境、开始结束、退出码：
+  npm run typecheck                                            exit 0
+  npx tsx --test tests/room-api.test.ts                          exit 0（7 pass / 0 fail）
+  npm test                                                     exit 0（491 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-21 21:35–22:05 CST
+证据路径：
+  .state/parallel-room-image/r04-tests-20261021.log
+实际覆盖的模式和失败分支：
+  active 列表过滤；deleting snapshot/events 可读、deleted 410；owner audit
+  includeDeleted；artifact 下载/预览防绕过；最后房间删除后重启不重建 seed；
+  RoomClient configure/delete 命令；WS 收到 room.deleting 后关闭不重连
+尚未验证项及明确原因：
+  /api/agent/tool 中 room_wait 在等待期间房间被删除时立即结束（当前等待逻辑
+  尚未监听删除事件）；RoomClient 的 REST gap 遇 410 停止重连仅对直接 events
+  抛错可感知，未做端到端故障注入；
+  room-import/export 的 lifecycle 与图片引用映射（R04 #13/#14）未实现；
+  房间设置/删除 UI 属 R05
+下一张卡与依赖：R05（房间设置和删除 UI）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移

@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync, copyFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
-import { VERSION, capabilitiesFor, executionSettingsSchema,eventSchema,eventMetadata,EventContractError,projectionTableNames,type ProjectionTable,type ExecutionSettings, type Actor, type AgentDescriptor, type Room, type RoomEvent, type RoomSnapshot, type Run, type Task, type Discussion,type ToolOperation } from '../../../packages/protocol/src/index.ts';
+import { VERSION, capabilitiesFor, executionSettingsSchema,eventSchema,eventMetadata,EventContractError,projectionTableNames,normalizeRoom,ProtocolError,type ProjectionTable,type ExecutionSettings, type Actor, type AgentDescriptor, type Room, type RoomEvent, type RoomSnapshot, type Run, type Task, type Discussion,type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { MemoryProjectionSink,SqlProjectionSink,projectEvent,projectionJson } from './event-projections.ts';
 import type { EventStore } from './ports/event-store.ts';
 export const DATABASE_VERSION=18;
@@ -182,6 +182,15 @@ if(version<16)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS capabili
     this.db.prepare(`INSERT INTO ${table}(id,room_id,body) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET room_id=excluded.room_id,body=excluded.body`).run(value.id, value.roomId ?? null, JSON.stringify(value));
   }
   rooms(): Room[] { return this.db.prepare('SELECT body,seq FROM rooms ORDER BY rowid').all().map((r: any) => ({ ...JSON.parse(r.body), seq: r.seq })); }
+  activeRooms(): Room[] { return this.rooms().filter(room => normalizeRoom(room).status === 'active'); }
+  requireActiveRoom(id: string): Room {
+    const room = this.room(id);
+    if (!room) throw new ProtocolError('not_found', '房间不存在', 404);
+    const status = normalizeRoom(room).status;
+    if (status === 'deleted') throw new ProtocolError('room_deleted', '房间已删除', 410);
+    if (status === 'deleting') throw new ProtocolError('room_deleting', '房间正在删除', 409);
+    return room;
+  }
   room(id: string): Room | undefined { const row = this.db.prepare('SELECT body,seq FROM rooms WHERE id=?').get(id) as any; return row ? { ...JSON.parse(row.body), seq: row.seq } : undefined; }
   putRoom(room: Room,actor:Actor=SYSTEM) {
     return this.atomic(()=>{

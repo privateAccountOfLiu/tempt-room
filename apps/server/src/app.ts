@@ -78,10 +78,19 @@ export async function createApp(options: AppOptions = {}) {
     const room = typeof request.query.room === 'string' ? request.query.room : '';
     return reply.redirect('/' + (room ? `?room=${encodeURIComponent(room)}` : ''));
   });
-  app.get('/api/rooms', () => store.rooms());
-  app.get<{ Params: { id: string } }>('/api/rooms/:id', request => { if (!store.room(request.params.id)) throw new ProtocolError('not_found', '房间不存在', 404); return store.snapshotWithTail(request.params.id).snapshot; });
+  const roomLifecycleStatus = (roomId: string) => {
+    const room = store.room(roomId);
+    if (!room) throw new ProtocolError('not_found', '房间不存在', 404);
+    return (room as {status?: string}).status ?? 'active';
+  };
+  const assertReadableRoom = (roomId: string) => {
+    if (roomLifecycleStatus(roomId) === 'deleted') throw new ProtocolError('room_deleted', '房间已删除', 410);
+  };
+  app.get('/api/rooms', () => store.activeRooms?.() ?? store.rooms());
+  app.get<{ Params: { id: string } }>('/api/rooms/:id', request => { assertReadableRoom(request.params.id); return store.snapshotWithTail(request.params.id).snapshot; });
   app.get<{Params:{id:string};Querystring:{cursor?:string;limit?:string}}>('/api/rooms/:id/snapshot',request=>{
-    const room=store.room(request.params.id);if(!room)throw new ProtocolError('not_found','房间不存在',404);
+    assertReadableRoom(request.params.id);
+    const room=store.room(request.params.id)!;
     const cursor=request.query.cursor===undefined?undefined:z.coerce.number().int().nonnegative().parse(request.query.cursor),limit=z.coerce.number().int().min(1).max(2000).parse(request.query.limit??1000);
     if(cursor!==undefined&&cursor>room.seq)throw new ProtocolError('invalid_cursor','游标超出当前房间事件序号',400);
     return store.snapshotWithTail(room.id,cursor,limit);
@@ -92,14 +101,14 @@ export async function createApp(options: AppOptions = {}) {
     return store.rebuildProjections(request.params.id,fromSeq);
   });
   app.get<{ Params: { id: string }; Querystring: { after?: string } }>('/api/rooms/:id/events', request => {
-    if (!store.room(request.params.id)) throw new ProtocolError('not_found', '房间不存在', 404);
+    assertReadableRoom(request.params.id);
     return store.events(request.params.id, z.coerce.number().int().min(0).parse(request.query.after ?? 0));
   });
   // Local audit trail export: one JSON event per line. It passes through the
   // normal owner authorization hook, so it is not available to Agent tokens.
-  app.get<{ Params: { id: string } }>('/api/rooms/:id/audit/export', (request, reply) => {
+  app.get<{ Params: { id: string }; Querystring: { includeDeleted?: string } }>('/api/rooms/:id/audit/export', (request, reply) => {
     const roomId = request.params.id;
-    if (!store.room(roomId)) throw new ProtocolError('not_found', '房间不存在', 404);
+    if (roomLifecycleStatus(roomId) === 'deleted' && request.query.includeDeleted !== '1') throw new ProtocolError('room_deleted', '房间已删除；历史导出需显式 includeDeleted=1', 410);
     const throughSeq = store.room(roomId)!.seq, floorSeq = store.projectionStatus(roomId).historyFloor;
     reply.header('content-type', 'application/x-ndjson; charset=utf-8');
     reply.header('content-disposition', `attachment; filename="${roomId}-audit.jsonl"`);
@@ -221,6 +230,9 @@ export async function createApp(options: AppOptions = {}) {
     const input = agentToolCallSchema.parse(request.body);
     const agentId = bearer ? verifyAgentToken(tokenSecret, bearer, input.roomId) : undefined;
     if (!agentId) return reply.code(401).send({ code: 'invalid_agent_token', message: 'Agent 接入令牌无效' });
+    const toolRoomStatus = roomLifecycleStatus(input.roomId);
+    if (toolRoomStatus === 'deleted') return reply.code(410).send({code:'room_deleted',message:'房间已删除'});
+    if (toolRoomStatus === 'deleting') return reply.code(409).send({code:'room_deleting',message:'房间正在删除'});
     try {
       return { result: await worker.agentTool(agentId, input.roomId, input.name, input.arguments, input.commandId) };
     } catch (error) {
@@ -383,10 +395,12 @@ export async function createApp(options: AppOptions = {}) {
   });
   app.get<{ Params: { id: string } }>('/api/artifacts/:id', (request, reply) => {
     const artifact = store.get<Artifact>('artifacts', request.params.id); if (!artifact) throw new ProtocolError('not_found', '交付物不存在', 404);
+    assertReadableRoom(artifact.roomId);
     return reply.header('content-type', 'application/octet-stream').header('x-content-type-options', 'nosniff').header('content-disposition', `attachment; filename*=UTF-8''${encodeURIComponent(artifact.name)}`).send(readFileSync(join(root, 'artifacts', artifact.id)));
   });
   app.get<{ Params: { id: string } }>('/api/artifacts/:id/preview', request => {
     const artifact = store.get<Artifact>('artifacts', request.params.id); if (!artifact) throw new ProtocolError('not_found', '交付物不存在', 404);
+    assertReadableRoom(artifact.roomId);
     if (artifact.size > 2 ** 20 || !/^(text\/|application\/(json|xml))/.test(artifact.mediaType)) return { artifact, text: null };
     return { artifact, text: readFileSync(join(root, 'artifacts', artifact.id), 'utf8') };
   });
@@ -394,13 +408,18 @@ export async function createApp(options: AppOptions = {}) {
     let roomId: string | undefined, handshake = false;
     const timeout = setTimeout(() => { if (!handshake) socket.close(1008, 'Handshake required'); }, 5000);
     const durable=(event:RoomEvent)=>{if(socket.readyState!==1)return false;if(socket.bufferedAmount>1024*1024){socket.close(1013,'Durable replay required');return false;}socket.send(JSON.stringify(event));return true;};
-    const eventListener = (event: RoomEvent) => { if (event.roomId === roomId) durable(event); };
+    const eventListener = (event: RoomEvent) => {
+      if (event.roomId !== roomId) return;
+      const sent = durable(event);
+      if (sent && (event.type === 'room.deleted' || event.type === 'room.deleting')) socket.close(1000, event.type === 'room.deleted' ? 'room_deleted' : 'room_deleting');
+    };
     const deltaListener = (delta: any) => { if (delta.roomId === roomId && socket.readyState === 1 && socket.bufferedAmount<256*1024) socket.send(JSON.stringify(delta)); };
     socket.on('message', raw => {
       try {
         if (handshake) throw new Error('Already subscribed');
         const input = z.object({ version: z.literal(VERSION), roomId: z.string(), after: z.number().int().min(0),clientType:z.enum(['browser','sdk']).default('browser') }).strict().parse(JSON.parse(raw.toString()));
         const room = store.room(input.roomId); if (!room || input.after > room.seq) throw new Error('Invalid room or cursor');
+        if ((room as {status?: string}).status === 'deleted') { socket.close(1008, 'room_deleted'); return; }
         roomId = input.roomId; handshake = true; clearTimeout(timeout);
         // Synchronous replay and subscription registration cannot interleave with a commit.
         let cursor = input.after;

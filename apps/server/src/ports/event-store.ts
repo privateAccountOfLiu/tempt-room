@@ -41,6 +41,8 @@ export interface EventStore {
   putRoom(room: Room, actor?: Actor): void;
   list<T>(table: string, roomId?: string): T[];
   room(id: string): Room | undefined;
+  activeRooms?(): Room[];
+  requireActiveRoom?(id: string): Room;
   rooms(): Room[];
   snapshot(id: string): RoomSnapshot;
   snapshotAt(roomId: string, cursor: number): RoomSnapshot;

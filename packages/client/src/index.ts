@@ -24,6 +24,12 @@ export class RoomClient {
   command(type: Command['type'], payload: Record<string, unknown>, roomId?: string, commandId = `cmd_${crypto.randomUUID().replaceAll('-', '')}`) {
     return this.request<Receipt>('/api/commands', { method: 'POST', body: JSON.stringify({ version: VERSION, commandId, roomId, type, payload }) });
   }
+  configureRoom(roomId: string, input: {name: string; description: string; members: string[]; expectedRevision: number}, commandId?: string) {
+    return this.command('room.configure', input, roomId, commandId);
+  }
+  deleteRoom(roomId: string, expectedRevision: number, commandId?: string) {
+    return this.command('room.delete', {expectedRevision}, roomId, commandId);
+  }
   subscribe(roomId: string, after: number, onEvent: (event: RoomEvent | StreamDelta | { type: string; [key: string]: unknown }) => void, onStatus?: (connected: boolean) => void): () => void {
     let stopped = false, socket: WebSocket | undefined, retry: ReturnType<typeof setTimeout> | undefined,pending=Promise.resolve(),bufferedBytes=0;
     const cursor=new RoomEventCursor(roomId,after,seq=>this.events(roomId,seq),event=>{if(!stopped)onEvent(event);});
@@ -43,9 +49,19 @@ export class RoomClient {
           return;
         }
         bufferedBytes+=bytes;
-        pending=pending.then(async()=>{if(!stopped)await cursor.accept(frame);}).catch(()=>connection.close(1013,'Event replay required')).finally(()=>{bufferedBytes-=bytes;});
+        pending=pending.then(async()=>{
+          if(stopped)return;
+          await cursor.accept(frame);
+          if(frame.type==='room.deleted'){stopped=true;onStatus?.(false);connection.close(1000,'room_deleted');}
+        }).catch(()=>connection.close(1013,'Event replay required')).finally(()=>{bufferedBytes-=bytes;});
       };
-      connection.onclose = () => { if(socket!==connection)return;onStatus?.(false);void pending.finally(()=>{if(!stopped)retry=setTimeout(connect,1000);}); };
+      connection.onclose = event => {
+        if(socket!==connection)return;
+        onStatus?.(false);
+        const terminal = event.code === 1000 || event.code === 1008 ? /room_deleted|room_deleting/.test(event.reason) : false;
+        if(terminal){stopped=true;return;}
+        void pending.finally(()=>{if(!stopped)retry=setTimeout(connect,1000);});
+      };
       connection.onerror = () => connection.close();
     }; connect();
     return () => { stopped = true; clearTimeout(retry); socket?.close(); };
