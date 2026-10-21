@@ -916,6 +916,56 @@ try {
     await send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
     step('ui-mobile-delete', {room: disposable});
 
+    // Two real windows save the same room revision: second must keep its form and show conflict.
+    const conflictRoomName = `冲突保存房间 ${Date.now() % 1000000}`;
+    const conflictRoom = (await command(roomId, 'room.create', {name: conflictRoomName, members: ['demo-planner']}) as any).result.roomId;
+    const conflictLoaded = waitEvent('Page.loadEventFired');
+    await send('Page.navigate', {url: `${base}/?room=${conflictRoom}`}, sessionId);
+    await conflictLoaded;
+    await waitFor('冲突保存第一窗口', async () => (await bodyText()).includes(conflictRoomName), 15000);
+    const conflictTarget = await send('Target.createTarget', {url: 'about:blank'});
+    const conflictAttached = await send('Target.attachToTarget', {targetId: conflictTarget.targetId, flatten: true});
+    const conflictSession = conflictAttached.sessionId;
+    await send('Page.enable', {}, conflictSession);
+    await send('Runtime.enable', {}, conflictSession);
+    await send('Page.addScriptToEvaluateOnNewDocument', {source: `(() => { const Native = window.WebSocket; window.__blockRoomWS = false; function Wrapped(...args) { const socket = new Native(...args); Object.defineProperty(socket, 'onmessage', {configurable: true, set(handler) { this.__roomHandler = handler; socket.addEventListener('message', event => { if (!window.__blockRoomWS) this.__roomHandler?.call(socket, event); }); }, get() { return this.__roomHandler; }}); return socket; } Wrapped.prototype = Native.prototype; for (const key of ['CONNECTING','OPEN','CLOSING','CLOSED']) Wrapped[key] = Native[key]; window.WebSocket = Wrapped; })()`}, conflictSession);
+    const conflictEvaluate = async (expression: string) => {
+      const result = await send('Runtime.evaluate', {expression, returnByValue: true, awaitPromise: true}, conflictSession);
+      if (result.exceptionDetails) fail(`冲突窗口脚本异常：${result.exceptionDetails.text ?? ''}`);
+      return result.result?.value;
+    };
+    const conflictBodyText = () => conflictEvaluate('document.body ? document.body.innerText : ""') as Promise<string>;
+    const conflictClick = async (text: string) => conflictEvaluate(`(() => { const button = [...document.querySelectorAll('dialog.modal button')].find(item => (item.textContent ?? '').trim().includes(${JSON.stringify(text)})); if (!button) return 'missing'; button.click(); return 'ok'; })()`);
+    const conflictSetName = async (value: string) => conflictEvaluate(`(() => { const label = [...document.querySelectorAll('dialog.modal label')].find(item => (item.textContent ?? '').includes('房间名称')); const input = label?.querySelector('input'); if (!input) return 'missing'; const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set; setter?.call(input, ${JSON.stringify(value)}); input.dispatchEvent(new Event('input', {bubbles: true})); return 'ok'; })()`);
+    const conflictNavigate = waitEvent('Page.loadEventFired');
+    await send('Page.navigate', {url: `${base}/?room=${conflictRoom}`}, conflictSession);
+    await conflictNavigate;
+    await waitFor('冲突保存第二窗口', async () => (await conflictBodyText()).includes(conflictRoomName) && (await conflictBodyText()).includes('实时连接'), 20000);
+    const openConflictSettings = async (evaluateIn: (expression: string) => Promise<any>) => {
+      if (await evaluateIn(`(() => { const button = document.querySelector('button[aria-label="房间设置"]'); if (!button) return 'missing'; button.click(); return 'ok'; })()`) !== 'ok') fail('冲突保存找不到房间设置入口');
+    };
+    await openConflictSettings(conflictEvaluate);
+    await waitFor('冲突保存第二窗口设置', async () => (await conflictBodyText()).includes('保存设置'), 10000);
+    await conflictEvaluate(`(() => { window.__blockRoomWS = true; return true; })()`);
+    await sleep(250);
+    await sleep(300);
+    const renamedForConflict = conflictRoomName + ' 改';
+    await openConflictSettings(evaluate);
+    await waitFor('冲突保存第一窗口设置', async () => (await bodyText()).includes('保存设置'), 10000);
+    if (await setInputByLabel('房间名称', renamedForConflict) !== 'ok') fail('冲突保存第一窗口无法改名');
+    if (await clickByText('dialog.modal button', '保存设置') !== 'ok') fail('冲突保存第一窗口无法保存');
+    await waitFor('冲突保存第一窗口保存完成', async () => !(await bodyText()).includes('保存设置'), 15000);
+    if (await conflictSetName(conflictRoomName + ' 旧表单') !== 'ok') fail('冲突保存第二窗口无法改名');
+    if (await conflictClick('保存设置') !== 'ok') fail('冲突保存第二窗口无法保存');
+    await waitFor('冲突错误保留表单', async () => { const text = await conflictBodyText(); return text.includes('房间已被其他窗口修改') && text.includes('刷新房间数据') && text.includes('保存设置'); }, 15000);
+    if (await conflictClick('刷新房间数据') !== 'ok') fail('冲突保存找不到刷新按钮');
+    await waitFor('刷新后表单同步新名称', async () => {
+      const value = await conflictEvaluate(`(() => document.querySelector('dialog.modal input')?.value ?? '')()`);
+      return value === renamedForConflict && !(await conflictBodyText()).includes('房间已被其他窗口修改');
+    }, 15000);
+    step('ui-two-window-conflict-save', {room: conflictRoom});
+    await send('Target.closeTarget', {targetId: conflictTarget.targetId});
+
     // Last room: deleting all remaining rooms must show the empty state after reload.
     const remainingRooms = appHandle!.store.activeRooms();
     for (const room of remainingRooms) {

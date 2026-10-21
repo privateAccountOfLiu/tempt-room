@@ -27,7 +27,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | R02 单事务保存房间设置与成员 | verified | 纯规划 + 单事件 room.configured；revision CAS、成员去重/校验、忙成员移除拒绝、闲置会话结束、legacy 命令复用；5 个用例通过 |
 | R03 删除请求、停止执行与清理 | in_progress | afterCommit、短事务、finalizer、写入口拒绝、wake/input/inbox 清理、outbound delivery 在非 active 房间记录 aborted 且不再尝试；image-upload 失效由 Worker expireRoom 覆盖；全入口二次校验仍未系统覆盖 |
 | R04 API、WebSocket、SDK 与列表语义 | verified | activeRooms/410/WS 终态/owner 导出/artifact 防绕过/RoomClient 命令/删除房间导入新身份 8 用例；room_wait 删除即时结束、两个真实 WS 窗口终态、两浏览器窗口删除同步均通过 |
-| R05 房间设置与删除 UI | in_progress | 设置单命令/冲突保留+刷新、新增 Agent 自动预选、删除二次确认/取消删除/手机删除/双窗口同步/最后房间空状态浏览器均通过；忙成员提示已加，冲突保存浏览器步骤仍待补 |
+| R05 房间设置与删除 UI | verified | 设置单命令/冲突保留+刷新、新增 Agent 自动预选、删除确认/取消/手机删除/双窗口同步/最后房间空状态/两窗口同 revision 冲突保存均通过浏览器验收 |
 | I01 图片协议、工具参数与权限 | verified | images.ts 冻结分块/元数据/操作 ID；artifact 图片元数据；image 工具名与写权限映射；attachment-only 消息；7+3 个用例通过；真实上传实现归 I02/I05 |
 | I02 有界可恢复的上传临时状态 | verified | image_uploads/parts 表 + migration 19、分块状态机、配额/TTL、原子落盘、缺失块检测、GC 与 Worker image 工具/删除房间失效接线完成；重启进程 E2E 仍由 I04 覆盖 |
 | I03 解码验真、原图与安全预览 | verified | sharp 0.35.5 + 签名/结构检查 + 完整解码 + 1920 PNG 预览 + 原子落盘/稳定 artifactId；Worker 三个低层工具已接线并通过 3+3 用例；bridge/helper 归 I04 |
@@ -1664,6 +1664,23 @@ b) 浏览器在删除所有 active rooms 后 reload，断言“还没有房间�
        npx vite build exit 0；npx tsc --noEmit exit 0。
 证据：.state/parallel-room-image/r05-cancel-mobile-browser-20261022.log。
 未验证：两窗口同 revision 冲突保存的浏览器点击链路、未知清理详情入口。
+下一张卡：V03（等待付费授权）或 AppContainer 真图片 smoke
+```
+
+## R05 — 两窗口同 revision 冲突保存浏览器
+
+```
+基线 SHA：19c323f；实现见本次提交
+修改：scripts/browser-e2e.ts（+ui-two-window-conflict-save）
+新建 conflict 房间，两个真实浏览器 target 同时打开房间设置（同 revision v1）；
+第二窗口注入 WebSocket onmessage 抑制器模拟事件缺口，第一窗口改名保存成功；
+第二窗口用旧 revision 保存 → Modal 保留表单并显示“房间已被其他窗口修改”+
+“刷新房间数据”；点击刷新后表单同步第一窗口保存的新名称。
+验证：npm run test:browser PASS（含冲突保存/取消删除/手机删除/双窗口/空状态）；
+npm test 545/545。
+证据：.state/parallel-room-image/r05-conflict-save-tests-20261022.log、
+.state/browser-e2e/run-LC2yr8/report.json。
+未验证：未知清理详情入口的服务端事件展示；不在 R05 浏览器验收清单内。
 下一张卡：V03（等待付费授权）或 AppContainer 真图片 smoke
 ```
 
