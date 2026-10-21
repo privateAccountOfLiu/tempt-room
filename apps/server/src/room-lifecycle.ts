@@ -1,4 +1,4 @@
-import { ProtocolError, normalizeRoom, terminalStates, type AgentSession, type Discussion, type ResourceLease, type Room, type Run, type Subscription, type Task } from '../../../packages/protocol/src/index.ts';
+import { ProtocolError, normalizeRoom, terminalStates, type AgentSession, type Discussion, type Integration, type ResourceLease, type Room, type Run, type Subscription, type Task, type WakeIntent } from '../../../packages/protocol/src/index.ts';
 import type { EventStore } from './ports/event-store.ts';
 
 /**
@@ -76,4 +76,12 @@ export function retireRemovedMembers(store: EventStore, roomId: string, removedM
       store.event(roomId, 'subscription.updated', actor, {subscription: {...subscription, enabled: false}});
     }
   }
+}
+
+/** Plan a deletion request; repeated requests return the existing state. */
+export function planRoomDeletion(room: Room, expectedRevision: number, actorId: string, commandId: string): {next?: Room; status: 'deleting' | 'deleted'} {
+  const current = normalizeRoom(room);
+  if (current.status === 'deleting' || current.status === 'deleted') return {status: current.status};
+  if (current.revision !== expectedRevision) throw new ProtocolError('room_revision_conflict', '房间设置已被其他窗口修改，请刷新后重试', 409);
+  return {status: 'deleting', next: {...current, revision: current.revision + 1, status: 'deleting', deletion: {requestedAt: new Date().toISOString(), requestedBy: actorId, commandId, pendingReasons: []}}};
 }

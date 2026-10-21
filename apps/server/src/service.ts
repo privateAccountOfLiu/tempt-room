@@ -17,7 +17,7 @@ import { summarizeOutboundDeliveries } from './outbound-summary.ts';
 import {acquireResource,releaseResource} from './resource-manager.ts';
 import {canonicalProjectPath,projectBaseCommit} from './project-manifest.ts';
 import type { PreparedProjectBinding } from './command-executor.ts';
-import { planRoomConfiguration, retireRemovedMembers } from './room-lifecycle.ts';
+import { planRoomConfiguration, planRoomDeletion, retireRemovedMembers } from './room-lifecycle.ts';
 import {taskVerificationRecordSchema} from '../../../packages/protocol/src/index.ts';
 
 /** External (non-managed) claims must heartbeat within this window or the worker recycles the task. */
@@ -25,6 +25,7 @@ const externalTaskLeaseMs = (store: EventStore) => store.settings().taskLeaseMs;
 
 export class RoomService {
   onCancel: (runId: string) => void = () => {};
+  onRoomDeleting: (roomId: string) => void = () => {};
   onApply: (artifactId: string) => Record<string, unknown> = () => { throw new ProtocolError('not_available', '成果应用服务不可用', 503); };
   onRollback: (integrationId: string, actor: Actor) => Record<string, unknown> = () => { throw new ProtocolError('not_available', '集成回滚服务不可用', 503); };
   onInput: (runId: string, text: string) => void = () => {};
@@ -40,6 +41,10 @@ export class RoomService {
       const previous = this.store.receipt(command.commandId);
       if (previous) { if (previous.hash !== hash) throw new ProtocolError('idempotency_conflict', '同一 commandId 不能用于不同内容', 409); return previous.receipt; }
       if (command.roomId && !this.store.room(command.roomId)) throw new ProtocolError('not_found', '房间不存在', 404);
+      if (command.roomId && command.type !== 'room.delete') {
+        const status = (this.store.room(command.roomId) as {status?: string}).status;
+        if (status === 'deleting' || status === 'deleted') throw new ProtocolError('room_inactive', '房间正在删除或已删除', 409);
+      }
       if (actor.kind === 'agent') {
         if (!command.roomId || !this.store.room(command.roomId)?.members.includes(actor.id)) throw new ProtocolError('forbidden', '不是该房间的成员', 403);
         if (!['message.send', 'decision.propose', 'task.create', 'task.claim', 'task.context', 'task.complete', 'task.heartbeat', 'input.ack'].includes(command.type)) throw new ProtocolError('forbidden', 'Agent 无权执行此命令', 403);
@@ -77,8 +82,37 @@ export class RoomService {
         return {roomId, revision: plan.revision, changed: plan.changed, addedMemberIds: plan.addedMemberIds, removedMemberIds: plan.removedMemberIds};
       }
       case 'room.delete': {
-        // R03 owns deletion request/cleanup.
-        throw new ProtocolError('not_implemented', '房间删除命令尚未启用', 409);
+        if (actor.kind !== 'human') throw new ProtocolError('forbidden', '只有 owner 可以删除房间', 403);
+        const roomId = this.requireRoom(command), room = this.store.room(roomId)!;
+        const input = z.object({expectedRevision:z.number().int().positive()}).strict().parse(p);
+        const plan = planRoomDeletion(room, input.expectedRevision, actor.id, command.commandId);
+        if (!plan.next) return {roomId, status: plan.status, revision: (room.revision ?? 1)};
+        this.store.event(roomId, 'room.deleting', actor, {room: plan.next}, command.commandId);
+        for (const run of this.store.list<Run>('runs', roomId).filter(item => !terminalStates.has(item.status))) this.cancel(run, 'user_cancel', true);
+        for (const task of this.store.list<Task>('tasks', roomId)) {
+          if (!task.leaseUntil || task.status === 'completed') continue;
+          const next: Task = {...task, status: 'canceled', version: task.version + 1, generation: (task.generation ?? 1) + 1};
+          delete next.leaseUntil;
+          this.store.event(roomId, 'task.updated', SYSTEM, {task: next});
+        }
+        for (const discussion of this.store.list<Discussion>('discussions', roomId)) {
+          if (discussion.status !== 'active' && discussion.status !== 'paused') continue;
+          const next: Discussion = {...discussion, status: 'stopped', endedAt: now(), endedSeq: this.store.room(roomId)!.seq, endReason: 'user_stop'};
+          this.store.event(roomId, 'discussion.stopped', actor, {discussion: next, reason: '房间删除'});
+        }
+        for (const session of this.store.list<AgentSession>('agent_sessions', roomId)) {
+          if (session.status !== 'active') continue;
+          this.store.event(roomId, 'agent_session.ended', actor, {agentSession: {...session, status: 'ended', updatedAt: now()}});
+        }
+        for (const subscription of this.store.list<Subscription>('subscriptions', roomId)) {
+          if (subscription.enabled) this.store.event(roomId, 'subscription.updated', actor, {subscription: {...subscription, enabled: false}});
+        }
+        for (const integration of this.store.list<Integration>('integrations', roomId)) {
+          if (!['queued', 'ready_to_apply'].includes(integration.status)) continue;
+          this.store.event(roomId, 'integration.updated', SYSTEM, {integration: {...integration, status: 'blocked', errorCode: 'room_deleting', updatedAt: now()}});
+        }
+        this.store.afterCommit?.(() => this.onRoomDeleting(roomId));
+        return {roomId, status: 'deleting', revision: plan.next.revision};
       }
       case 'room.update': {
         const roomId = this.requireRoom(command), room = this.store.room(roomId)!;
@@ -591,6 +625,8 @@ export class RoomService {
     this.store.event(run.roomId,'budget.updated',SYSTEM,{reservation:next});
   }
   enqueue(roomId: string, agentId: string, prompt: string, basedOnSeq: number, extra: Partial<Run> & { causationId?: string } = {}): Run {
+    const enqueueStatus = (this.store.room(roomId) as {status?: string}|undefined)?.status;
+    if (enqueueStatus === 'deleting' || enqueueStatus === 'deleted') throw new ProtocolError('room_inactive', '房间正在删除或已删除', 409);
     const executionAgent=this.checkAgent(roomId,agentId);
     // Cost-budgeted runs from providers without verified usage are blocked by default.
     {const provisionalLimits={costBudgetUsd:extra.limits?.costBudgetUsd??this.store.settings().costBudgetUsd};this.assertCostPolicy(roomId,executionAgent,provisionalLimits);}
@@ -767,13 +803,14 @@ export class RoomService {
       }
     });
   }
-  cancel(run: Run,reason:'user_cancel'|'superseded'='user_cancel') {
+  cancel(run: Run,reason:'user_cancel'|'superseded'='user_cancel',commitSideEffects=false) {
     if (terminalStates.has(run.status)) return;
     run.stopReason=reason;
     run.status = run.status === 'queued' && !run.codex ? reason==='superseded'?'superseded':'canceled' : 'cancel_requested'; run.updatedAt = now();
      this.store.event(run.roomId, 'run.updated', OWNER, { run }, null, run.id);
     if(run.taskId){const task=this.store.get<Task>('tasks',run.taskId);if(task&&task.version===run.taskVersion){task.status=run.status;this.store.event(run.roomId,'task.updated',SYSTEM,{task});}}
-    queueMicrotask(() => { this.onCancel(run.id); if (run.status === 'canceled'||run.status==='superseded') this.settleDiscussion(run); });
+    const notify = () => { this.onCancel(run.id); if (run.status === 'canceled'||run.status==='superseded') this.settleDiscussion(run); };
+    if (commitSideEffects && this.store.afterCommit) this.store.afterCommit(notify); else queueMicrotask(notify);
   }
 }
 

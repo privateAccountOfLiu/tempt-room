@@ -15,6 +15,8 @@ import type {
 export interface EventStore {
   /** Run one callback in the store's local write transaction. */
   atomic<T>(callback: () => T): T;
+  /** Run a side effect only after the enclosing transaction commits. */
+  afterCommit?(fn: () => void): void;
   /** Append one room event and return the durable event. */
   event(
     roomId: string,

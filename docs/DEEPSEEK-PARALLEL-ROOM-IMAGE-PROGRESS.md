@@ -25,7 +25,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | P06 M1 七项可失败用例 | in_progress | 1–6 的模拟切片已覆盖（并发=1 负例、共同基线、整体组合、局部失败/重试、幂等/fence、同文件冲突保留双方 patch）；第 7 项真实 CLI 对照依赖 V03 尚未执行 |
 | R01 Room schema/事件/迁移 | verified | room.ts 统一 schema/normalizeRoom；新增 room.configured/deleting/deletion.updated/deleted 与状态守卫；迁移整理为 v10→v18 有序升级；生成物更新 |
 | R02 单事务保存房间设置与成员 | verified | 纯规划 + 单事件 room.configured；revision CAS、成员去重/校验、忙成员移除拒绝、闲置会话结束、legacy 命令复用；5 个用例通过 |
-| R03 删除请求、停止执行与清理 | not_started | |
+| R03 删除请求、停止执行与清理 | in_progress | afterCommit 队列、room.delete 短事务、Worker 持久 finalizer、已删房间写入口拒绝已实现并通过 5 个用例；wake/input-batch/delivery/image-upload 清理和迟到结果封禁仍未覆盖 |
 | R04 API、WebSocket、SDK 与列表语义 | not_started | |
 | R05 房间设置与删除 UI | not_started | |
 | I01 图片协议、工具参数与权限 | not_started | |
@@ -525,6 +525,65 @@ P02 后续补充（第 5 轮已覆盖）：
   R03 删除请求/清理；pending inbox/batch 的专用过期事件未新增，
   当前由会话/订阅终止与现有交付状态机处理
 下一张卡与依赖：R03（删除请求、停止执行与持久清理）
+```
+
+## R03 — 删除请求、停止执行与持久清理（核心切片）
+
+```
+卡号与状态：R03 / in_progress（核心删除闭环已验证；计划中的 wake/input-batch/
+delivery/image-upload 细节与全入口 assertActiveRoom 仍待补）
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 8688d21（R02 提交）；实现见本次提交
+修改文件和关键符号：
+  apps/server/src/store.ts
+    新增 afterCommit(fn)：事务内排队，rollback 丢弃，commit 后才执行；
+    执行异常写入 afterCommitErrors，不反向伪装成命令回滚
+  apps/server/src/ports/event-store.ts
+    EventStore 增加可选 afterCommit 能力
+  apps/server/src/room-lifecycle.ts
+    planRoomDeletion()：owner/revision 校验、重复删除返回现有状态、
+    room.deleting 的 next room（status=deleting/revision+1/deletion 请求身份）
+  apps/server/src/service.ts
+    room.delete 短事务：追加 room.deleting；取消 queued/running Run；
+    失效外部租约 Task；停止 active/paused Discussion；结束 agent_session、
+    禁用 subscription；queued/ready_to_apply integration 记 blocked；
+    post-commit 通知 Worker（onRoomDeleting），不在提交前杀进程
+    删除后业务写入口（execute、enqueue）拒绝 room_inactive；room.delete
+    本身可重复调用返回 deleting/deleted
+    cancel() 默认保持原 microtask 语义；删除路径显式使用 afterCommit
+  apps/server/src/worker.ts
+    service.onRoomDeleting 触发 tick；finalizeDeletions() 每 tick 扫描
+    deleting 房间，检查 active/unknown Run、apply journal/integration、
+    resource lease、pending input；干净时发 room.deleted（revision+1、
+    deletedAt），否则限频去重发 room.deletion.updated pendingReasons
+  tests/room-deletion.test.ts（新增）5 个用例
+变更前触发条件 / 变更后行为：
+  变更前：room.delete 只有 schema，命令 not_implemented；取消/清理只能靠
+  microtask，进程重启后没有持久 finalizer。
+  变更后：删除先持久化 request，再在 commit 后通知 Worker；Worker 每 tick
+  都能继续清理（含重启后）；有未知进程/apply journal 时不得宣称已删除。
+接口/事件/迁移/兼容性：
+  复用 R01 的 room.deleting/room.deletion.updated/room.deleted 事件；
+  无数据库迁移。afterCommit 是可选 Store 能力，旧 EventStore 实现可缺省。
+执行命令、cwd、环境、开始结束、退出码：
+  npm run typecheck                                            exit 0
+  npx tsx --test tests/room-deletion.test.ts                     exit 0（5 pass / 0 fail）
+  npm test                                                     exit 0（483 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-21 21:05–21:35 CST
+证据路径：
+  .state/parallel-room-image/r03-tests-20261021.log
+实际覆盖的模式和失败分支：
+  afterCommit commit/rollback；idle 房间删除幂等并 finalizer 落 deleted；
+  deleting 后 message.send 拒绝；queued 工作取消；运行中进程阻止 finalizer，
+  abort 后删除；applying integration 未解决时保持 deleting 并输出稳定
+  pendingReason，人工标记 blocked 后才删除
+尚未验证项及明确原因：
+  wake intents suppressed、input batch expired、outbound delivery 停止、
+  pending 图片上传失效与容量释放尚未接入删除事务；
+  所有业务入口的 assertActiveRoom（upload/tool/apply/staging/外部 room_wait）
+  未逐一覆盖；迟到 adapter 输出在 commit 后的二次校验仍未系统化；
+  room.delete API/WS/SDK/UI 属 R04/R05
+下一张卡与依赖：R04（API、WebSocket、SDK 与列表语义）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移

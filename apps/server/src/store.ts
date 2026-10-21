@@ -141,15 +141,23 @@ if(version<16)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS capabili
       throw error;
     }
   }
+  private afterCommitQueue: Array<() => void> | null = null;
+  readonly afterCommitErrors: string[] = [];
+  /** Run only after a successful commit; rollback discards the queue. */
+  afterCommit(fn: () => void): void {
+    if (this.afterCommitQueue) { this.afterCommitQueue.push(fn); return; }
+    fn();
+  }
   atomic<T>(fn: () => T): T {
     if(this.rebuilding)throw new Error('Projection rebuild is read-only');
     if (this.transactionEvents) return fn();
-    this.db.exec('BEGIN IMMEDIATE'); this.transactionEvents = [];
-    let result: T; let events: RoomEvent[];
-    try { result = fn(); this.db.exec('COMMIT'); events = this.transactionEvents; }
-    catch (error) { this.db.exec('ROLLBACK'); this.transactionEvents = null; throw error; }
-    this.transactionEvents = null;
+    this.db.exec('BEGIN IMMEDIATE'); this.transactionEvents = []; this.afterCommitQueue = [];
+    let result: T; let events: RoomEvent[]; let afterCommit: Array<() => void>;
+    try { result = fn(); this.db.exec('COMMIT'); events = this.transactionEvents; afterCommit = this.afterCommitQueue; }
+    catch (error) { this.db.exec('ROLLBACK'); this.transactionEvents = null; this.afterCommitQueue = null; throw error; }
+    this.transactionEvents = null; this.afterCommitQueue = null;
     for (const event of events) for (const listener of this.listeners) { try { listener(event); } catch { /* A subscriber cannot roll back committed state. */ } }
+    for (const callback of afterCommit) { try { callback(); } catch (error) { this.afterCommitErrors.push((error as Error).message); } }
     return result;
   }
   list<T>(table: Table, roomId?: string): T[] {

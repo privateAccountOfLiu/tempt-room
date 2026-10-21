@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash, createHmac } from 'node:crypto';
 import { basename, dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
-import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type AgentSession, type Artifact, type Discussion, type UsageSample, type ExecutionSettings, type Subscription, type InputBatch, type InboxDelivery, type ProjectBinding, type Integration, type Message, type Run, type Task, type WakeIntent, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
+import { defaultSandbox, parseDiscussionReply, terminalStates,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,contextSeqOf, VERSION, ProtocolError,budgetError,classifyFailure, type AgentDescriptor, type AgentSession, type Artifact, type ResourceLease, type Discussion, type UsageSample, type ExecutionSettings, type Subscription, type InputBatch, type InboxDelivery, type ProjectBinding, type Integration, type Message, type Run, type Task, type WakeIntent, type StreamDelta, type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { diagnose, ExecutionUnknown, RemoteCanceled, runAdapter } from './adapters.ts';
 import { SandboxHost } from './sandbox.ts';
 import { digest, now, Store, SYSTEM, uid } from './store.ts';
@@ -79,6 +79,7 @@ export class Worker {
   private executions=new Map<string,Readonly<RunFence>>();
   private readonly transport: AgentTransport;
   private lastBaselineGc = 0;
+  private deletionNotices = new Map<string, {reasons: string; at: number}>();
   private steerWakeInFlight = new Set<string>();
   private toolApprovals = new Map<string,{roomId:string;agentId:string;tool:string;argsDigest:string;createdAt:string;resolve:(allow:boolean)=>void;timer:NodeJS.Timeout}>();
   private steerHandlers = new Map<string,{generation:number;executionId?:string;handler:(text:string)=>Promise<void>}>();
@@ -108,6 +109,7 @@ export class Worker {
       projectSource: integration => this.integrationSource(integration),
     });
     service.onCancel = id => this.active.get(id)?.abort(new Error('用户取消'));
+    service.onRoomDeleting = () => this.tick();
     service.onInput = (id, text) => {
       const input=this.inputs.get(id);if(!input)throw new Error('输入通道已断开，请修改目标后重新启动');
       assertRunFence(store,input.fence);
@@ -251,12 +253,44 @@ export class Worker {
       else attempted.add(next.id);
     }
     this.processIntegrations();
+    this.finalizeDeletions();
     this.scanSubscriptions();
     this.collectBaselines();
     this.cleanupStaging();
     expireResourceLeases(this.store);
     expireQuarantinedLeases(this.store,this.store.settings().resourceQuarantineTtlMs);
     this.service.expireDiscussionWindows();
+  }
+  /** Persistent finalizer for rooms in the deleting state. */
+  private finalizeDeletions(): void {
+    for (const room of this.store.rooms()) {
+      const status = (room as {status?: string}).status;
+      if (status !== 'deleting') continue;
+      const reasons: string[] = [];
+      const activeRuns = this.store.list<Run>('runs', room.id).filter(run => ['running', 'waiting_input', 'cancel_requested'].includes(run.status));
+      if (activeRuns.some(run => this.active.has(run.id))) reasons.push('active_process');
+      if (activeRuns.some(run => !this.active.has(run.id))) reasons.push('unknown_process');
+      const integrations = this.store.list<Integration>('integrations', room.id);
+      if (integrations.some(item => ['validating', 'testing', 'applying', 'unknown'].includes(item.status))) reasons.push('apply_journal_unresolved');
+      if (integrations.some(item => item.status === 'ready_to_apply')) reasons.push('integration_pending');
+      if (this.store.list<ResourceLease>('resource_leases', room.id).some(item => item.status === 'active' || item.status === 'quarantined')) reasons.push('resource_lease');
+      const staged = [...this.inputs.keys()].some(runId => this.store.get<Run>('runs', runId)?.roomId === room.id);
+      if (staged) reasons.push('pending_input');
+      if (reasons.length === 0) {
+        const deletion = (room as {deletion?: Record<string, unknown>}).deletion ?? {};
+        const next = {...room, status: 'deleted', revision: (room.revision ?? 1) + 1, deletion: {...deletion, deletedAt: now()}};
+        this.store.event(room.id, 'room.deleted', SYSTEM, {room: next});
+        this.deletionNotices.delete(room.id);
+        continue;
+      }
+      const code = [...new Set(reasons)].sort().join(',');
+      const previous = this.deletionNotices.get(room.id);
+      if (previous && previous.reasons === code && Date.now() - previous.at < 5000) continue;
+      this.deletionNotices.set(room.id, {reasons: code, at: Date.now()});
+      const deletion = {...((room as {deletion?: Record<string, unknown>}).deletion ?? {}), pendingReasons: [...new Set(reasons)]};
+      const next = {...room, revision: (room.revision ?? 1), deletion};
+      this.store.event(room.id, 'room.deletion.updated', SYSTEM, {room: next});
+    }
   }
   private cleanupStaging(){
     const stagingRoot=join(this.root,'staging');if(!existsSync(stagingRoot))return;
