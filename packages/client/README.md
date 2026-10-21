@@ -20,3 +20,25 @@ The checkout's `npm run test:sdk` packs both public packages, installs them and
 their already-installed dependency in a temporary offline consumer, then checks
 module exports, JSON Schemas, request identities, retries and type declarations.
 It sends no model requests.
+
+## Sending an image from browser bytes
+
+```ts
+import { RoomAgentClient } from "@tempt/room-client";
+
+const agent = new RoomAgentClient("http://127.0.0.1:4317", roomId, token);
+const bytes = new Uint8Array(await file.arrayBuffer());
+const result = await agent.sendImage(bytes, {
+  name: file.name,
+  operationId: "image-send-" + crypto.randomUUID(),
+  text: "Please review this screenshot",
+  alt: "screenshot of the failing dialog"
+});
+console.log(result.artifactId, result.messageId, result.stage);
+```
+
+`uploadImage` additionally stops after the verified artifact stage when the run
+cannot post a message yet. Both helpers reuse the same operationId across retries
+so a lost response produces one artifact and one message, never duplicates.
+The browser never passes a filesystem path or owner session token; chunks are
+bounded JSON requests and the local connector handles its own file paths.

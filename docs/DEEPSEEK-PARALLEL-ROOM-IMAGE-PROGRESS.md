@@ -32,7 +32,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | I02 有界可恢复的上传临时状态 | verified | image_uploads/parts 表 + migration 19、分块状态机、配额/TTL、原子落盘、缺失块检测、GC 与 Worker image 工具/删除房间失效接线完成；重启进程 E2E 仍由 I04 覆盖 |
 | I03 解码验真、原图与安全预览 | verified | sharp 0.35.5 + 签名/结构检查 + 完整解码 + 1920 PNG 预览 + 原子落盘/稳定 artifactId；Worker 三个低层工具已接线并通过 3+3 用例；bridge/helper 归 I04 |
 | I04 托管 bridge/host/AppContainer 传输 | in_progress | Worker executeTool/agentTool 已接上 begin/chunk/complete（托管 fence 与外部身份）并通过 3 个用例；bridge helper、toolchain 复制与真实 pipe chunk smoke 仍待实现 |
-| I05 外部 MCP、插件与 SDK 发图 | not_started | |
+| I05 外部 MCP、插件与 SDK 发图 | in_progress | Browser/Node SDK uploadImage/sendImage（Web Crypto、稳定 commandId、错误 stage）与 RoomAgentClient 方法已完成并通过 4 个用例；外部 MCP room_send_image、helper 与插件同步仍未接线 |
 | I06 安全内联路由与图片展示 | not_started | |
 | I07 跨功能竞态 | not_started | |
 | V01 开发/发布报告分模式 | not_started | |
@@ -906,6 +906,51 @@ delivery/image-upload 细节与全入口 assertActiveRoom 仍待补）
   managed executeTool 的端到端 pipe 调用未做自动化（代码路径已接线）；
   room_post 的 attachments/replyTo 便利编排与消息发布仍归 I05/D04
 下一张卡与依赖：I05（外部 MCP、Claude 插件与浏览器可用 SDK）
+```
+
+## I05 — 外部 MCP、Claude 插件与浏览器可用 SDK（SDK 切片）
+
+```
+卡号与状态：I05 / in_progress（SDK 上传/发图完成；外部 MCP 便利工具与插件同步待补）
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 9ebe3b4（I04 提交）；实现见本次提交
+修改文件和关键符号：
+  packages/client/src/image-upload.ts（新增）
+    uploadImage(send, bytes, options)：浏览器/Node 通用 Uint8Array，
+      Web Crypto SHA-256、分块 base64（无 String.fromCharCode(...spread)）、
+      begin→chunk→complete，stable commandId 由 imageOperationIds 派生，
+      支持 AbortSignal；错误保留 stage/commandId，可按阶段重试
+    sendImage：上传成功后再用 attachments 调 room_post；成功返回 posted 阶段
+      与 artifactId/messageId；room_post 失败保留 artifactId 供补发
+  packages/client/src/index.ts
+    export uploadImage/sendImage/ImageUploadError 与类型；
+    RoomAgentClient 新增 uploadImage()/sendImage()，内部复用同一 sender，
+    不引入 node:fs/node:path，不暴露本地 path
+  packages/client/README.md
+    浏览器 File.arrayBuffer 发图最小示例
+  tests/sdk-image-upload.test.ts（新增 4 个用例）
+变更前触发条件 / 变更后行为：
+  变更前：浏览器 SDK 与 Agent 客户端只能发文本/附件 ID，不能上传图片字节。
+  变更后：浏览器或外部连接器可将 Uint8Array 按 192 KiB 分块上传，服务端
+  负责解码验真；同一 operationId 重试使用完全相同的 commandId，不重复发图。
+接口/事件/迁移/兼容性：
+  仅 client 包接口与类型；协议沿用 I01 的低层工具；无服务端迁移。
+执行命令、cwd、环境、开始结束、退出码：
+  npm run typecheck                                            exit 0
+  npx tsx --test tests/sdk-image-upload.test.ts                 exit 0（4 pass / 0 fail）
+  npm test                                                      exit 0（517 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-22 00:35–01:00 CST
+证据路径：
+  .state/parallel-room-image/i05-sdk-tests-20261021.log
+实际覆盖的模式和失败分支：
+  begin/分块/complete 顺序；分块长度与 sha256；同一 operationId 跨调用稳定
+  commandId；sendImage 只发一条 attachment 消息；complete 失败 stage/commandId；
+  AbortSignal 提前取消；浏览器不传 path/owner token
+尚未验证项及明确原因：
+  scripts/room-image-transfer.mjs 与 room-agent-mcp 的 room_send_image 便利
+  工具尚未实现；Claude 插件副本与 sync-room-agent-plugin --check 未包含 helper；
+  真实 stdio→HTTP→Worker SDK 并发/丢回复 e2e 未做；I06 的图片展示路由仍待实现
+下一张卡与依赖：I06（安全内联路由与图片消息展示）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移

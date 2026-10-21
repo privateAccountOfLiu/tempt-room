@@ -1,6 +1,8 @@
 import { VERSION, agentToolCallSchema, type AgentToolCall, type AgentToolName, type Command, type Receipt, type Room, type RoomEvent, type RoomSnapshot, type StreamDelta, type AgentDescriptor,type ServerCapabilities,type SnapshotEnvelope } from '../../protocol/src/index.ts';
 import {RoomEventCursor} from './event-cursor.ts';
+import {uploadImage,sendImage,ImageUploadError,type UploadedImage,type ImageUploadOptions,type SendImageOptions,type RoomSendImageResult} from './image-upload.ts';
 export {RoomEventCursor} from './event-cursor.ts';
+export {uploadImage,sendImage,ImageUploadError,type UploadedImage,type ImageUploadOptions,type SendImageOptions,type RoomSendImageResult} from './image-upload.ts';
 export { VERSION };
 export type { AgentToolCall,AgentToolName,Command, Receipt, Room, RoomEvent, RoomSnapshot, StreamDelta, AgentDescriptor,ServerCapabilities };
 export class RoomClient {
@@ -85,4 +87,9 @@ export class RoomAgentClient {
     }catch(error){throw Object.assign(error instanceof Error?error:new Error(String(error)),{commandId:input.commandId});}
   }
   call<T=unknown>(name:AgentToolName,args:Record<string,unknown>={},commandId?:string):Promise<T>{return this.send<T>(this.prepare(name,args,commandId));}
+  private imageSender():(commandId:string,name:string,args:Record<string,unknown>)=>Promise<any>{
+    return (commandId,name,args)=>this.send<any>(this.prepare(name as AgentToolName,args,commandId));
+  }
+  uploadImage(bytes:Uint8Array,options:ImageUploadOptions):Promise<UploadedImage>{return uploadImage(this.imageSender(),bytes,options);}
+  sendImage(bytes:Uint8Array,options:SendImageOptions):Promise<RoomSendImageResult&{artifactId:string}>{return sendImage(this.imageSender(),bytes,options);}
 }
