@@ -248,3 +248,12 @@
 
 .avatar svg{display:block}
 .avatar-initial{font-family:'IBM Plex Mono',monospace;font-size:inherit}
+/* Terminal unfinished drafts are historical; keep them collapsed and dismissible. */
+.unfinished-drafts{margin:20px 0 0 46px;padding:12px;border:1px dashed #3a4633;border-radius:4px;font-size:11px;color:var(--muted);background:#141914}
+.unfinished-drafts-head{display:flex;align-items:center;gap:8px}
+.unfinished-drafts-toggle{display:flex;align-items:center;gap:6px;padding:0;border:0;background:transparent;color:var(--muted);font-size:11px;cursor:pointer;text-align:left}
+.unfinished-drafts-toggle:hover{color:#c6d5bb}
+.unfinished-drafts-toggle small{margin-left:auto;color:#66745d}
+.unfinished-drafts-head .text-button{margin-left:8px}
+.unfinished-drafts-list{padding-top:8px;display:flex;flex-direction:column;gap:8px}
+.unfinished-drafts-list .run-draft{margin:0;padding:8px;border:1px solid #293326;border-radius:5px;background:#101510}

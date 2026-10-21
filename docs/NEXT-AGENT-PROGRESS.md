@@ -794,3 +794,11 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - 说明：此前已 stopped 的讨论不会自动恢复；需重新发起讨论
 
 - 讨论超时修复最终验证：422/422 测试；preflight 8/8（.state/preflight/run-PSxff1，180.4s）；实时服务 PID 23712
+
+## 未完成草稿 UX（第 132 轮）
+
+- 终止状态 run 的未完成草稿不再常驻会话底部：改为「未完成草稿 · N 条」折叠分组，默认收起
+- 分组支持展开/收起与「清除」；清除只在本机 localStorage 隐藏当前草稿 id，不删除运行记录，跨刷新仍保持隐藏
+- 进行中 run 的实时/已保存草稿仍显示在会话底部；讨论、最终回复替换草稿等原有行为不变
+- 浏览器 E2E 新增断言：终端草稿默认收起、可展开，且旧目标草稿仍显示「已被新目标替代」；partial-drafts.png 截图确认
+- preflight 8/8（.state/preflight/run-pHvdhU，190.5s）；测试 422/422；浏览器 45/45（.state/browser-e2e/run-AZQVDi）

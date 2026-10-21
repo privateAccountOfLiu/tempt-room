@@ -674,6 +674,9 @@ try {
     supersededRun.status='running';supersededRun.executionId='browser_superseded_execution';appHandle.store.event(draftRoom,'run.started',{id:'system',kind:'system'},{run:supersededRun});
     appHandle.worker.publishPartial(supersededRun,'SUPERSEDED_DRAFT_01','superseded_stream',0);
     await command(draftRoom,'task.revise',{taskId:supersededTask,title:'New draft goal'});appHandle.worker.finish(supersededRun,'canceled');
+    await waitFor('未完成草稿折叠入口',async()=>await evaluate(`Boolean(document.querySelector('.unfinished-drafts-toggle'))`),10000);
+    if(await evaluate(`Boolean(document.querySelector('.unfinished-drafts-list'))`))fail('未完成草稿默认应收起');
+    await evaluate(`document.querySelector('.unfinished-drafts-toggle')?.click()`);
     await waitFor('旧目标草稿保留并显示替代状态',async()=>await evaluate(`document.querySelector('.run-draft')?.textContent.includes('SUPERSEDED_DRAFT_01')&&document.querySelector('.run-draft')?.textContent.includes('已被新目标替代')`),15000);
     const draftShot=await send('Page.captureScreenshot',{format:'png'},sessionId);const draftShotPath=join(runDir,'partial-drafts.png');writeFileSync(draftShotPath,Buffer.from(draftShot.data,'base64'));report.screenshots.push(draftShotPath);
     step('superseded-draft-preserved',{screenshot:draftShotPath});
