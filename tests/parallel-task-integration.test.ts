@@ -41,9 +41,9 @@ function createTask(ctx: Ctx, title: string, verifierScript: string) {
   return {taskId, run, command};
 }
 
-function publish(ctx: Ctx, taskId: string, run: Run, file: string) {
+function publish(ctx: Ctx, taskId: string, run: Run, file: string, content = '1\n') {
   const snapshot = ctx.worker.workspaces.snapshot(ctx.project, run.id);
-  writeFileSync(join(snapshot.workspace, file), '1\n');
+  writeFileSync(join(snapshot.workspace, file), content);
   const changes = ctx.worker.workspaces.changes(run.id);
   const artifact = ctx.worker.publishArtifact(run, `${file}.patch`, changes.patch, 'text/x-diff', 'patch');
   writeFileSync(join(ctx.root, 'artifacts', artifact.id + '.changes.json'), JSON.stringify(changes));
@@ -150,4 +150,23 @@ test('a verifier change after verification blocks apply', async t => {
   const conflicted = await waitIntegration(ctx, integrationId, ['conflict', 'blocked', 'unknown']);
   assert.equal(conflicted.errorCode, 'stale_artifact');
   assert.equal(readFileSync(join(ctx.project, 'a.txt'), 'utf8'), '0\n');
+});
+
+test('two candidates changing the same file keep the applied result and both patches', async t => {
+  const ctx = await fixture(t);
+  const a = createTask(ctx, 'conflict-a', 'process.exit(0)');
+  const b = createTask(ctx, 'conflict-b', 'process.exit(0)');
+  const aArtifact = publish(ctx, a.taskId, a.run, 'a.txt', '1\n');
+  const bArtifact = publish(ctx, b.taskId, b.run, 'a.txt', '2\n');
+  const aIntegration = a.command('artifact.integrate', {artifactId: aArtifact.id}).result.integrationId as string;
+  ctx.worker.tick();
+  await waitIntegration(ctx, aIntegration, ['applied']);
+  const bIntegration = b.command('artifact.integrate', {artifactId: bArtifact.id}).result.integrationId as string;
+  ctx.worker.tick();
+  const conflicted = await waitIntegration(ctx, bIntegration, ['conflict', 'blocked']);
+  assert.equal(conflicted.errorCode, 'apply_conflict');
+  assert.equal(readFileSync(join(ctx.project, 'a.txt'), 'utf8'), '1\n');
+  assert.equal(existsSync(join(ctx.root, 'artifacts', aArtifact.id)), true);
+  assert.equal(existsSync(join(ctx.root, 'artifacts', bArtifact.id)), true);
+  assert.equal(ctx.store.get<Artifact>('artifacts', bArtifact.id)?.applied, undefined);
 });

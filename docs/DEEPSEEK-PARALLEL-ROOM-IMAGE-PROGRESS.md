@@ -22,7 +22,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | P03 按 canonical 项目互斥、异步验收 | verified | 项目锁跨房间 canonical 互斥；验收异步化并纳入超时/输出上限/进程树清理；新增 4 个并发与 HTTP 用例 |
 | P04 staging 精确组合 | verified | staging 由当前已认可目标 + 候选组成；目标/候选/verifier 篡改与无关文件变化均在 apply 前拒绝；journal 记录目标前后摘要 |
 | P05 双启动屏障与真实派发 | verified | 可控 adapter 由真实 Worker 派发；两个 Run 同时进入后才释放，独立工作区、真实产物、owner 验收和 integration 全链路通过 |
-| P06 M1 七项可失败用例 | not_started | |
+| P06 M1 七项可失败用例 | in_progress | 1–6 的模拟切片已覆盖（并发=1 负例、共同基线、整体组合、局部失败/重试、幂等/fence、同文件冲突保留双方 patch）；第 7 项真实 CLI 对照依赖 V03 尚未执行 |
 | R01 Room schema/事件/迁移 | not_started | |
 | R02 单事务保存房间设置与成员 | not_started | |
 | R03 删除请求、停止执行与清理 | not_started | |
@@ -352,6 +352,51 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
   未覆盖：真实 CLI/API 模型参与的双运行（本 fixture 使用确定性 adapter，
   modelRequests=0，符合本卡范围）
 下一张卡与依赖：P06（M1 七项可失败用例）
+```
+
+## P06 — 将原 M1 七项逐一变成可失败的用例
+
+```
+卡号与状态：P06 / in_progress（1–6 的模拟切片已通过；第 7 项真实 CLI 对照待 V03）
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 87485e6（P05 提交）；实现见本次提交
+新增/修改文件：
+  tests/parallel-task-dependencies.test.ts（新增）
+    - 并发上限=1 时两次 adapter 进入必须失败：waitForEntered(2) 明确拒绝，
+      同一时刻只有一个 Run 活动；释放后才串行进入第二个
+    - 共同基线与隔离：两个 isolated 运行的 workspace 不同、baselineHash 相同，
+      源目录 manifest 在运行前/后保持不变，A 的文件不出现在 B 的工作区
+    - 局部失败/依赖：A 失败后其后继 C 不完成，独立 B 完成后 D 可推进；
+      retry A 后 C 可重新推进；B 的 Run ID 与 artifact ID 保持不变
+    - 相同 commandId 幂等；相同 commandId 不同内容明确报错
+  tests/parallel-task-integration.test.ts（扩展）
+    - 两个候选修改同一文件：A 应用成功，B 返回 apply_conflict；
+      源文件保留 A 的结果，两份 patch 文件都保留，B 不标记 applied
+  P04/P03/integration 既有用例提供：
+    - 整体组合：正常组合可通过、互斥组合在 Worker verifier 路径失败
+    - fence：旧任务版本/generation、目标变化、未知 journal 均不可 applied
+    - 恢复：restart/incomplete journal/资源租约隔离
+变更前触发条件 / 变更后行为：
+  变更前：M1 的七项只有一次性验收脚本；没有“把并发调小/依赖失败/同文件冲突”
+  这类反向探针，无法证明测试本身有检出力。
+  变更后：至少 1/2/3/4/5/6 六项都有可失败断言或既有失败用例可追溯；
+  第 7 项真实实验仍需按 V03 固定 CLI 执行，当前不作为已完成声明。
+执行命令、cwd、环境、开始结束、退出码：
+  npm run typecheck                                                exit 0
+  npx tsx --test tests/parallel-task-dependencies.test.ts           exit 0（4 pass / 0 fail）
+  npx tsx --test tests/parallel-task-integration.test.ts            exit 0（5 pass / 0 fail）
+  npm test                                                         exit 0（465 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-21 19:39–20:05 CST
+证据路径：
+  .state/parallel-room-image/p06-tests-20261021.log
+实际覆盖的模式和失败分支：
+  并发上限=1 反向检出力；共同基线/隔离/源目录不变；整体组合与互斥组合；
+  A 失败/后继阻塞/B 独立推进/D 后继推进；A 修复后 B 的 Run/产物 ID 稳定；
+  commandId 幂等与内容冲突；同文件冲突保留双方 patch；重启与未知 journal 恢复
+尚未验证项及明确原因：
+  第 7 项“真实实验与对照”未执行：需要按 V03 固定两个真实 CLI 版本并记录
+  可观察执行区间；本卡当前只关闭模拟切片，不能宣称 P06 全量完成
+下一张卡与依赖：V03（固定版本真实 CLI 与三组对照）；P06 剩余第 7 项依赖它
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移
