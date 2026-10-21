@@ -441,7 +441,7 @@ export class Worker {
       const task=this.store.get<Task>('tasks',run.taskId);
       if(!task)return{started:false,reason:'admission_denied',errorCode:'task_missing'};
       if(task.version!==run.taskVersion)return{started:false,reason:'admission_denied',errorCode:'stale_task_version'};
-      try{const inputs=dependencyInputs(this.store,task);run.dependencyVersions=inputs.versions;run.inputArtifacts=inputs.artifacts;}catch(error){this.finish(run,'failed',(error as Error).message);return{started:false,reason:'failed',errorCode:'dependency_inputs_invalid'};}
+      try{const inputs=dependencyInputs(this.store,task);run.dependencyVersions=inputs.versions;run.inputArtifacts=inputs.artifacts;run.dependencyArtifactHashes=this.dependencyArtifactHashes(inputs.artifacts);run.dependencyInputHash=digest({versions:run.dependencyVersions,artifacts:run.inputArtifacts,hashes:run.dependencyArtifactHashes});}catch(error){this.finish(run,'failed',(error as Error).message);return{started:false,reason:'failed',errorCode:'dependency_inputs_invalid'};}
     }
     const activeInRoom=this.store.list<Run>('runs',run.roomId).filter(item=>item.id!==run.id&&['running','waiting_input'].includes(item.status)).length;
     if(activeInRoom>=settings.maxConcurrentRunsPerRoom)return{started:false,reason:'resource_busy',errorCode:'room_capacity'};
@@ -501,6 +501,48 @@ export class Worker {
     // Legacy binding without a frozen baseline: the live source is scanned.
     return this.workspaces.snapshot(task.projectPath,runId);
   }
+  /** Hash the exact dependency bytes (patch + changes) captured at run start. */
+  private dependencyArtifactHashes(ids:string[]):Record<string,string>{
+    const hashes:Record<string,string>={};
+    for(const id of ids){
+      const artifact=this.store.get<Artifact>('artifacts',id);if(!artifact)continue;
+      const main=join(this.root,'artifacts',id);if(!existsSync(main))throw new ProtocolError('dependency_input_missing','依赖交付物缺少文件：'+id,409);
+      const parts=[readFileSync(main)];
+      if(artifact.kind==='patch'){
+        const changesPath=join(this.root,'artifacts',id+'.changes.json');if(!existsSync(changesPath))throw new ProtocolError('dependency_input_missing','依赖交付物缺少变更清单：'+id,409);
+        parts.push(Buffer.from('\0'),readFileSync(changesPath));
+      }
+      hashes[id]=createHash('sha256').update(Buffer.concat(parts)).digest('hex');
+    }
+    return hashes;
+  }
+  /** Layer frozen dependency patches into the isolated workspace before the Agent runs. */
+  private layerDependencyArtifacts(run:Run,task:Task,workspace:string){
+    const ids=run.inputArtifacts??[];if(!ids.length)return;
+    const sha=(buffer:Buffer)=>createHash('sha256').update(buffer).digest('hex');
+    for(const id of ids){
+      const artifact=this.store.get<Artifact>('artifacts',id);
+      if(!artifact||artifact.kind!=='patch')continue;
+      if(!run.dependencyVersions?.[artifact.taskId!])throw new ProtocolError('dependency_input_invalid','依赖交付物不在冻结的依赖任务集合内',409);
+      const expected=run.dependencyArtifactHashes?.[id];
+      if(!expected)throw new ProtocolError('dependency_input_changed','依赖交付物缺少冻结摘要',409);
+      const main=readFileSync(join(this.root,'artifacts',id));
+      const changesRaw=readFileSync(join(this.root,'artifacts',id+'.changes.json'));
+      const actual=createHash('sha256').update(Buffer.concat([main,Buffer.from('\0'),changesRaw])).digest('hex');
+      if(actual!==expected)throw new ProtocolError('dependency_input_changed','依赖交付物在运行开始后发生变化，拒绝组合',409);
+      const changes=JSON.parse(changesRaw.toString('utf8')) as {changes:{path:string;before:string|null;after:string|null}[]};
+      for(const change of changes.changes){
+        const target=safePath(workspace,change.path),current=existsSync(target)?readFileSync(target):null;
+        const currentHash=current?sha(current):null;
+        if(currentHash!==change.before)throw new ProtocolError('dependency_patch_conflict','依赖变更与当前工作区基线冲突：'+change.path,409);
+        if(change.after===null){if(existsSync(target))unlinkSync(target);}
+        else{mkdirSync(dirname(target),{recursive:true});writeFileSync(target,Buffer.from(change.after,'base64'));}
+      }
+    }
+    this.workspaces.refreshManifest(run.id);
+    run.dependencyInputHash=digest({versions:run.dependencyVersions,artifacts:ids,hashes:run.dependencyArtifactHashes});
+  }
+
   /** Real project directory touched by a host-mode task run, if any. */
   private threadKey(run:Run):string|undefined {
     return run.codex?.binding.threadId ?? codexThreadKey(this.store.get<AgentDescriptor>('agents',run.agentId)!);
@@ -639,6 +681,7 @@ export class Worker {
             const sourcePath=resolve(task.projectPath),manifestHash=manifest.baselineId?manifest.manifestHash!:digest(Object.fromEntries(Object.entries(manifest.files).map(([name,file])=>[name,file.hash])));
             if(!(run.externalReads??[]).some(read=>read.kind==='file'&&read.source===sourcePath))run.externalReads=[...(run.externalReads??[]),{kind:'file',source:sourcePath,version:manifest.sourceCommit??undefined,hash:manifestHash,fetchedAt:now()}];
             run.baselineId=manifest.baselineId;run.workspaceMode='isolated';
+            this.layerDependencyArtifacts(run,task,workspace);
             task.workspaceId = run.id; task.status = 'running'; this.store.atomic(() => {  this.store.event(run.roomId, 'task.updated', SYSTEM, { task }); });
           } else mkdirSync(workspace, { recursive: true });
         }

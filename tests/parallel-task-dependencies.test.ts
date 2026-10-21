@@ -167,3 +167,34 @@ test('the same commandId is idempotent and the same id with different content is
   assert.equal(ctx.store.list('messages', ctx.roomId).filter((message: any) => message.text === 'exactly once').length, 1);
   assert.throws(() => ctx.service.execute({version: '0.1', commandId, roomId: ctx.roomId, type: 'message.send', payload: {text: 'different content'}}), /commandId|不同内容/);
 });
+
+test('a successor run receives the verified dependency patch in its isolated workspace', async t => {
+  mkdirSync(parent, {recursive: true});
+  const root = mkdtempSync(join(parent, 'dependency-layering-'));
+  const project = join(root, 'project');
+  mkdirSync(project, {recursive: true});
+  writeFileSync(join(project, 'README.md'), '# layering project\n');
+  const store = new Store(join(root, 'room.sqlite'));
+  const service = new RoomService(store);
+  let successorContent = '';
+  const worker = new Worker(store, service, root, {adapter: async function* (ctx: any) {
+    if (ctx.agent.id === 'demo-planner') writeFileSync(join(ctx.workspace, 'planner.txt'), 'upstream\n');
+    else { successorContent = readFileSync(join(ctx.workspace, 'planner.txt'), 'utf8'); writeFileSync(join(ctx.workspace, 'reviewer.txt'), 'downstream\n'); }
+    yield {type: 'text', text: 'done'};
+  }});
+  t.after(async () => { await worker.close(); try { store.close(); } catch { /* closed */ } rmSync(root, {recursive: true, force: true}); });
+  const roomId = store.rooms()[0].id;
+  const command = (type: string, payload: unknown) => service.execute({version: '0.1', commandId: uid(), roomId, type, payload});
+  const upstream = command('task.create', {title: 'upstream patch', agentId: 'demo-planner', projectPath: project}).result.taskId as string;
+  await waitUntil(() => { worker.tick(); return store.get<Task>('tasks', upstream)?.status === 'completed'; }, 'upstream task completed', 30000);
+  const upstreamArtifacts = store.list<Artifact>('artifacts', roomId).filter(artifact => artifact.taskId === upstream && artifact.kind === 'patch');
+  assert.equal(upstreamArtifacts.length, 1);
+  const downstream = command('task.create', {title: 'downstream uses patch', agentId: 'demo-reviewer', projectPath: project, dependencies: [upstream]}).result.taskId as string;
+  await waitUntil(() => { worker.tick(); return store.get<Task>('tasks', downstream)?.status === 'completed'; }, 'downstream task completed', 30000);
+  assert.equal(successorContent, 'upstream\n');
+  const downstreamRun = store.list<Run>('runs', roomId).find(run => run.taskId === downstream)!;
+  assert.ok(downstreamRun.dependencyInputHash && /^[a-f0-9]{64}$/.test(downstreamRun.dependencyInputHash));
+  assert.equal(downstreamRun.dependencyArtifactHashes?.[upstreamArtifacts[0].id]?.length, 64);
+  assert.equal(readFileSync(join(project, 'README.md'), 'utf8'), '# layering project\n');
+  assert.equal(existsSync(join(project, 'planner.txt')), false, 'source project must not be mutated by isolated runs');
+});

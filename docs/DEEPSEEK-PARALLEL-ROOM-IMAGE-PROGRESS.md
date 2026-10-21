@@ -18,7 +18,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | G00 开工记录与测试隔离 | verified | 基线 SHA/状态/工具链已落盘；fixture 隔离要求写入本文件与后续卡 |
 | G01 两份外部 MCP 与防漂移 | verified | 语法错误在当前 HEAD 已修复；新增契约测试 15/15 与字节级同步闸门 |
 | P01 候选枚举不消耗容量 | verified | 候选不再提前占用房间容量；派发前二次校验；资源忙保持排队不判失败 |
-| P02 不可变基线与 host 独立目录 | in_progress | 共享扫描器 + 不可变基线 + host-isolated + 基线 GC + 旧绑定补建已实现并验证；依赖产物叠入、attached isolated 真实模式仍未覆盖 |
+| P02 不可变基线与 host 独立目录 | in_progress | 共享扫描器/不可变基线/host-isolated/GC/旧绑定补建；依赖 patch 叠入工作区带冻结 hash+before 校验已实现并测试；attached isolated 真实模式仍无环境 |
 | P03 按 canonical 项目互斥、异步验收 | verified | 项目锁跨房间 canonical 互斥；验收异步化并纳入超时/输出上限/进程树清理；新增 4 个并发与 HTTP 用例 |
 | P04 staging 精确组合 | verified | staging 由当前已认可目标 + 候选组成；目标/候选/verifier 篡改与无关文件变化均在 apply 前拒绝；journal 记录目标前后摘要 |
 | P05 双启动屏障与真实派发 | verified | 可控 adapter 由真实 Worker 派发；两个 Run 同时进入后才释放，独立工作区、真实产物、owner 验收和 integration 全链路通过 |
@@ -166,6 +166,16 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
   附件路径使用运行目录下的副本，不承诺工作区组合）；
   未覆盖：附着线程 + isolated 的 workspace_mode_unsupported（代码已显式拒绝，
   但真实附着模式需要 Codex 线程，本轮无该环境）
+P02 后续补充（第 44 轮：依赖产物叠入）：
+  packages/protocol Run 增加 dependencyArtifactHashes/dependencyInputHash；
+  Worker.startRun 冻结依赖 artifact（主文件 + .changes.json）SHA256 与组合摘要；
+  isolated workspace 在 Agent 启动前按冻结 patch 逐文件校验 before hash 后叠入，
+  更新工作区 manifest，使后续 patch 只包含本次 Agent 改动；
+  dependency 内容在 start→layer 之间变化返回 dependency_input_changed，不静默组合；
+  测试：tests/parallel-task-dependencies.test.ts 新增 successor run 读到上游
+  planner.txt、上游源目录不被修改、dependencyInputHash/hashes 为 64 hex；
+  npm test 550/550（2026-10-22 00:20–00:45 CST）。
+  P02 剩余：真实 attached 线程 + isolated 的 workspace_mode_unsupported 运行环境。
 P02 后续补充（第 5 轮已覆盖）：
   基线 GC：ImmutableBaselines.gc(referenced, minAgeMs) 增加年龄下限；
   Worker.collectBaselines() 汇总 binding/run 引用并在 tick 中限频调用，

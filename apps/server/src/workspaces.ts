@@ -87,6 +87,14 @@ export class Workspaces {
     writeFileSync(join(this.root, 'manifests', `${runId}.json`), JSON.stringify(manifest));
     return manifest;
   }
+  /** Accept verified dependency/input files as the new run baseline so only
+   * the agent's own subsequent edits become its patch. */
+  refreshManifest(runId: string): Manifest {
+    const manifest: Manifest = JSON.parse(readFileSync(join(this.root, 'manifests', `${runId}.json`), 'utf8'));
+    manifest.files = scan(manifest.workspace);
+    return this.writeManifest(runId, manifest);
+  }
+
   changes(runId: string): { manifest: Manifest; changes: FileChange[]; patch: string } {
     const manifest: Manifest = JSON.parse(readFileSync(join(this.root, 'manifests', `${runId}.json`), 'utf8'));
     const current = scan(manifest.workspace), changes: FileChange[] = [];

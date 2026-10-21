@@ -279,6 +279,23 @@
             "maximum": 9007199254740991
           }
         },
+        "dependencyArtifactHashes": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "dependencyInputHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
         "taskId": {
           "type": "string",
           "minLength": 1,
