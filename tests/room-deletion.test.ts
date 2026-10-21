@@ -140,3 +140,13 @@ test('deleting a room aborts unsent outbound deliveries with a stable audit reas
   assert.equal(ctx.store.events(ctx.roomId).filter(event => event.type === 'outbound.attempted').length, 0, 'must not attempt a delivery after deletion started');
   assert.ok(ctx.store.events(ctx.roomId).some(event => event.type === 'audit.recorded' && String((event.payload as any).action).startsWith('outbound.aborted:outbound_delete_test')));
 });
+
+test('agent room_wait returns promptly when the room starts deleting', async t => {
+  const ctx = fixture(t);
+  const waiting = ctx.worker.agentTool('demo-planner', ctx.roomId, 'room_wait', {timeoutMs: 10000});
+  await new Promise(done => setTimeout(done, 50));
+  ctx.command('room.delete', {expectedRevision: 1});
+  const started = Date.now();
+  await assert.rejects(waiting, /房间/);
+  assert.ok(Date.now() - started < 3000, 'room_wait must not wait for the full timeout');
+});

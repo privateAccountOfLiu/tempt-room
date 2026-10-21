@@ -507,6 +507,24 @@ try {
     if (!saveListed.includes('未启用')) fail(`新 Agent 默认启用状态不正确：${saveListed}`);
     step('ui-add-agent', {agentName});
 
+    const settingsForAdd = await evaluate(`(() => { const button = document.querySelector('button[aria-label="房间设置"]'); if (!button) return 'missing'; button.click(); return 'ok'; })()`);
+    if (settingsForAdd !== 'ok') fail('找不到房间设置入口（新增成员）');
+    await waitFor('房间设置（新增成员）', async () => (await bodyText()).includes('保存设置'), 10000);
+    if (await clickByText('dialog.modal button', '新增 Agent') !== 'ok') fail('房间设置中找不到新增 Agent');
+    await waitFor('紧接新增 Agent 表单', async () => (await bodyText()).includes('保存连接'), 10000);
+    const autoAgentName = `设置新增 Agent ${Date.now() % 1000000}`;
+    if (await setInputByLabel('显示名称', autoAgentName) !== 'ok') fail('无法填写设置新增 Agent 名称');
+    if (await setSelectByLabel('接入方式', 'external') !== 'ok') fail('无法选择设置新增 Agent 接入方式');
+    if (await clickByText('dialog.modal button', '保存连接') !== 'ok') fail('无法保存设置新增 Agent');
+    await waitFor('新增 Agent 后自动回到房间设置', async () => { const text = await bodyText(); return text.includes('保存设置') && text.includes(autoAgentName); }, 15000);
+    const preselected = await evaluate(`(() => { const labels = [...document.querySelectorAll('dialog.modal label.checkbox-label')]; const label = labels.find(item => (item.textContent ?? '').includes(${JSON.stringify(autoAgentName)})); const input = label?.querySelector('input[type="checkbox"]'); return Boolean(input?.checked); })()`) as boolean;
+    if (!preselected) fail('新增 Agent 未自动预选为房间成员');
+    step('ui-add-agent-from-settings', {autoAgentName});
+    const closeAfterAdd = await evaluate(`(() => { const button = document.querySelector('dialog.modal button[aria-label="关闭"]'); if (!button) return 'missing'; button.click(); return 'ok'; })()`);
+    if (closeAfterAdd !== 'ok') fail('无法关闭设置新增 Agent 后的房间设置');
+    if (await clickByText('button', 'Agent 连接') !== 'ok') fail('无法重新打开 Agent 连接列表（继续既有流程）');
+    await waitFor('Agent 连接列表恢复', async () => (await bodyText()).includes(agentName), 10000);
+
     if (await clickByText('.connection-list button', agentName) !== 'ok') fail('无法打开新 Agent 设置');
     await waitFor('Agent 连接设置', async () => (await bodyText()).includes('允许在房间中被点名和分派任务'), 10000);
     if (await toggleCheckboxByLabel('允许在房间中被点名和分派任务', true) !== 'ok') fail('无法启用 Agent');
