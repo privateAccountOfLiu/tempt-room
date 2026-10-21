@@ -98,6 +98,9 @@ test('two projects verify concurrently within the verifier limit', async t => {
 test('two rooms targeting the same project serialize their verification', async t => {
   const ctx = await fixture(t);
   const project = join(ctx.root, 'shared-project');
+  mkdirSync(project, {recursive: true});
+  writeFileSync(join(project, 'a.txt'), 'original\n');
+  writeFileSync(join(project, 'b.txt'), 'original\n');
   const timeline = join(ctx.root, 'shared.timeline');
   const roomA = ctx.store.rooms()[0].id, roomB = makeRoom(ctx, 'shared room');
   const a = enqueue(ctx, roomA, project, 'a.txt', timeline, 350);
