@@ -824,3 +824,5 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - MiniMax MCP 配置实测：使用生成的 minimax-mcp.json 启动 stdio 客户端，initialize + tools/list 成功返回 13 个工具；同时修复 scripts/room-agent-mcp.mjs 与插件副本 tools 数组缺逗号的语法错误，新增 tests/room-mcp-server.test.ts（语法 + 工具清单）
 
 - 最终门禁：428/428 测试；preflight 8/8（.state/preflight/run-V7LSm4，192.1s）；room MCP 两副本 node --check 通过
+
+- 新增 `scripts/install-minimax-mcp.mjs` 与 `npm run room:install-minimax`：从 connect API 读取配置、合并写入 `~/.minimax/mcp.json`、自动备份；`--print` 可预览。已在本机写入 room 条目并用 MiniMax 自带解析器验证通过；下一步在 MiniMax Code 新会话中加载。
