@@ -684,6 +684,15 @@ try {
       ledger.observe(intent,{provider:'codex',kind:'commandExecution',itemId:'ui-command',phase:'started',requestHash:'a'.repeat(64)});ledger.abandon(intent);evidenceWorker.finish(run,'unknown','NATIVE_RECEIPT_UI_FIXTURE');
     });
     await waitFor('原生未知回执卡片',async()=>(await bodyText()).includes('NATIVE_RECEIPT_UI_FIXTURE'),10000);
+    const unfinishedToggle=await evaluate(`(()=>{const button=[...document.querySelectorAll('.unfinished-toggle')].find(item=>item.textContent.includes('\u672a\u5b8c\u6210\u8fd0\u884c\u8bb0\u5f55'));if(!button)return false;button.click();return true;})()`);
+    if(!unfinishedToggle)fail('\u627e\u4e0d\u5230\u672a\u5b8c\u6210\u8fd0\u884c\u8bb0\u5f55\u6298\u53e0\u6309\u94ae');
+    await waitFor('\u672a\u5b8c\u6210\u8fd0\u884c\u8bb0\u5f55\u6298\u53e0',async()=>await evaluate(`document.querySelector('.unfinished-list')?.hasAttribute('hidden')===true`));
+        const collapseMetrics=await evaluate(`(()=>{const u=document.querySelector('.unfinished-runs')?.getBoundingClientRect(),g=document.querySelector('.usage-history')?.getBoundingClientRect();return JSON.stringify({u:u&&{w:u.width,h:u.height,l:u.left},g:g&&{w:g.width,h:g.height,l:g.left}});})()`);
+    console.log('COLLAPSE_METRICS '+collapseMetrics);
+    const alignedCollapseWidth=(()=>{try{const m=JSON.parse(collapseMetrics);return Boolean(m.u&&m.g&&Math.abs(m.u.w-m.g.w)<2&&Math.abs(m.u.l-m.g.l)<2&&Math.abs(m.u.h-m.g.h)<2)}catch{return false}})();
+    if(!alignedCollapseWidth)fail('\u672a\u5b8c\u6210\u8fd0\u884c\u5361\u7247\u4e0e\u7528\u91cf\u6298\u53e0\u5361\u7247\u5c3a\u5bf8\u672a\u5bf9\u9f50');
+    await evaluate(`document.querySelector('.unfinished-toggle')?.click()`);
+    await waitFor('\u672a\u5b8c\u6210\u8fd0\u884c\u8bb0\u5f55\u5c55\u5f00',async()=>await evaluate(`document.querySelector('.unfinished-list')?.hasAttribute('hidden')===false`));
     const nativeDetail=await evaluate(`(()=>{const card=[...document.querySelectorAll('.run-error')].find(item=>item.textContent.includes('NATIVE_RECEIPT_UI_FIXTURE'));const button=card&&[...card.querySelectorAll('button')].find(item=>item.textContent==='详情');if(!button)return false;button.click();return true;})()`);
     if(!nativeDetail)fail('找不到原生操作详情');
     await waitFor('原生意图与回执明确显示未知',async()=>{const text=await bodyText();return text.includes('原生执行意图')&&text.includes('原生工具回执 · commandExecution')&&text.includes('结果未知')&&text.includes('不代表副作用已撤销');},10000);

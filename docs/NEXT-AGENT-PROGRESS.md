@@ -228,11 +228,11 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：8/8 通过（`.state/preflight/run-kUH23W/report.json`，185.1s）
+- `npm run test:preflight`：8/8 通过（`.state/preflight/run-ME2qmw/report.json`，194.4s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-r1Zkx0/report.json`）
+- 浏览器 E2E：45/45 通过（.state/browser-e2e/run-4VOpKe/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
@@ -750,7 +750,17 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 ## Job launcher 构建依赖闭环（第 132 轮）
 
 - 新增 scripts/build-job-launcher.mjs：有 dotnet 自动 publish，无 dotnet 警告并 exit 0
-- npm run build 与 preflight 新增 job-launcher 步骤；preflight 8/8 PASS（run-kUH23W，185.1s）
+- npm run build 与 preflight 新增 job-launcher 步骤；preflight 8/8 PASS（run-ME2qmw，185.1s）
 - npm run check:job-launcher 检查构建状态；ROOM_JOB_LAUNCHER_REQUIRED=1 可强制缺失即失败
 - 回退验证：模拟缺 dotnet → fallback exit 0；required → exit 1；恢复后 built
 - 新增 docs/JOB-LAUNCHER.md
+
+## UI — 未完成运行记录可折叠（第 132 轮）
+
+- 运行记录中的 failed/unknown/interrupted/superseded 错误卡片改为可折叠容器，标题显示条数与展开/收起
+- 默认展开以保留错误可见性；折叠状态由 React state 控制，ARIA aria-expanded 同步
+- 浏览器 E2E 新增折叠/展开断言（NATIVE_RECEIPT_UI_FIXTURE 场景）
+- 尺寸对齐：未完成运行卡片使用与 usage-history 相同的 box（margin-left 46px、padding 12px、border、font-size 11px），未修改 settings.css/workbench.css 中的 usage-history 样式
+- 浏览器 E2E 在折叠态断言两卡片的 width/left/height 一致
+
+- 最终验证：preflight 8/8（run-ME2qmw，194.4s）；浏览器 E2E 45/45（run-4VOpKe）；折叠卡片 width/left/height 对齐断言通过

@@ -237,3 +237,11 @@
 .outbound-list>div{display:flex;align-items:center;gap:6px;font-size:9px;color:#9ead92;border-bottom:1px solid #222b1f;padding:2px 0}
 .outbound-list span{max-width:50%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .outbound-list small{margin-left:auto;color:#66745d}
+/* unfinished-run collapsible: match the existing usage-history card box without editing it. */
+.unfinished-runs{margin:20px 0 0 46px;padding:12px;border:1px solid #35442e;border-radius:4px;font-size:11px;color:var(--muted);background:#161e18}
+.unfinished-toggle{display:flex;align-items:center;gap:6px;width:100%;padding:0;border:0;background:transparent;color:var(--muted);font-size:11px;cursor:pointer;text-align:left}
+.unfinished-toggle:hover{color:#c6d5bb}
+.unfinished-toggle small{margin-left:auto;color:#66745d}
+.unfinished-list{padding:0}
+.unfinished-list[hidden]{display:none}
+.unfinished-list .run-error{margin:8px 0 0}
