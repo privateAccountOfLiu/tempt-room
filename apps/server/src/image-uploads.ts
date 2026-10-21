@@ -226,7 +226,7 @@ export class ImageUploads {
   }
 
   /** Decode/verify the completed image and install original + preview files, then persist one artifact. */
-  async finalize(uploadId: string, identity: {roomId: string; agentId: string; fence?: ImageUploadFence}): Promise<{artifactId: string; uploadId: string; mediaType: ImageMediaType; width: number; height: number; size: number; contentHash: string; reused: boolean}> {
+  async finalize(uploadId: string, identity: {roomId: string; agentId: string; fence?: ImageUploadFence}, options: {beforeCommit?: () => Promise<void>} = {}): Promise<{artifactId: string; uploadId: string; mediaType: ImageMediaType; width: number; height: number; size: number; contentHash: string; reused: boolean}> {
     const completed = await this.complete(uploadId, identity);
     const {body, row} = this.body(uploadId);
     if (row.room_id !== identity.roomId || row.agent_id !== identity.agentId) throw new ProtocolError('upload_owner_mismatch', '上传不属于此 Agent', 403);
@@ -240,6 +240,7 @@ export class ImageUploads {
     const bytes = readFileSync(completeFile);
     if (bytes.byteLength !== completed.size || sha(bytes) !== completed.sha256) throw new ProtocolError('upload_hash_mismatch', '完成文件摘要不一致', 409);
     const decoded = await validateAndPreview(bytes, body.alt);
+    if (options.beforeCommit) await options.beforeCommit();
     // Re-check authority after the awaited decode: a room/member change must win.
     if (!this.roomActive(identity.roomId)) throw new ProtocolError('room_inactive', '房间正在删除或已删除', 409);
     const agent = this.store.get<any>('agents', identity.agentId);

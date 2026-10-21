@@ -34,8 +34,8 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | I04 托管 bridge/host/AppContainer 传输 | in_progress | Worker 三段式工具、helper、bridge `room_send_image`、toolchain 复制；真实 HostRoomPipe 固定图 smoke 通过（`test:room-images-native --mode host`）；AppContainer 模式明确 not_verified |
 | I05 外部 MCP、插件与 SDK 发图 | in_progress | SDK、外部 MCP room_send_image、真实 stdio→HTTP 重试幂等、HTTP timeout/401/403/410 分类与 no-retry 语义通过 4 个用例；并发双图与手动宿主验证待补 |
 | I06 安全内联路由与图片展示 | verified | 私有 `/api/artifacts/:id/image`（active/verified/hash/no-store）、缩略图、失败降级、键盘 Lightbox、纯图不渲染空 Markdown 已完成并通过 3 个接口用例与完整浏览器 E2E |
-| I07 跨功能竞态 | in_progress | 删房/移除成员/并行上传/丢回执重试/导出回放/删后审计 6 类竞态通过 6 个用例；`acceptance:room-images --check` 通过；托管取消、删除与最终 apply、最后房间重启组合仍未覆盖 |
-| V01 开发/发布报告分模式 | in_progress | schemaVersion 2、sourceBefore/sourceAfter、tracked/working/untracked+lockfile hash、`--release --expected-head` 前置失败 not_run、source_changed 检测与 checksPassed/releaseEligible 已完成并通过 5 个用例；真实 release 运行与 expected-head 参数化脚本入口待补 |
+| I07 跨功能竞态 | in_progress | 删房/移除成员/并行上传/丢回执重试/导出回放/删后审计 + 解码期间删房/托管 stale generation 共 8 个用例通过；删除与最终 apply、最后房间 restart 组合仍未覆盖 |
+| V01 开发/发布报告分模式 | in_progress | schemaVersion 2、sourceBefore/sourceAfter、tracked/working/untracked+lockfile hash、`--release --expected-head` 前置失败 not_run、source_changed 检测与 checksPassed/releaseEligible 已通过 5 个用例；CLI 入口已由 V02 preflight 接入，真实 clean release 运行待 CI |
 | V02 CI/preflight 接入真实入口 | in_progress | preflight 改为 collaboration release/development 单次入口 + 连接器/并行/图片检查；外层 sourceBefore/After 与 releaseEligible/verdict；CI 传 github.sha、上传证据；本地 skip 模式 preflight PASS（development_only）；真实 release CI 运行待下次推送验证 |
 | V03 固定版本真实 CLI 与三组对照 | not_started | |
 | V04 文档、备份导入导出与统一口径 | not_started | |
@@ -1325,6 +1325,45 @@ delivery/image-upload 细节与全入口 assertActiveRoom 仍待补）
   并发双图通过同一 connector 的 JSON-RPC 顺序仍为单请求串行；真实宿主
   （Claude Code/Codex/DeepSeek）手动发图未跑；V03 付费实验未授权
 下一张卡与依赖：I07 剩余竞态或 V03（等待授权）
+```
+
+## I07 — 解码期间删房与托管 generation 补充
+
+```
+卡号与状态：I07 补充切片 / in_progress
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 a22443f（I05 超时提交）；实现见本次提交
+修改文件和关键符号：
+  apps/server/src/image-uploads.ts
+    finalize 增加测试注入 beforeCommit()（仅可选回调，生产调用不传）；
+    解码/预览完成后、权限复核前执行，用于证明 await 期间房间删除仍会
+    阻止 artifact.created
+  tests/room-image-races.test.ts（+2 个用例）
+    1) beforeCommit 内写 room.deleting：finalize 抛房间错误，artifact 0；
+    2) 真实 Worker 托管 run：adapter 内经 executeTool 执行
+       image_upload_begin，随后 run.updated generation+1，再用旧 fence 调
+       image_upload_chunk → executeTool 返回 Stale run generation 错误，
+       artifact 0
+变更前触发条件 / 变更后行为：
+  变更前：I03 只有一个“房间已 deleting”的单例，无解码 await 窗口注入；
+  managed executeTool 的 generation 变化未纳入图片测试。
+  变更后：证明解码完成后权限复核仍获胜；托管旧 generation 不能继续上传。
+接口/事件/迁移/兼容性：
+  仅测试钩子与测试；生产行为不变；无迁移。
+执行命令、cwd、环境、开始结束、退出码：
+  npx tsc --noEmit                                              exit 0
+  npx tsx --test tests/room-image-races.test.ts                  exit 0（8 pass / 0 fail）
+  npm test                                                       exit 0（538 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-22 05:15–05:40 CST
+证据路径：
+  .state/parallel-room-image/i07-remaining-tests-20261022.log
+实际覆盖的模式和失败分支：
+  解码 await 期间删房；托管 fence/generation 失效；均不产生 artifact
+尚未验证项及明确错误：
+  Run 取消而不是 generation 变化、任务版本变化、删除与最终 project apply
+  并发、最后房间删除后 restart/重建投影仍待补；host/sandbox 真管道证据在
+  I04 已单列
+下一张卡与依赖：V03（等待付费授权）或最后房间 restart 竞态
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移

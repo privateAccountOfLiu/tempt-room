@@ -4,10 +4,12 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import sharp from 'sharp';
-import { Store, SYSTEM, now } from '../apps/server/src/store.ts';
+import { Store, SYSTEM, now, uid } from '../apps/server/src/store.ts';
 import { RoomService } from '../apps/server/src/service.ts';
 import { ImageUploads } from '../apps/server/src/image-uploads.ts';
-import { imageOperationIds } from '../packages/protocol/src/index.ts';
+import { imageOperationIds, type Run } from '../packages/protocol/src/index.ts';
+import { Worker } from '../apps/server/src/worker.ts';
+import { executionFence } from '../apps/server/src/execution.ts';
 
 const parent = resolve('.state/test-data');
 const sha = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
@@ -120,4 +122,47 @@ test('deleting the room after a complete upload hides the image but keeps audit 
   const uploadRow = ctx.store.db.prepare('SELECT state FROM image_uploads WHERE id=?').get(upload.uploadId) as any;
   assert.equal(uploadRow.state, 'completed');
   assert.ok(imageOperationIds('root').begin.length <= 128);
+});
+
+test('a room entering deletion while the preview is generated cannot commit the artifact', async t => {
+  const ctx = await fixture(t);
+  const bytes = await picture(6, 6);
+  const upload = await pending(ctx, bytes);
+  await assert.rejects(() => ctx.uploads.finalize(upload.uploadId, {roomId: ctx.roomId, agentId: ctx.agentId}, {beforeCommit: async () => {
+    ctx.store.event(ctx.roomId, 'room.deleting', SYSTEM, {room: {...ctx.store.room(ctx.roomId)!, status: 'deleting', revision: 2}});
+  }}), /房间/);
+  assert.equal(ctx.store.list<any>('artifacts', ctx.roomId).length, 0);
+});
+
+test('managed tool image commits reject a stale generation before writing an artifact', async t => {
+  mkdirSync(parent, {recursive: true});
+  const root = mkdtempSync(join(parent, 'managed-image-fence-'));
+  const store = new Store(join(root, 'room.sqlite'));
+  const service = new RoomService(store);
+  const roomId = store.rooms()[0].id;
+  const bytes = await picture(3, 3);
+  let worker!: Worker;
+  const captured: {uploadId?: string; error?: string; code?: string} = {};
+  worker = new Worker(store, service, root, {adapter: async function* (ctx: any) {
+    try {
+      const fence = executionFence(ctx.run);
+      const begin = await worker.executeTool(ctx.run.id, {name: 'image_upload_begin', arguments: {name: 'managed.png', size: bytes.byteLength, sha256: sha(bytes)}, operationId: 'managed_root'}, fence);
+      captured.uploadId = begin.uploadId;
+      const latest = store.get<Run>('runs', ctx.run.id)!;
+      store.event(roomId, 'run.updated', SYSTEM, {run: {...latest, generation: (latest.generation ?? 1) + 1}});
+      try {
+        const result = await worker.executeTool(ctx.run.id, {name: 'image_upload_chunk', arguments: {uploadId: begin.uploadId, index: 0, dataBase64: bytes.toString('base64'), sha256: sha(bytes)}, operationId: 'managed_chunk'}, fence);
+        if (result?.code) { captured.code = result.code; captured.error = result.error; }
+      } catch (error) { captured.error = (error as Error).message; captured.code = (error as any).code; }
+    } catch (error) { captured.error = (error as Error).message; captured.code = (error as any).code; }
+    yield {type: 'text', text: 'done'};
+  }});
+  t.after(async () => { await worker.close(); try { store.close(); } catch { /* closed */ } rmSync(root, {recursive: true, force: true}); });
+  service.execute({version: '0.1', commandId: uid(), roomId, type: 'task.create', payload: {title: 'managed image race', agentId: 'demo-planner'}});
+  worker.start();
+  const deadline = Date.now() + 15000;
+  while (!captured.error && Date.now() < deadline) { worker.tick(); await new Promise(done => setTimeout(done, 20)); }
+  assert.ok(captured.uploadId, 'managed image adapter did not run: ' + JSON.stringify(captured));
+  assert.match(String(captured.code) + ' ' + String(captured.error), /stale_generation|Stale run generation/, 'captured=' + JSON.stringify(captured));
+  assert.equal(store.list<any>('artifacts', roomId).length, 0);
 });
