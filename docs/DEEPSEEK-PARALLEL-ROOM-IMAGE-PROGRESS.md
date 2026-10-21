@@ -31,7 +31,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | I01 图片协议、工具参数与权限 | verified | images.ts 冻结分块/元数据/操作 ID；artifact 图片元数据；image 工具名与写权限映射；attachment-only 消息；7+3 个用例通过；真实上传实现归 I02/I05 |
 | I02 有界可恢复的上传临时状态 | verified | image_uploads/parts 表 + migration 19、分块状态机、配额/TTL、原子落盘、缺失块检测、GC 与 Worker image 工具/删除房间失效接线完成；重启进程 E2E 仍由 I04 覆盖 |
 | I03 解码验真、原图与安全预览 | verified | sharp 0.35.5 + 签名/结构检查 + 完整解码 + 1920 PNG 预览 + 原子落盘/稳定 artifactId；Worker 三个低层工具已接线并通过 3+3 用例；bridge/helper 归 I04 |
-| I04 托管 bridge/host/AppContainer 传输 | in_progress | host pipe 固定图 smoke + AppContainer probe 已验证 bridge 在沙箱内 advertise `room_send_image`（sandbox probe 23/23 通过）；AppContainer 真图片上传仍 not_verified（`--mode sandbox` 明确不冒充） |
+| I04 托管 bridge/host/AppContainer 传输 | verified | host HostRoomPipe 与 AppContainer 真 sandbox（staged Node+bridge）两种模式固定图上传均 verified=true；sandbox probe 23/23；helper symlink 祖先检查改为只到允许根 |
 | I05 外部 MCP、插件与 SDK 发图 | in_progress | SDK、外部 MCP room_send_image、真实 stdio→HTTP 重试幂等、timeout/401/403/410 分类、两个独立 MCP 进程并发上传不同图通过 5 个用例；真实宿主手动发图待验证 |
 | I06 安全内联路由与图片展示 | verified | 私有 `/api/artifacts/:id/image`（active/verified/hash/no-store）、缩略图、失败降级、键盘 Lightbox、纯图不渲染空 Markdown 已完成并通过 3 个接口用例与完整浏览器 E2E |
 | I07 跨功能竞态 | in_progress | 9 个用例覆盖删房/移除成员/并行上传/丢回执/导出回放/删后审计/解码期间删房/托管 stale generation/最后房间 restart + 列表为空 + 旧图片 URL 410；删除与最终 project apply 并发仍未覆盖 |
@@ -1682,6 +1682,29 @@ npm test 545/545。
 .state/browser-e2e/run-LC2yr8/report.json。
 未验证：未知清理详情入口的服务端事件展示；不在 R05 浏览器验收清单内。
 下一张卡：V03（等待付费授权）或 AppContainer 真图片 smoke
+```
+
+## I04 — AppContainer 真图片上传 smoke
+
+```
+基线 SHA：da42cce；实现见本次提交
+修改：scripts/smoke-agent-images.ts（--mode sandbox 实现）、scripts/room-image-transfer.mjs、插件 helper
+- sandbox 模式：Store/RoomService/ImageUploads + SandboxHost + stageToolchain；
+  固定 18×12 PNG 写入 sandbox workspace；staged Node 启动 workspace 内的 MCP
+  client，再 spawn staged room-bridge.mjs；bridge 的 room_send_image 分块通过
+  sandbox RoomPipe 回 server handler，complete 后 finalize；
+  校验 verified 元数据/预览 hash/一条消息/真实 jobEmpty exit0；
+- 修复 helper：symlink 祖先扫描原来一直走到盘根，在 AppContainer 内 lstat
+  父目录 EPERM；改为只扫描到允许根，sandbox 才能读取 workspace 图片。
+验证：npm run test:room-images-native -- --mode host    PASS verified=true；
+       npm run test:room-images-native -- --mode sandbox PASS verified=true；
+       npm run test:sandbox -- --probe 23/23 PASS；npm test 545/545 PASS。
+证据：.state/parallel-room-image/i04-native-matrix-20261022.log、
+      .state/parallel-room-image/i04-appcontainer-tests-20261022.log、
+      .state/room-images-native/latest.json。
+未验证：真实 Claude/Codex/DeepSeek 宿主手动发图（I05 剩余）；
+       CI native-image job 未实际推送运行。
+下一张卡：V03（等待付费授权）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移

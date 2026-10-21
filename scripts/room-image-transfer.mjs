@@ -70,9 +70,10 @@ export function readLocalImage(file, roots, maxBytes = IMAGE_MAX_BYTES) {
   // Reject symlink/junction ancestors and require a regular target file.
   const targetInfo = lstatSync(canonical);
   if (targetInfo.isSymbolicLink() || !targetInfo.isFile()) fail('image_path_denied', '图片路径必须是普通文件');
-  for (let parent = dirname(canonical); ; parent = dirname(parent)) {
+  const canonicalRoot = roots.find(root => inside(root, canonical));
+  for (let parent = dirname(canonical); canonicalRoot && inside(canonicalRoot, parent); parent = dirname(parent)) {
     if (lstatSync(parent).isSymbolicLink()) fail('image_path_denied', '图片路径包含符号链接');
-    if (dirname(parent) === parent) break;
+    if (parent === canonicalRoot) break;
   }
   const fd = openSync(canonical, 'r');
   try {
