@@ -123,11 +123,11 @@ export class ImmutableBaselines {
   /** Remove baselines that no run, binding or artifact references. */
   gc(referenced: ReadonlySet<string>, minAgeMs = 0): number {
     let removed = 0;
-    const cutoff = Date.now() - minAgeMs;
+    const cutoff = minAgeMs > 0 ? Date.now() - minAgeMs : 0;
     for (const entry of readdirSync(this.root, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       if (referenced.has(entry.name)) continue;
-      try { if (statSync(join(this.root, entry.name)).mtimeMs > cutoff) continue; } catch { continue; }
+      if (minAgeMs > 0) { try { if (statSync(join(this.root, entry.name)).mtimeMs > cutoff) continue; } catch { continue; } }
       try {
         rmSync(join(this.root, entry.name), { recursive: true, force: true });
         removed += 1;

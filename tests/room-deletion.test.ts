@@ -6,7 +6,7 @@ import { Store, SYSTEM, uid, now } from '../apps/server/src/store.ts';
 import { RoomService } from '../apps/server/src/service.ts';
 import { Worker } from '../apps/server/src/worker.ts';
 import { createControllableAdapter } from './helpers/controllable-adapter.ts';
-import type { Integration, Room, Run, Task } from '../packages/protocol/src/index.ts';
+import type { InboxDelivery, InputBatch, Integration, Room, Run, Task, WakeIntent } from '../packages/protocol/src/index.ts';
 
 const parent = resolve('.state/test-data');
 
@@ -111,4 +111,23 @@ test('an unresolved apply journal keeps the room deleting with stable pending re
   ctx.store.event(ctx.roomId, 'integration.updated', SYSTEM, {integration: {...integration, status: 'blocked', errorCode: 'room_deleting', updatedAt: now()}});
   ctx.worker.tick();
   assert.equal(ctx.store.room(ctx.roomId)!.status, 'deleted');
+});
+
+test('deletion suppresses pending wakes and expires batches and inbox deliveries', t => {
+  const ctx = fixture(t);
+  const session = {id: 'session_delete_pending', roomId: ctx.roomId, agentId: 'demo-planner', status: 'active' as const, createdAt: now(), updatedAt: now()};
+  ctx.store.event(ctx.roomId, 'agent_session.created', SYSTEM, {agentSession: session});
+  const wake: WakeIntent = {id: 'wake_pending_delete', scopeKey: 'delete-scope', agentSessionId: session.id, sourceEventId: 'evt_delete_source', sourceSeq: 1, status: 'pending'};
+  ctx.store.event(ctx.roomId, 'wake.requested', SYSTEM, {wakeIntent: wake});
+  const delivery: InboxDelivery = {id: 'delivery_pending_delete', agentSessionId: session.id, sourceEventId: 'evt_delete_source', sourceSeq: 1, status: 'pending'};
+  ctx.store.event(ctx.roomId, 'inbox.delivered', SYSTEM, {delivery});
+  const batch: InputBatch = {id: 'batch_pending_delete', agentSessionId: session.id, generation: 1, executionId: 'exec_delete', deliveryIds: [delivery.id], sourceEventIds: ['evt_delete_source'], fromScanSeq: 0, throughScanSeq: 1, payloadHash: 'a'.repeat(64), deliveryMode: 'next-turn', createdAt: now(), status: 'created'};
+  ctx.store.event(ctx.roomId, 'input.batch.created', SYSTEM, {batch});
+  ctx.command('room.delete', {expectedRevision: 1});
+  assert.equal(ctx.store.get<WakeIntent>('wake_intents', wake.id)!.status, 'suppressed');
+  assert.equal(ctx.store.get<WakeIntent>('wake_intents', wake.id)!.suppressionReason, 'room_deleting');
+  assert.equal(ctx.store.get<InputBatch>('input_batches', batch.id)!.status, 'expired');
+  assert.equal(ctx.store.get<InboxDelivery>('inbox_deliveries', delivery.id)!.status, 'expired');
+  assert.ok(ctx.store.events(ctx.roomId).some(event => event.type === 'wake.suppressed'));
+  assert.ok(ctx.store.events(ctx.roomId).some(event => event.type === 'input.batch.expired'));
 });

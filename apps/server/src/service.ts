@@ -1,7 +1,7 @@
 import { discussionWindowEstimate, isDiscussionWindowExpired } from './discussion-windows.ts';
 import { z } from 'zod';
 import {discussionPrompt,assessConvergence,discussionSummaryPrompt} from './discussions.ts';
-import { agentSchema,contextSeqOf,taskContractSchema, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type DiscussionRound, type Task, type Decision, type AgentSession, type Subscription, type WakeIntent, type ProjectBinding, type Integration, type BudgetReservation, type CapabilityEvidence } from '../../../packages/protocol/src/index.ts';
+import { agentSchema,contextSeqOf,taskContractSchema, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type DiscussionRound, type Task, type Decision, type AgentSession, type Subscription, type WakeIntent, type InputBatch, type InboxDelivery, type ProjectBinding, type Integration, type BudgetReservation, type CapabilityEvidence } from '../../../packages/protocol/src/index.ts';
 import { digest, now, OWNER, Store, SYSTEM, uid } from './store.ts';
 import type { EventStore } from './ports/event-store.ts';
 import {assertContextCurrent} from './context-reconciliation.ts';
@@ -106,6 +106,18 @@ export class RoomService {
         }
         for (const subscription of this.store.list<Subscription>('subscriptions', roomId)) {
           if (subscription.enabled) this.store.event(roomId, 'subscription.updated', actor, {subscription: {...subscription, enabled: false}});
+        }
+        for (const wakeIntent of this.store.list<WakeIntent>('wake_intents', roomId)) {
+          if (wakeIntent.status !== 'pending') continue;
+          this.store.event(roomId, 'wake.suppressed', SYSTEM, {wakeIntent: {...wakeIntent, status: 'suppressed', suppressionReason: 'room_deleting'}});
+        }
+        for (const batch of this.store.list<InputBatch>('input_batches', roomId)) {
+          if (batch.status !== 'created' && batch.status !== 'provided') continue;
+          this.store.event(roomId, 'input.batch.expired', SYSTEM, {batch: {...batch, status: 'expired'}});
+        }
+        for (const delivery of this.store.list<InboxDelivery>('inbox_deliveries', roomId)) {
+          if (delivery.status !== 'pending' && delivery.status !== 'batched') continue;
+          this.store.event(roomId, 'inbox.delivered', SYSTEM, {delivery: {...delivery, status: 'expired'}});
         }
         for (const integration of this.store.list<Integration>('integrations', roomId)) {
           if (!['queued', 'ready_to_apply'].includes(integration.status)) continue;
