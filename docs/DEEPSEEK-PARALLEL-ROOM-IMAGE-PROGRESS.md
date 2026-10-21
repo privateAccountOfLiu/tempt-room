@@ -21,7 +21,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | P02 不可变基线与 host 独立目录 | in_progress | 共享扫描器 + 不可变基线 + host-isolated 已实现并验证；基线 GC、旧绑定补建、依赖产物叠入、UI 选择仍未覆盖 |
 | P03 按 canonical 项目互斥、异步验收 | verified | 项目锁跨房间 canonical 互斥；验收异步化并纳入超时/输出上限/进程树清理；新增 4 个并发与 HTTP 用例 |
 | P04 staging 精确组合 | verified | staging 由当前已认可目标 + 候选组成；目标/候选/verifier 篡改与无关文件变化均在 apply 前拒绝；journal 记录目标前后摘要 |
-| P05 双启动屏障与真实派发 | not_started | |
+| P05 双启动屏障与真实派发 | verified | 可控 adapter 由真实 Worker 派发；两个 Run 同时进入后才释放，独立工作区、真实产物、owner 验收和 integration 全链路通过 |
 | P06 M1 七项可失败用例 | not_started | |
 | R01 Room schema/事件/迁移 | not_started | |
 | R02 单事务保存房间设置与成员 | not_started | |
@@ -299,6 +299,59 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
   未覆盖：verifier 内容文件本身不可变副本（当前冻结并复核声明 hash；
   verifier 命令由 owner 提供的 argv 执行）
 下一张卡与依赖：P05（双启动屏障和真实 Worker 派发）
+```
+
+## P05 — 双启动屏障和真实 Worker 派发
+
+```
+卡号与状态：P05 / verified
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 507e949（P04 提交）；实现见本次提交
+修改文件和关键符号：
+  tests/helpers/controllable-adapter.ts（新增）
+    createControllableAdapter()：deferred Promise 屏障，不使用 sleep 推测；
+    adapter 被真实 Worker 调用时登记 runId/agentId/taskId/workspace/prompt/
+    baselineHash；release()/fail()/releaseAll()；waitForEntered(count, timeout)
+    由实际 adapter 进入事件 resolve；timeline 使用 hrtime ns
+  tests/parallel-task-execution.test.ts（新增）
+    - project.bind 冻结基线；两个任务经正常 task.create 入队
+    - worker.tick() 后等待两个真实 adapter 进入；进入前断言没有 completed 任务、
+      没有 artifact、两个 Run 都处于活动区间
+    - 两个 cwd 不同且 baselineHash 相同；源目录未被修改
+    - release 后 Worker 生成两个 patch artifact、Run 完成、任务 pending 验收
+    - owner 依据实际 artifact 字节计算 SHA256 并 task.verification.record
+    - artifact.integrate 经真实 integration queue 应用；最终源目录同时包含两份产物
+  scripts/acceptance-parallel-tasks.ts（重写核心路径）
+    删除 materialize() 伪执行主路径；改用同一可控 adapter 走真实 Worker 派发；
+    报告记录 modelRequests:0、tasks/workspaces/timeline/artifacts/verifierHash、
+    binding manifest hash 与 integration 结果
+  tests/parallel-task-acceptance.test.ts（保持契约，验证新 fixture 全链路）
+变更前触发条件 / 变更后行为：
+  变更前：验收 fixture 直接调用 workspaces.snapshot()/publishArtifact() 模拟执行，
+  只证明端到端拼装，不证明 Worker 真的并行派发。
+  变更后：两个任务由真实 Worker 的 tick/execute 路径进入 adapter；只有两个
+  adapter 都被进入后测试才释放，源码与工作区事实均由 Worker 产出。
+接口/事件/迁移/兼容性：
+  仅新增测试 helper 与验收路径；无协议、事件或迁移变更。
+执行命令、cwd、环境、开始结束、退出码：
+  npm run typecheck                                             exit 0
+  npx tsx --test tests/parallel-task-execution.test.ts           exit 0（1 pass / 0 fail）
+  npx tsx --test tests/parallel-task-acceptance.test.ts          exit 0（1 pass / 0 fail）
+  npm run acceptance:parallel -- --check                        exit 0（全部检查通过）
+  npm test                                                      exit 0（460 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-21 19:40–20:05 CST
+证据路径：
+  .state/parallel-room-image/p05-tests-20261021.log
+  .state/parallel-room-image/p05-acceptance-20261021.log
+实际覆盖的模式和失败分支：
+  两个 adapter 同时进入屏障；进入前无提前完成/产物；独立 isolated 工作区；
+  源目录在运行期间不可见变化；owner 使用真实 artifact hash 验收；
+  integration 队列应用两份 patch；--check 无模型请求
+尚未验证项及明确原因：
+  未覆盖：并发上限=1 时必须失败的反向检出力（列入 P06 第 1 项）
+  未覆盖：真实 CLI/API 模型参与的双运行（本 fixture 使用确定性 adapter，
+  modelRequests=0，符合本卡范围）
+下一张卡与依赖：P06（M1 七项可失败用例）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移
