@@ -36,7 +36,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | I06 安全内联路由与图片展示 | verified | 私有 `/api/artifacts/:id/image`（active/verified/hash/no-store）、缩略图、失败降级、键盘 Lightbox、纯图不渲染空 Markdown 已完成并通过 3 个接口用例与完整浏览器 E2E |
 | I07 跨功能竞态 | in_progress | 删房/移除成员/并行上传/丢回执重试/导出回放/删后审计 6 类竞态通过 6 个用例；`acceptance:room-images --check` 通过；托管取消、删除与最终 apply、最后房间重启组合仍未覆盖 |
 | V01 开发/发布报告分模式 | in_progress | schemaVersion 2、sourceBefore/sourceAfter、tracked/working/untracked+lockfile hash、`--release --expected-head` 前置失败 not_run、source_changed 检测与 checksPassed/releaseEligible 已完成并通过 5 个用例；真实 release 运行与 expected-head 参数化脚本入口待补 |
-| V02 CI/preflight 接入真实入口 | not_started | |
+| V02 CI/preflight 接入真实入口 | in_progress | preflight 改为 collaboration release/development 单次入口 + 连接器/并行/图片检查；外层 sourceBefore/After 与 releaseEligible/verdict；CI 传 github.sha、上传证据；本地 skip 模式 preflight PASS（development_only）；真实 release CI 运行待下次推送验证 |
 | V03 固定版本真实 CLI 与三组对照 | not_started | |
 | V04 文档、备份导入导出与统一口径 | not_started | |
 
@@ -1103,6 +1103,69 @@ delivery/image-upload 细节与全入口 assertActiveRoom 仍待补）
   仍 dirty 且 release 要求 clean；expected-head 参数尚未接入 npm preflight
   脚本/CI；schemaVersion 1 旧报告读取兼容路径未做读取器测试
 下一张卡与依赖：V02（CI/preflight 接入真实入口）
+```
+
+## V02 — CI/preflight 接入真实入口
+
+```
+卡号与状态：V02 / in_progress（preflight/CI/依赖接线完成；真实 GitHub CI release job 未推送验证）
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 960f61e（V01 提交）；实现见本次提交
+修改文件和关键符号：
+  scripts/preflight.ts（重构）
+    合并重复的 typecheck/unit-tests 为单次 collaboration 入口：
+      --expected-head / ROOM_EXPECTED_HEAD 存在时调用
+      verify:collaboration:release --expected-head <sha>，否则 development；
+    后续依次 secret-scan、check:room-plugin、test:mcp-connectors、
+    acceptance:parallel --check、acceptance:room-images、job-launcher、build、
+    sdk-consumer、browser-e2e、production-smoke；
+    外层 capture sourceBefore/sourceAfter 并比较 tracked/working/untracked/
+    lockfile；跳过 sdk/browser 或 --with-native 缺失进入 notVerified；
+    report 新增 mode/expectedHead/sourceStable/releaseEligible/verdict；
+    未知参数直接报错，不再静默忽略；不调用 preflight 自身、不递归
+  package.json
+    build 的 tsup 增加 --external sharp；新增
+    verify:collaboration:release 脚本；acceptance:room-images 写入
+    .state/acceptance-room-images/latest.json 证据
+  scripts/acceptance-room-images.ts
+    --check 结果落 latest.json 供 CI evidence 上传
+  .github/workflows/ci.yml
+    verify job 增加 connector/plugin、并行任务与图片验收步骤；
+    release-preflight job 注入 ROOM_EXPECTED_HEAD=${{ github.sha }}，
+    调用重构后的 test:preflight；
+    evidence 上传 preflight、collaboration-baseline、browser、图片与并行验收，
+    if:always；不上传 tokens/用户原图/完整数据库
+变更前触发条件 / 变更后行为：
+  变更前：preflight 重复执行 typecheck+全量测试+replay，和 CI verify job 重复；
+  没有 release expected-head 入口、图片/连接器验收、外层 source 稳定性检查。
+  变更后：一次 collaboration 入口提供 typecheck/test/replay，preflight 只追加
+  其他 required 检查；CI 用 checkout SHA 作为 release 目标；跳过/缺失项
+  只能得到 development_only 或非发布 verdict。
+接口/事件/迁移/兼容性：
+  preflight report 新增字段，旧字段保留；package scripts 向后兼容；
+  native image pipe 仍为模式矩阵中的 not_verified，不把 skip 算 supported。
+执行命令、cwd、环境、开始结束、退出码：
+  npm run typecheck                                            exit 0
+  npm run acceptance:room-images                               exit 0（latest.json 写入）
+  npm run test:preflight -- --skip-browser --skip-sdk          exit 0
+    verdict=development_only releaseEligible=false sourceStable=true
+  npm test                                                      exit 0（529 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-22 02:30–03:20 CST
+证据路径：
+  .state/parallel-room-image/v02-preflight-20261022b.log
+  .state/parallel-room-image/v02-tests-20261022.log
+  .state/preflight/latest.json
+实际覆盖的模式和失败分支：
+  preflight 真实入口一次跑通 collaboration+secret+plugin+mcp+parallel+images+
+  build+production（skip sdk/browser）；外层 sourceStable=true；
+  development_only/releaseEligible=false 判定；V02 前发现并修复了 dev preflight
+  误用 release 脚本的问题
+尚未验证项及明确原因：
+  真实 GitHub Actions 尚未推送运行，expected-head/PR merge SHA 行为只有本地
+  逻辑与单测证据；完整 browser+sdk+production release preflight 未在本轮全跑；
+  native-image-pipe smoke 仍需要 Windows sandbox 环境；evidence 路径中的
+  acceptance-parallel 实际输出目录需以 CI 首跑确认
+下一张卡与依赖：V03（固定版本真实 CLI 与三组对照）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移

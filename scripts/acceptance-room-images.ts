@@ -40,7 +40,11 @@ try {
     imageSchemasPresent: ['image-metadata', 'image-upload-begin', 'image-upload-chunk', 'image-upload-complete', 'room-send-image-args'].every(name => existsSync(resolve('packages/protocol/schema', `${name}.schema.json`)))
   };
   ok = Object.values(checks).every(Boolean);
-  console.log(JSON.stringify({ok, mode: 'check', modelRequests: 0, checks, artifactId: image.artifactId, messageId: post.result.messageId}, null, 2));
+  const evidence = {ok, mode: 'check', modelRequests: 0, checks, artifactId: image.artifactId, messageId: post.result.messageId};
+  mkdirSync(resolve('.state', 'acceptance-room-images'), {recursive: true});
+  const fsmod = await import('node:fs');
+  fsmod.writeFileSync(resolve('.state', 'acceptance-room-images', 'latest.json'), JSON.stringify(evidence, null, 2));
+  console.log(JSON.stringify(evidence, null, 2));
 } finally {
   try { store.close(); } catch { /* noop */ }
   rmSync(root, {recursive: true, force: true});

@@ -38,6 +38,10 @@ jobs:
         run: npm run test:faults
       - name: Two-connection concurrency conflict suite
         run: npm run test:concurrency
+      - name: Connector and plugin copy contract
+        run: npm run check:room-plugin && npm run test:mcp-connectors
+      - name: Parallel task and image acceptance checks
+        run: npm run acceptance:parallel -- --check && npm run acceptance:room-images
       - name: Production build
         run: npm run build
 
@@ -45,6 +49,8 @@ jobs:
     needs: verify
     runs-on: windows-latest
     timeout-minutes: 45
+    env:
+      ROOM_EXPECTED_HEAD: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -57,7 +63,7 @@ jobs:
       - run: npm ci
       - name: Build Windows sandbox host and pipe compatibility module
         run: npm run build:sandbox
-      - name: Release preflight (typecheck, tests, secrets, build, SDK consumer, browser E2E, production smoke)
+      - name: Release preflight (collaboration release, secrets, build, SDK, browser E2E, production smoke, image/connector checks)
         run: npm run test:preflight
       - name: Upload release evidence
         if: always()
@@ -66,6 +72,9 @@ jobs:
           name: release-evidence
           path: |
             .state/preflight/**
+            .state/collaboration-baseline/**
             .state/browser-e2e/**
+            .state/acceptance-room-images/**
+            .state/acceptance-parallel/**
           if-no-files-found: warn
           retention-days: 14
