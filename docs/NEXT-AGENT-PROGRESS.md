@@ -23,11 +23,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 2de8ed712145b3ab1c8cd7b3dddf290d6d2c1cc3 (dirty)
+source HEAD: 339be1b9188a985547b1990a4f6fd4bc3379ca28 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-21T01-13-44-602Z-4659e5a1/report.json
+report: .state/collaboration-baseline/run-2026-10-21T01-33-51-656Z-86be3061/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -225,19 +225,19 @@ report: .state/collaboration-baseline/run-2026-10-21T01-13-44-602Z-4659e5a1/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-JiigQy/report.json`，173.6s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-VfiDqJ/report.json`，176.5s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-pjuqwZ/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-hfFqcq/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-21T01-13-44-602Z-4659e5a1/report.json`
-- `.state/collaboration-baseline/run-2026-10-21T01-13-44-602Z-4659e5a1/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-21T01-13-44-602Z-4659e5a1/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-21T01-13-44-602Z-4659e5a1/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-21T01-33-51-656Z-86be3061/report.json`
+- `.state/collaboration-baseline/run-2026-10-21T01-33-51-656Z-86be3061/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-21T01-33-51-656Z-86be3061/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-21T01-33-51-656Z-86be3061/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -709,8 +709,9 @@ report: .state/collaboration-baseline/run-2026-10-21T01-13-44-602Z-4659e5a1/repo
 ## C04b Job Object 硬保证
 
 - 新增 tools/job-launcher C# helper：CreateJobObject + JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE，透明代理 stdin/stdout/stderr，子进程启动后 AssignProcessToJobObject
-- Host 模式默认不启用；仅 ROOM_JOB_LAUNCHER=1 且 .state/tools/job-launcher.exe 存在时启用。helper 退出/被杀时内核关闭 job handle，终止整棵子进程树
-- 说明：job-launcher 的 stdio 代理在真实 Codex app-server 上出现 initialize 超时，因此保持 opt-in，默认继续使用 taskkill+CIM 路径
+- host-launcher stdin 改用 GetStdHandle(-10) + 手动 pump，修复 Console 标准输入在无控制台子进程中不转发的问题
+- 真实 Codex 经 job-launcher 运行 completed，cleanupProof=job-object-kill-on-close remaining=0
+- Host 模式在 .state/tools/job-launcher.exe 存在时默认启用；未构建时回退 taskkill+CIM
 - HostChannel cleanupProof 标记 evidence=job-object-kill-on-close；仍保留 taskkill+CIM tracked PID 扫描
 - 新增 job-launcher 测试：仅杀 helper（非 /T）时孙进程 ESRCH；HostChannel 证明 evidence 正确
 - 构建：npm run build:job-launcher（需要 dotnet SDK）；helper 未构建时自动回退原 taskkill 路径
@@ -721,3 +722,10 @@ report: .state/collaboration-baseline/run-2026-10-21T01-13-44-602Z-4659e5a1/repo
 - 真实 Codex host 冒烟：默认路径 completed，消息 HOST_OK，cleanupProof=taskkill-tree-scan remaining=0
 - 真实 Codex 经 job-launcher 路径出现 initialize 超时，说明 stdio 代理尚未可靠；因此保持 ROOM_JOB_LAUNCHER=1 opt-in，默认不使用
 - C04b 剩余：修复 launcher stdio 代理后再启用 Job Object 硬保证
+
+### C04b 真实 Job Object 验证
+
+- 房间 room_5b8825b523b642cab6af553bfed50d1f / Run run_205e09dced0547abae1d8d2c5350836b
+- Codex 回复 JOB_ENABLED_OK，Run completed
+- cleanupProof=job-object-kill-on-close，remainingProcesses=0
+- launcher 单测：仅杀 helper 时孙进程退出；HostChannel JSON-RPC initialize 经代理返回 echo

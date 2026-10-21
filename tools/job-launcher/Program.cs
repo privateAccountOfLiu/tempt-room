@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 
 namespace JobLauncher;
 
@@ -45,6 +46,9 @@ internal static class Program
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr GetStdHandle(int handle);
 
     public static int Main(string[] args)
     {
@@ -92,23 +96,31 @@ internal static class Program
             return 67;
         }
 
-        var stdout = Task.Run(() => child.StandardOutput.BaseStream.CopyToAsync(Console.OpenStandardOutput()));
-        var stderr = Task.Run(() => child.StandardError.BaseStream.CopyToAsync(Console.OpenStandardError()));
-        var stdin = Task.Run(() =>
+        var stdout = new Thread(() => { try { child.StandardOutput.BaseStream.CopyTo(Console.OpenStandardOutput()); } catch (Exception ex) { try { Console.Error.WriteLine("job-launcher stdout: " + ex.Message); } catch { } } }) { IsBackground = true };
+        var stderr = new Thread(() => { try { child.StandardError.BaseStream.CopyTo(Console.OpenStandardError()); } catch { } }) { IsBackground = true };
+        var stdin = new Thread(() =>
         {
             try
             {
-                Console.OpenStandardInput().CopyTo(child.StandardInput.BaseStream);
+                using var input = new FileStream(new SafeFileHandle(GetStdHandle(-10), ownsHandle: false), FileAccess.Read, 81920, false);
+                var buffer = new byte[8192];
+                int read;
+                while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    child.StandardInput.BaseStream.Write(buffer, 0, read);
+                    child.StandardInput.BaseStream.Flush();
+                }
             }
-            catch { }
+            catch (Exception ex) { try { Console.Error.WriteLine("job-launcher stdin: " + ex.Message); } catch { } }
             finally
             {
                 try { child.StandardInput.Close(); } catch { }
             }
-        });
+        }) { IsBackground = true };
+        stdout.Start(); stderr.Start(); stdin.Start();
 
         child.WaitForExit();
-        try { stdout.Wait(2000); stderr.Wait(2000); } catch { }
+        try { stdout.Join(2000); stderr.Join(2000); } catch { }
         Console.Out.Flush();
         Console.Error.Flush();
         return child.ExitCode;
