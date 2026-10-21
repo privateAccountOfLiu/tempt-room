@@ -56,7 +56,7 @@ export async function createApp(options: AppOptions = {}) {
     const bearer = request.headers.authorization?.replace(/^Bearer /, '');
     const wsToken = request.headers['sec-websocket-protocol']?.split(',').map(s=>s.trim()).find(s=>s.startsWith('room-token.'))?.slice(11);
     if (!authorized(request.cookies[sessionCookie]) && !authorized(bearer) && !(request.url==='/api/events'&&authorized(wsToken))) return reply.code(401).send({ code: 'unauthorized', message: '本地会话已过期，请使用启动地址或粘贴启动令牌重新连接' });
-    const binaryDownload = request.method==='GET' && /^\/api\/artifacts\/[^/]+$/.test(request.url);
+    const binaryDownload = request.method==='GET' && /^\/api\/artifacts\/[^/]+(?:\/image)?$/.test(request.url);
     if (!request.url.startsWith('/api/events') && !binaryDownload && request.headers['room-protocol-version'] !== VERSION) return reply.code(426).send({ code: 'version_mismatch', message: `需要 Room Protocol ${VERSION}` });
   });
   app.setErrorHandler((error, request, reply) => {
@@ -397,6 +397,17 @@ export async function createApp(options: AppOptions = {}) {
     const artifact = store.get<Artifact>('artifacts', request.params.id); if (!artifact) throw new ProtocolError('not_found', '交付物不存在', 404);
     assertReadableRoom(artifact.roomId);
     return reply.header('content-type', 'application/octet-stream').header('x-content-type-options', 'nosniff').header('content-disposition', `attachment; filename*=UTF-8''${encodeURIComponent(artifact.name)}`).send(readFileSync(join(root, 'artifacts', artifact.id)));
+  });
+  app.get<{ Params: { id: string } }>('/api/artifacts/:id/image', (request, reply) => {
+    const artifact = store.get<Artifact>('artifacts', request.params.id);
+    if (!artifact) throw new ProtocolError('not_found', '交付物不存在', 404);
+    if (roomLifecycleStatus(artifact.roomId) !== 'active') throw new ProtocolError('room_inactive', '房间正在删除或已删除', 410);
+    if (!artifact.image?.verified) throw new ProtocolError('not_an_image', '交付物没有经过验证的图片预览', 415);
+    const previewPath = join(root, 'artifacts', `${artifact.id}.preview.png`);
+    if (!existsSync(previewPath)) throw new ProtocolError('preview_unavailable', '图片预览不可用', 410);
+    const bytes = readFileSync(previewPath);
+    if (bytes.byteLength !== artifact.image.previewSize || createHash('sha256').update(bytes).digest('hex') !== artifact.image.previewHash) throw new ProtocolError('preview_corrupt', '图片预览完整性校验失败', 410);
+    return reply.header('content-type', 'image/png').header('x-content-type-options', 'nosniff').header('content-disposition', 'inline').header('cross-origin-resource-policy', 'same-origin').header('cache-control', 'private, no-store').send(bytes);
   });
   app.get<{ Params: { id: string } }>('/api/artifacts/:id/preview', request => {
     const artifact = store.get<Artifact>('artifacts', request.params.id); if (!artifact) throw new ProtocolError('not_found', '交付物不存在', 404);

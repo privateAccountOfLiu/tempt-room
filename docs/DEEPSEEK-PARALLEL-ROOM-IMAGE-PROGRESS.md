@@ -33,7 +33,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | I03 解码验真、原图与安全预览 | verified | sharp 0.35.5 + 签名/结构检查 + 完整解码 + 1920 PNG 预览 + 原子落盘/稳定 artifactId；Worker 三个低层工具已接线并通过 3+3 用例；bridge/helper 归 I04 |
 | I04 托管 bridge/host/AppContainer 传输 | in_progress | Worker executeTool/agentTool 已接上 begin/chunk/complete（托管 fence 与外部身份）并通过 3 个用例；bridge helper、toolchain 复制与真实 pipe chunk smoke 仍待实现 |
 | I05 外部 MCP、插件与 SDK 发图 | in_progress | Browser/Node SDK uploadImage/sendImage（Web Crypto、稳定 commandId、错误 stage）与 RoomAgentClient 方法已完成并通过 4 个用例；外部 MCP room_send_image、helper 与插件同步仍未接线 |
-| I06 安全内联路由与图片展示 | not_started | |
+| I06 安全内联路由与图片展示 | verified | 私有 `/api/artifacts/:id/image`（active/verified/hash/no-store）、缩略图、失败降级、键盘 Lightbox、纯图不渲染空 Markdown 已完成并通过 3 个接口用例与完整浏览器 E2E |
 | I07 跨功能竞态 | not_started | |
 | V01 开发/发布报告分模式 | not_started | |
 | V02 CI/preflight 接入真实入口 | not_started | |
@@ -951,6 +951,61 @@ delivery/image-upload 细节与全入口 assertActiveRoom 仍待补）
   工具尚未实现；Claude 插件副本与 sync-room-agent-plugin --check 未包含 helper；
   真实 stdio→HTTP→Worker SDK 并发/丢回复 e2e 未做；I06 的图片展示路由仍待实现
 下一张卡与依赖：I06（安全内联路由与图片消息展示）
+```
+
+## I06 — 安全内联路由与图片消息展示
+
+```
+卡号与状态：I06 / verified
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 03cf6fe（I05 SDK 提交）；实现见本次提交
+修改文件和关键符号：
+  apps/server/src/app.ts
+    新增 GET /api/artifacts/:id/image：
+      owner cookie/bearer 鉴权不变；仅该精确 GET 豁免 Room-Protocol-Version；
+      房间必须 active（deleting/deleted 410）；artifact.image.verified 必需；
+      只读受管 <id>.preview.png，校验 previewSize + SHA256；
+      Content-Type:image/png、nosniff、inline、same-origin、
+      Cache-Control: private,no-store；不读客户端 previewPath
+    原图下载保持 octet-stream + attachment
+  packages/protocol/src/images.ts
+    imageOperationIds 改为内置同步 SHA-256，移除 node:crypto，
+    解决浏览器 Vite 将 node:crypto 外置导致应用壳空白
+  apps/web/src/attachments.tsx（新增）
+    MessageAttachments：按 artifactId 查 metadata；verified image 渲染
+    lazy/async 缩略图；非图片或预览失败仍走原文件按钮；onError 降级为
+    “预览不可用”文件卡且不重复设 src
+    ImageLightbox：role=dialog、Escape、焦点返回、下载原图、关闭；
+    img 使用 /api/artifacts/<encoded-id>/image，width/height 保留比例
+  apps/web/src/main.tsx
+    接入 MessageAttachments；纯图片消息不渲染空 Markdown 段；图文先正文再附件
+  apps/web/src/workbench.css
+    缩略图最大边距/比例、移动端不溢出、lightbox 居中布局
+  tests/artifact-image.test.ts（新增 3 个用例）
+变更前触发条件 / 变更后行为：
+  变更前：图片只能作为附件下载，不能内联展示；协议模块在浏览器构建失败。
+  变更后：已验真图片可通过私有同源路由内联展示、放大和下载；
+  deleting/deleted 房间、未验真/预览损坏均明确失败；浏览器应用恢复可用。
+接口/事件/迁移/兼容性：
+  新增只读 HTTP 路由；无事件/迁移；旧 owner image/* 无 verified 元数据继续
+  显示下载卡片；CSP 仍只允许 self 图片。
+执行命令、cwd、环境、开始结束、退出码：
+  npm run typecheck                                            exit 0
+  npx vite build                                               exit 0
+  npx tsx --test tests/artifact-image.test.ts                    exit 0（3 pass / 0 fail）
+  npm test                                                      exit 0（520 pass / 0 fail）
+  npm run test:browser                                         exit 0（全部 UI 步骤通过）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-22 01:00–01:35 CST
+证据路径：
+  .state/parallel-room-image/i06-final-tests-20261022.log
+  .state/parallel-room-image/i06-browser-20261022c.log
+实际覆盖的模式和失败分支：
+  私有 PNG 响应头/无协议头请求；匿名 401；未验真 415；deleting 房间 410；
+  预览损坏 410 且原图下载仍为 attachment；Vite 生产构建；完整浏览器回归
+尚未验证项及明确原因：
+  浏览器 E2E 尚未自动构造已验真图片消息来点击缩略图/Lightbox/键盘关闭；
+  cookie 过期与伪图文件降级未做浏览器级断言；多图/透明/竖图布局未做视觉快照
+下一张卡与依赖：I07（跨功能竞态）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移
