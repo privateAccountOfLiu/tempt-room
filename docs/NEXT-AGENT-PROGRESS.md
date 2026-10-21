@@ -819,4 +819,8 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - MiniMax Code：新增 provider `minimax`（仅 external），UI 类型/标签/Mi 标记；connect API 生成 MiniMax `mavis mcp create` 片段与 `minimax-mcp.json`；新增 `docs/MINIMAX-INTEGRATION.md`、`docs/F01-PORTS.md`、`docs/F03-AGENT-SCOPE.md`
 - 真实 MiniMax MCP 注册需在 MiniMax Code 应用内执行生成片段；未宣称真实桌面链路自动验证
 
-- F01/F03/MiniMax 最终验证：426/426 测试；preflight 8/8（.state/preflight/run-Dzi19c，187.6s）；浏览器 45/45（.state/browser-e2e/run-PfV2DU）；MiniMax provider 实测 connect snippets 含 minimax、minimax-mcp.json 已生成
+- F01/F03/MiniMax 最终验证：428/428 测试；preflight 8/8（.state/preflight/run-Dzi19c，187.6s）；浏览器 45/45（.state/browser-e2e/run-PfV2DU）；MiniMax provider 实测 connect snippets 含 minimax、minimax-mcp.json 已生成
+
+- MiniMax MCP 配置实测：使用生成的 minimax-mcp.json 启动 stdio 客户端，initialize + tools/list 成功返回 13 个工具；同时修复 scripts/room-agent-mcp.mjs 与插件副本 tools 数组缺逗号的语法错误，新增 tests/room-mcp-server.test.ts（语法 + 工具清单）
+
+- 最终门禁：428/428 测试；preflight 8/8（.state/preflight/run-V7LSm4，192.1s）；room MCP 两副本 node --check 通过

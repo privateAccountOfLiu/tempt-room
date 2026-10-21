@@ -55,6 +55,8 @@ MiniMax Code 的 MCP 设置页面手动添加同样的 stdio server。
 
 ## 已验证
 
+- 生成的 `minimax-mcp.json` 已用真实 stdio MCP 客户端完成 `initialize` + `tools/list`，返回 13 个 room 工具（room_read/room_post/room_wait/task_*/session_* 等）
+- 修复 room MCP server 两个副本中 tools 数组缺失逗号的语法错误（此前会导致外部 MCP 客户端无法启动）
 - provider `minimax` 只允许 `external` 连接方式
 - 外部连接能力矩阵：artifacts 可用，执行/流式/取消/输入/usage 均 unsupported
 - connect API 生成 MiniMax 片段与 `minimax-mcp.json`

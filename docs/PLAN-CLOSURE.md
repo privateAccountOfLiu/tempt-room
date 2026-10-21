@@ -76,8 +76,8 @@
 
 ## 最终验证
 
-- 单元/集成测试：426/426
-- 发布前门禁：8/8（含 job-launcher 构建步骤；run-Dzi19c）
+- 单元/集成测试：428/428
+- 发布前门禁：8/8（含 job-launcher 构建步骤；run-V7LSm4）
 - 浏览器 E2E：45/45
 - 生产冒烟：10/10
 - 协作基线：PASS（`.state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d`）
