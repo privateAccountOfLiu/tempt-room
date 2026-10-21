@@ -103,7 +103,7 @@ export class Workspaces {
     }).join('\n');
     return { manifest, changes, patch };
   }
-  apply(manifest: Manifest, changes: FileChange[]) {
+  apply(manifest: Manifest, changes: FileChange[], integrity: {targetBeforeHash?: string; targetAfterHash?: string} = {}) {
     const applyRoot=join(this.root,'apply');
     if(existsSync(applyRoot))for(const entry of readdirSync(applyRoot,{withFileTypes:true}))if(entry.isDirectory()){
       const journal=join(applyRoot,entry.name);if(!existsSync(join(journal,'complete'))&&existsSync(join(journal,'journal.json'))){const pending=JSON.parse(readFileSync(join(journal,'journal.json'),'utf8'));if(pending.source.toLowerCase()===manifest.source.toLowerCase())throw new ProtocolError('recovery_required',`发现未完成的应用日志 ${entry.name}。请先审查 journal.json 和备份，确认恢复后再应用。`,409);}
@@ -116,7 +116,7 @@ export class Workspaces {
       backups.push({ path, data });
     }
     const journalId = uid('apply'), journal = join(this.root, 'apply', journalId); mkdirSync(journal, { recursive: true });
-    writeFileSync(join(journal, 'journal.json'), JSON.stringify({ state: 'prepared', source: manifest.source, changes, backups: backups.map(b => ({ path: b.path, data: b.data?.toString('base64') ?? null })) }));
+    writeFileSync(join(journal, 'journal.json'), JSON.stringify({ state: 'prepared', source: manifest.source, changes, backups: backups.map(b => ({ path: b.path, data: b.data?.toString('base64') ?? null })), ...(integrity.targetBeforeHash ? {targetBeforeHash: integrity.targetBeforeHash} : {}), ...(integrity.targetAfterHash ? {targetAfterHash: integrity.targetAfterHash} : {}) }));
     const attempted: number[] = [];
     try {
       changes.forEach((change, index) => {

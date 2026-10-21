@@ -1,12 +1,12 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import { ProtocolError, type Artifact, type Integration, type Task } from '../../../packages/protocol/src/index.ts';
+import { ProtocolError, type Artifact, type Integration, type Run, type Task } from '../../../packages/protocol/src/index.ts';
 import { digest, now, SYSTEM } from './store.ts';
 import type { EventStore } from './ports/event-store.ts';
 import { acquireResource, canonicalProjectKey, quarantineResource, releaseResource } from './resource-manager.ts';
 import { killProcessTreeWithProof, type ProcessTreeProof } from './host.ts';
-import { safePath } from './workspaces.ts';
+import { assertTargetUnchanged, artifactSetHash, prepareIntegrationStaging, stagingRootFor, targetManifestHash, verifierManifestHash } from './integration-staging.ts';
 
 /**
  * Integration queue runner.
@@ -19,7 +19,7 @@ import { safePath } from './workspaces.ts';
 export interface IntegrationHost {
   store: EventStore;
   root: string;
-  apply(artifactId: string): { journalId: string; changedFiles: number };
+  apply(artifactId: string, hashes?: { targetBeforeHash?: string; targetAfterHash?: string }): { journalId: string; changedFiles: number };
   /** Canonical project directory of an integration, if it targets one. */
   projectSource(integration: Integration): string | undefined;
 }
@@ -120,35 +120,44 @@ export class IntegrationRunner {
         if ((integration as unknown as {status?: string}).status !== 'validating') return;
         const artifact = this.host.store.get<Artifact>('artifacts', integration.artifactId);
         const task = artifact?.taskId ? this.host.store.get<Task>('tasks', artifact.taskId) : undefined;
+        const run = integration.runId ? this.host.store.get<Run>('runs', integration.runId) : undefined;
+        if (!artifact || !task) throw new ProtocolError('artifact_binding_invalid', '交付物缺少一致的来源任务', 409);
+        if (run && run.taskVersion !== undefined && task.version !== run.taskVersion) throw new ProtocolError('stale_artifact', '任务版本已变化，候选交付物不能继续集成', 409);
         const changes = JSON.parse(readFileSync(join(this.host.root, 'artifacts', `${integration.artifactId}.changes.json`), 'utf8'));
         const artifactHash = digest(changes);
-        const checks = task?.contract?.acceptance ?? [];
+        if (integration.artifactHash && integration.artifactHash !== artifactHash) throw new ProtocolError('stale_artifact', '集成候选文件在验证前已被修改', 409);
+        const source = this.host.projectSource(integration);
+        if (!source) throw new ProtocolError('invalid_project', '集成缺少项目源目录', 409);
+        const checks = task.contract?.acceptance ?? [];
+        const verifierHash = verifierManifestHash(checks);
+        const previousTarget = this.previousAppliedTarget(integration, source);
+        const expectedTarget = previousTarget ?? integration.baseManifestHash;
+        const currentTargetHash = targetManifestHash(source);
+        if (expectedTarget !== undefined && currentTargetHash !== expectedTarget) throw new ProtocolError('source_changed', '当前项目目标与可认可基线不一致，不能复用旧集成结论', 409);
+        const allowedPaths = task.allowedPaths ?? task.contract?.projectBinding.allowedPaths ?? [];
+        const staging = stagingRootFor(this.host.root, integration.id);
+        const entry = this.inFlight.get(integration.id);
+        if (entry) entry.staging = staging;
+        const staged = prepareIntegrationStaging({ source, staging, changes: changes.changes ?? [], allowedPaths, requireAllowedPaths: Boolean(task.contract) });
+        const artifactSet = artifactSetHash(this.appliedArtifactIds(integration, source), artifact.id);
+        const integrity = {
+          artifactHash,
+          verifiedTargetManifestHash: staged.verifiedTargetManifestHash,
+          stagedManifestHash: staged.stagedManifestHash,
+          appliedArtifactSetHash: artifactSet,
+          verifierManifestHash: verifierHash
+        };
         if (checks.length) {
-          integration = this.update(integration, 'validating', 'testing', { artifactHash });
-          const staging = join(this.host.root, 'staging', integration.id);
-          const entry = this.inFlight.get(integration.id);
-          if (entry) entry.staging = staging;
-          mkdirSync(staging, { recursive: true });
-          for (const [filePath, file] of Object.entries<any>(changes.manifest.files ?? {})) {
-            const target = safePath(staging, filePath);
-            mkdirSync(dirname(target), { recursive: true });
-            writeFileSync(target, Buffer.from(file.content, 'base64'));
-          }
-          for (const change of changes.changes as any[]) {
-            const target = safePath(staging, change.path);
-            if (change.after === null) { if (existsSync(target)) rmSync(target); continue; }
-            mkdirSync(dirname(target), { recursive: true });
-            writeFileSync(target, Buffer.from(change.after, 'base64'));
-          }
+          integration = this.update(integration, 'validating', 'testing', integrity);
           const verification = await this.runChecks(checks, staging, controller.signal);
           if (entry) entry.cleanupProof = verification.cleanupProof;
           if (verification.rejected) {
-            this.update(integration, 'testing', 'verification_failed', { artifactHash, verificationId: `verification_${integration.id}`, errorCode: verification.rejected });
+            this.update(integration, 'testing', 'verification_failed', { ...integrity, verificationId: `verification_${integration.id}`, errorCode: verification.rejected });
             return;
           }
           if (verification.exitCode !== 0) {
             this.update(integration, 'testing', 'verification_failed', {
-              artifactHash,
+              ...integrity,
               verificationId: `verification_${integration.id}`,
               verificationExitCode: verification.exitCode,
               verificationOutputHash: digest(verification.output),
@@ -157,21 +166,22 @@ export class IntegrationRunner {
             return;
           }
           integration = this.update(integration, 'testing', 'testing', {
-            artifactHash,
+            ...integrity,
             verificationId: `verification_${integration.id}`,
             verificationExitCode: 0,
             verificationOutputHash: digest(verification.output),
             verificationEnvironment: verification.environment
           });
           integration = this.update(integration, 'testing', 'ready_to_apply', {
-            artifactHash,
+            ...integrity,
             verificationId: `verification_${integration.id}`,
             verificationExitCode: 0,
             verificationOutputHash: digest(verification.output),
             ...(verification.environment ? { verificationEnvironment: verification.environment } : {})
           });
         } else {
-          integration = this.update(integration, 'validating', 'ready_to_apply', { artifactHash });
+          if (entry) entry.cleanupProof = {checkedAt: now(), remainingProcesses: 0, trackedProcesses: 0, evidence: 'taskkill-tree-scan' };
+          integration = this.update(integration, 'validating', 'ready_to_apply', integrity);
         }
         if (integration.authorization === 'waiting') return;
       }
@@ -181,15 +191,29 @@ export class IntegrationRunner {
       // stale in-memory copy.
       const ready = this.host.store.get<Integration>('integrations', integration.id);
       if (!ready || ready.status !== 'ready_to_apply' || ready.authorization === 'waiting') return;
-      const applying = this.update(ready, 'ready_to_apply', 'applying');
-      if ((applying as unknown as {status?: string}).status !== 'applying') return;
       const artifact = this.host.store.get<Artifact>('artifacts', ready.artifactId);
       if (!artifact || !this.host.store.room(ready.roomId)) throw new ProtocolError('integration_state_changed', '集成期间对象已失效', 409);
-      const result = this.host.apply(ready.artifactId);
+      if (!ready.verifiedTargetManifestHash || !ready.stagedManifestHash) throw new ProtocolError('recovery_required', '集成缺少目标摘要，需重新验证', 409);
+      const frozenTask = artifact.taskId ? this.host.store.get<Task>('tasks', artifact.taskId) : undefined;
+      if (frozenTask) {
+        if (ready.taskVersion !== undefined && frozenTask.version !== ready.taskVersion) throw new ProtocolError('stale_artifact', '任务版本在验证后发生变化', 409);
+        const currentVerifier = verifierManifestHash(frozenTask.contract?.acceptance ?? []);
+        if (ready.verifierManifestHash && currentVerifier !== ready.verifierManifestHash) throw new ProtocolError('stale_artifact', '验证器在验证后发生变化', 409);
+      }
+      const currentChanges = JSON.parse(readFileSync(join(this.host.root, 'artifacts', `${ready.artifactId}.changes.json`), 'utf8'));
+      if (ready.artifactHash && digest(currentChanges) !== ready.artifactHash) throw new ProtocolError('stale_artifact', '验证后候选文件已被修改', 409);
+      const source = this.host.projectSource(ready);
+      if (!source) throw new ProtocolError('invalid_project', '集成缺少项目源目录', 409);
+      assertTargetUnchanged(source, ready.verifiedTargetManifestHash);
+      const applying = this.update(ready, 'ready_to_apply', 'applying');
+      if ((applying as unknown as {status?: string}).status !== 'applying') return;
+      const result = this.host.apply(ready.artifactId, { targetBeforeHash: ready.verifiedTargetManifestHash, targetAfterHash: ready.stagedManifestHash });
       const appliedArtifact = this.host.store.get<Artifact>('artifacts', ready.artifactId);
       if (!appliedArtifact?.applied) throw new ProtocolError('integration_state_changed', '应用后未记录 artifact.applied', 409);
-      this.update(applying, 'applying', 'applied', { journalId: result.journalId });
-      try { rmSync(join(this.host.root, 'staging', ready.id), { recursive: true, force: true }); } catch { /* Keep artifacts if cleanup is denied. */ }
+      const afterHash = targetManifestHash(source);
+      if (afterHash !== ready.stagedManifestHash) throw new ProtocolError('integration_state_changed', '应用后目标摘要与已验证 staging 不一致', 409);
+      this.update(applying, 'applying', 'applied', { journalId: result.journalId, appliedTargetManifestHash: afterHash });
+      try { rmSync(stagingRootFor(this.host.root, ready.id), { recursive: true, force: true }); } catch { /* Keep artifacts if cleanup is denied. */ }
     } catch (error) {
       const current = this.host.store.get<Integration>('integrations', integration.id);
       if (controller.signal.aborted) {
@@ -219,6 +243,26 @@ export class IntegrationRunner {
     }
   }
 
+  /** Target hash recorded by the latest applied integration for this source. */
+  private previousAppliedTarget(integration: Integration, source: string): string | undefined {
+    const canonical = canonicalProjectKey(source);
+    const candidates = this.host.store.list<Integration>('integrations')
+      .filter(item => item.status === 'applied' && item.id !== integration.id && item.appliedTargetManifestHash)
+      .map(item => ({ item, source: this.host.projectSource(item) }))
+      .filter((value): value is { item: Integration; source: string } => Boolean(value.source && canonicalProjectKey(value.source) === canonical))
+      .sort((left, right) => right.item.updatedAt.localeCompare(left.item.updatedAt));
+    return candidates[0]?.item.appliedTargetManifestHash;
+  }
+
+  /** Artifacts already applied to this source, used for the artifact-set hash. */
+  private appliedArtifactIds(integration: Integration, source: string): string[] {
+    const canonical = canonicalProjectKey(source);
+    return this.host.store.list<Integration>('integrations')
+      .filter(item => item.status === 'applied' && item.id !== integration.id)
+      .filter(item => { const other = this.host.projectSource(item); return Boolean(other && canonicalProjectKey(other) === canonical); })
+      .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
+      .map(item => item.artifactId);
+  }
   /**
    * Run the frozen acceptance checks.
    *

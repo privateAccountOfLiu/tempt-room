@@ -459,7 +459,9 @@ export class RoomService {
         if (unsafe) throw new ProtocolError('integration_unknown', '该交付物存在未知/阻塞的集成记录，请先审查后再入队', 409);
         if (artifact.applied) throw new ProtocolError('already_applied', '这份交付物已经应用', 409);
         const requireAuthorization = input.requireAuthorization;
-        const integration: Integration = {id: uid('integration'), roomId, artifactId: artifact.id, ...(artifact.traceId?{traceId:artifact.traceId}:{}), ...(artifact.runId ? {runId: artifact.runId} : {}), ...(artifact.taskId ? {taskId: artifact.taskId} : {}), status: 'queued', authorization: requireAuthorization ? 'waiting' : 'auto', requestActor: actor.id, createdAt: now(), updatedAt: now()};
+        const artifactRun = artifact.runId ? this.store.get<Run>('runs', artifact.runId) : undefined;
+        const artifactTask = artifact.taskId ? this.store.get<Task>('tasks', artifact.taskId) : undefined;
+        const integration: Integration = {id: uid('integration'), roomId, artifactId: artifact.id, ...(artifact.traceId?{traceId:artifact.traceId}:{}), ...(artifact.runId ? {runId: artifact.runId} : {}), ...(artifact.taskId ? {taskId: artifact.taskId} : {}), ...(artifactTask?.projectBindingId?{projectBindingId:artifactTask.projectBindingId}:{}), ...(artifactRun?.taskVersion?{taskVersion:artifactRun.taskVersion}:{}), ...(artifactTask?.baselineManifestHash?{baseManifestHash:artifactTask.baselineManifestHash}:{}), status: 'queued', authorization: requireAuthorization ? 'waiting' : 'auto', requestActor: actor.id, createdAt: now(), updatedAt: now()};
         this.store.event(roomId, 'integration.queued', actor, {integration});
         return {integrationId: integration.id, status: integration.status};
       }

@@ -102,7 +102,7 @@ export class Worker {
     this.integrations = new IntegrationRunner({
       store,
       root,
-      apply: id => this.apply(id),
+      apply: (id, hashes) => this.apply(id, hashes),
       projectSource: integration => this.integrationSource(integration),
     });
     service.onCancel = id => this.active.get(id)?.abort(new Error('用户取消'));
@@ -863,7 +863,7 @@ export class Worker {
       return {location:found.kind,phase:state.phase,run:this.store.get<Run>('runs',run.id)};
     } finally {this.active.delete(run.id);}
   }
-  private apply(id: string) {
+  private apply(id: string, hashes?: {targetBeforeHash?: string; targetAfterHash?: string}) {
     const artifact = this.store.get<Artifact>('artifacts', id)!;
     if (artifact.kind !== 'patch') throw new ProtocolError('not_applicable','这份交付物不是可应用的文件差异',409);
     if (artifact.applied) throw new ProtocolError('already_applied','这份交付物已经应用',409);
@@ -874,7 +874,7 @@ export class Worker {
     if(run.status!=='completed')throw new ProtocolError('run_not_completed','交付物所属运行尚未成功完成，不能应用',409);
     for(const [id,version] of Object.entries(run.dependencyVersions??{})){const dependency=this.store.get<Task>('tasks',id);if(dependency?.version!==version||dependency.status!=='completed')throw new ProtocolError('stale_dependency','依赖任务版本或完成状态已变化，不能应用旧交付物',409);}
     const changes = JSON.parse(readFileSync(join(this.root, 'artifacts', `${id}.changes.json`), 'utf8'));
-    const result = this.workspaces.apply(changes.manifest, changes.changes); artifact.applied = true;
+    const result = this.workspaces.apply(changes.manifest, changes.changes, hashes); artifact.applied = true;
      this.store.event(artifact.roomId, 'artifact.applied', { id: 'owner', kind: 'human' }, { artifact, ...result }); return result;
   }
   private attachToolBoundaryInput(run:Run,result:any){

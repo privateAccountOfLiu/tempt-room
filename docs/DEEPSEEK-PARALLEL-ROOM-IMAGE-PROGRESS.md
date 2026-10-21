@@ -20,7 +20,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | P01 候选枚举不消耗容量 | verified | 候选不再提前占用房间容量；派发前二次校验；资源忙保持排队不判失败 |
 | P02 不可变基线与 host 独立目录 | in_progress | 共享扫描器 + 不可变基线 + host-isolated 已实现并验证；基线 GC、旧绑定补建、依赖产物叠入、UI 选择仍未覆盖 |
 | P03 按 canonical 项目互斥、异步验收 | verified | 项目锁跨房间 canonical 互斥；验收异步化并纳入超时/输出上限/进程树清理；新增 4 个并发与 HTTP 用例 |
-| P04 staging 精确组合 | not_started | |
+| P04 staging 精确组合 | verified | staging 由当前已认可目标 + 候选组成；目标/候选/verifier 篡改与无关文件变化均在 apply 前拒绝；journal 记录目标前后摘要 |
 | P05 双启动屏障与真实派发 | not_started | |
 | P06 M1 七项可失败用例 | not_started | |
 | R01 Room schema/事件/迁移 | not_started | |
@@ -231,6 +231,74 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
   未覆盖：进程树清理对“父进程已退出、子进程被重新挂接”的场景只能尽力扫描；
   失败时租约保持 active/quarantined，不会伪报 released
 下一张卡与依赖：P04（staging 精确组合）
+```
+
+## P04 — staging 必须等于“当前受认可目标 + 本次候选”
+
+```
+卡号与状态：P04 / verified（4 个关键探针全部通过；未覆盖项见下）
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 82ded5c（P03 提交）；实现见本次提交
+修改文件和关键符号：
+  apps/server/src/integration-staging.ts（新增）
+    prepareIntegrationStaging()：扫描当前 source 目标 → 校验每个候选 change 的 before
+    hash → 把目标完整文件集写入 staging → 叠候选 → 重新扫描得到 stagedManifestHash；
+    allowedPaths 外的修改、before 不一致、越界路径显式拒绝
+    targetManifestHash()/assertTargetUnchanged()/verifierManifestHash()/
+    artifactSetHash()/workspaceManifestHash()
+  apps/server/src/integration-runner.ts
+    验证前：任务版本、候选 changes 摘要、当前目标摘要与可认可目标（最近 applied 的
+    appliedTargetManifestHash 或 integration.baseManifestHash）比对；
+    staging 由目标 + 候选组成，不再使用候选自己的旧 manifest 装配；
+    持久化 verifiedTargetManifestHash / stagedManifestHash / appliedArtifactSetHash /
+    verifierManifestHash；验证后 apply 前重新校验 source 目标、候选摘要、任务版本与
+    verifier 声明；apply 后重算 source 摘要并与 stagedManifestHash 对账；
+    applied 时写 appliedTargetManifestHash
+  packages/protocol/src/integration.ts
+    integrationSchema 增加可选 verifiedTargetManifestHash / stagedManifestHash /
+    appliedTargetManifestHash / appliedArtifactSetHash / verifierManifestHash；
+    旧事件缺字段仍可重放，新路径要求字段齐全
+  apps/server/src/service.ts
+    artifact.integrate 冻结 taskVersion / projectBindingId / baseManifestHash
+  apps/server/src/worker.ts、workspaces.ts
+    apply 接受 targetBeforeHash/targetAfterHash；journal.json 写入两摘要；
+    artifact.applied 事件仍保持原有结构
+  tests/parallel-task-integration.test.ts（新增）
+    - A 先应用 a=1；B 在包含 A 的目标上验证“a=1,b=1”被冻结 verifier 拒绝，源目录 b 保持 0
+    - 正常组合（verifier 接受 a=1,b=1）仍可应用，防止“一概禁止集成”
+    - 验证后篡改 source 无关文件 → source_changed，不应用
+    - 验证后篡改候选 changes → stale_artifact，不应用
+    - 验证后篡改任务 verifier/version → stale_artifact，不应用
+变更前触发条件 / 变更后行为：
+  变更前：staging 用候选自己的旧 manifest 装配文件；只检查 touched paths；
+  无法发现“A 已应用后 B 仍按旧目标验证”的组合错误。
+  变更后：staging 以当前已认可目标为底，验证的是真正会应用的整体组合；
+  源目录、候选、任务版本或 verifier 在验证后变化都会在 apply 前被拒绝。
+接口/事件/迁移/兼容性：
+  integrationSchema 仅新增可选字段，不新增事件类型或数据库迁移；
+  旧 integration 无新字段时仍可读取，但应用前要求目标摘要齐全。
+执行命令、cwd、环境、开始结束、退出码：
+  npm run typecheck                                           exit 0
+  npx tsx --test tests/parallel-task-integration.test.ts       exit 0（4 pass / 0 fail）
+  npm run acceptance:parallel -- --check                      exit 0（全部检查通过）
+  npm test                                                    exit 0（459 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-21 19:00–19:40 CST
+证据路径：
+  .state/parallel-room-image/p04-tests-20261021.log
+  .state/parallel-room-image/p04-acceptance-20261021.log
+实际覆盖的模式和失败分支：
+  单任务应用；A 后 B 的互斥组合失败；正常组合通过；应用后目标摘要与 journal 前后
+  摘要一致；source/候选/verifier 三种验证后篡改；allowedPaths 外修改拒绝；
+  before hash 冲突拒绝；artifact set hash 随应用集合变化
+尚未验证项及明确原因：
+  未覆盖：rollback 的完整目标摘要复核（当前 rollback 仍按 touched files 检查；
+  下一步补齐 appliedTargetManifestHash 回滚链路）
+  未覆盖：journal complete 与 SQLite applied 两份内容证据的崩溃对账（P04 #17）
+  未覆盖：旧 integration 缺目标摘要时从有序 applied/rolled_back 记录补证
+  （当前返回 recovery_required，要求重新验证）
+  未覆盖：verifier 内容文件本身不可变副本（当前冻结并复核声明 hash；
+  verifier 命令由 owner 提供的 argv 执行）
+下一张卡与依赖：P05（双启动屏障和真实 Worker 派发）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移
