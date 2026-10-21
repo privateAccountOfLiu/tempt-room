@@ -125,3 +125,35 @@ test('external MCP aborts a hung HTTP request at the configured timeout', async 
   await assert.rejects(() => connector.request('tools/call', {name: 'room_read', arguments: {}}), /超时|timeout/i);
   assert.ok(Date.now() - started < 5000);
 });
+
+test('two external MCP processes can upload different images concurrently', async t => {
+  const ctx = await fixture(t);
+  const secondBytes = await sharp({create: {width: 4, height: 9, channels: 3, background: '#ff8800'}}).png().toBuffer();
+  const secondPath = join(ctx.root, 'external-second.png');
+  writeFileSync(secondPath, secondBytes);
+  const firstConnector = startConnector(ctx.env);
+  const secondConnector = startConnector(ctx.env);
+  t.after(() => { firstConnector.stop(); secondConnector.stop(); });
+  await Promise.all([firstConnector.request('initialize', {protocolVersion: '2025-06-18'}), secondConnector.request('initialize', {protocolVersion: '2025-06-18'})]);
+  const callWithPath = (connector: ReturnType<typeof startConnector>, operationId: string, path: string) => connector.request('tools/call', {name: 'room_send_image', arguments: {path, operationId, text: operationId}});
+  const [firstResponse, secondResponse] = await Promise.all([
+    callWithPath(firstConnector, 'concurrent_image_a', ctx.imagePath),
+    callWithPath(secondConnector, 'concurrent_image_b', secondPath)
+  ]);
+  assert.equal(firstResponse.isError, false, JSON.stringify(firstResponse.content));
+  assert.equal(secondResponse.isError, false, JSON.stringify(secondResponse.content));
+  const first = JSON.parse(firstResponse.content[0].text);
+  const second = JSON.parse(secondResponse.content[0].text);
+  assert.notEqual(first.artifactId, second.artifactId);
+  assert.notEqual(first.messageId, second.messageId);
+  const firstArtifact = ctx.store.get<any>('artifacts', first.artifactId)!;
+  const secondArtifact = ctx.store.get<any>('artifacts', second.artifactId)!;
+  assert.equal(firstArtifact.image.width, 11);
+  assert.equal(firstArtifact.image.height, 7);
+  assert.equal(secondArtifact.image.width, 4);
+  assert.equal(secondArtifact.image.height, 9);
+  assert.equal(ctx.store.events(ctx.roomId).filter(event => event.type === 'artifact.created').length, 2);
+  const messages = ctx.store.snapshot(ctx.roomId).messages;
+  assert.equal(messages.filter(message => message.attachments.includes(first.artifactId)).length, 1);
+  assert.equal(messages.filter(message => message.attachments.includes(second.artifactId)).length, 1);
+});

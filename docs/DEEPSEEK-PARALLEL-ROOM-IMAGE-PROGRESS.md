@@ -32,7 +32,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | I02 有界可恢复的上传临时状态 | verified | image_uploads/parts 表 + migration 19、分块状态机、配额/TTL、原子落盘、缺失块检测、GC 与 Worker image 工具/删除房间失效接线完成；重启进程 E2E 仍由 I04 覆盖 |
 | I03 解码验真、原图与安全预览 | verified | sharp 0.35.5 + 签名/结构检查 + 完整解码 + 1920 PNG 预览 + 原子落盘/稳定 artifactId；Worker 三个低层工具已接线并通过 3+3 用例；bridge/helper 归 I04 |
 | I04 托管 bridge/host/AppContainer 传输 | in_progress | host pipe 固定图 smoke + AppContainer probe 已验证 bridge 在沙箱内 advertise `room_send_image`（sandbox probe 23/23 通过）；AppContainer 真图片上传仍 not_verified（`--mode sandbox` 明确不冒充） |
-| I05 外部 MCP、插件与 SDK 发图 | in_progress | SDK、外部 MCP room_send_image、真实 stdio→HTTP 重试幂等、HTTP timeout/401/403/410 分类与 no-retry 语义通过 4 个用例；并发双图与手动宿主验证待补 |
+| I05 外部 MCP、插件与 SDK 发图 | in_progress | SDK、外部 MCP room_send_image、真实 stdio→HTTP 重试幂等、timeout/401/403/410 分类、两个独立 MCP 进程并发上传不同图通过 5 个用例；真实宿主手动发图待验证 |
 | I06 安全内联路由与图片展示 | verified | 私有 `/api/artifacts/:id/image`（active/verified/hash/no-store）、缩略图、失败降级、键盘 Lightbox、纯图不渲染空 Markdown 已完成并通过 3 个接口用例与完整浏览器 E2E |
 | I07 跨功能竞态 | in_progress | 9 个用例覆盖删房/移除成员/并行上传/丢回执/导出回放/删后审计/解码期间删房/托管 stale generation/最后房间 restart + 列表为空 + 旧图片 URL 410；删除与最终 project apply 并发仍未覆盖 |
 | V01 开发/发布报告分模式 | in_progress | schemaVersion 2、sourceBefore/sourceAfter、tracked/working/untracked+lockfile hash、`--release --expected-head` 前置失败 not_run、source_changed 检测与 checksPassed/releaseEligible 已通过 5 个用例；CLI 入口已由 V02 preflight 接入，真实 clean release 运行待 CI |
@@ -1607,6 +1607,19 @@ V03 付费真实 CLI 实验。
   浏览器两个真实页面窗口的 UI 同步仍无断言（当前是协议层真实 WS）；
   客户端收到 room.deleting 后停止重连由 client SDK 代码覆盖，未做双窗口浏览器
   断线重连计时断言。
+下一张卡：V03（等待付费授权）或 AppContainer 真图片 smoke
+```
+
+## I05 — 两个外部 MCP 进程并发图片
+
+```
+基线 SHA：f4790b7；实现见本次提交
+修改：tests/external-image-tools.test.ts（+1 用例）
+两个独立 room-agent-mcp.mjs 进程、各自 stdio/HTTP、并发 room_send_image
+上传不同 PNG；断言 artifactId/messageId 不同、尺寸/hash 不串线、只产生
+两个 artifact.created 与各自一条附件消息。
+npm test 545/545；证据 .state/parallel-room-image/i05-concurrent-tests-20261022.log。
+未验证：真实 Claude/Codex/DeepSeek 宿主手动发图。
 下一张卡：V03（等待付费授权）或 AppContainer 真图片 smoke
 ```
 
