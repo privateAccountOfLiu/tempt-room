@@ -982,8 +982,8 @@ export class Worker {
         const input=z.object({afterSeq:z.number().int().nonnegative().default(0),limit:z.number().int().min(1).max(200).default(100)}).strict().parse(args);
         action=()=>{const events=this.store.events(run.roomId,input.afterSeq,input.limit),nextSeq=events.at(-1)?.seq??input.afterSeq,historyFloor=this.store.projectionStatus(run.roomId).historyFloor;return {roomId:run.roomId,fromSeq:input.afterSeq,nextSeq,head:this.store.room(run.roomId)!.seq,historyFloor,resetRequired:input.afterSeq<historyFloor,hasMore:events.length===input.limit,events:events.map(event=>({seq:event.seq,type:event.type,createdAt:event.createdAt,payload:event.payload}))};};
       }else if(name==='room_post'){
-        const input=z.object({text:z.string().min(1).max(32000),mentions:z.array(z.string()).default([])}).strict().parse(args);
-        assertRoomPostLength(toolAgent,input.text);
+        const input=z.object({text:z.string().trim().max(32000).default(''),mentions:z.array(z.string().min(1).max(128)).max(20).default([]),replyTo:z.string().min(1).max(128).optional(),attachments:z.array(z.string().min(1).max(128)).max(10).default([])}).strict().superRefine((value,ctx)=>{if(!value.text&&value.attachments.length===0)ctx.addIssue({code:'custom',message:'room_post 必须包含非空正文或至少一个附件'})}).parse(args);
+        if(input.text)assertRoomPostLength(toolAgent,input.text);
         action=()=>this.service.execute({version:VERSION,commandId,roomId:run.roomId,type:'message.send',payload:input},actor,scope);
       }else if(name==='task_propose'){
         const input=z.object({title:z.string().min(1).max(5000),agentId:z.string(),dependencies:z.array(z.string()).max(20).default([])}).strict().parse(args);
@@ -1081,8 +1081,8 @@ export class Worker {
       return this.service.execute({version: VERSION, commandId, roomId, type: 'input.ack', payload: input}, actor);
     }
     if (name === 'room_post') {
-      const input = z.object({ text: z.string().min(1).max(32000), mentions: z.array(z.string()).default([]) }).strict().parse(args);
-      assertRoomPostLength(agent,input.text);
+      const input = z.object({text:z.string().trim().max(32000).default(''),mentions:z.array(z.string().min(1).max(128)).max(20).default([]),replyTo:z.string().min(1).max(128).optional(),attachments:z.array(z.string().min(1).max(128)).max(10).default([])}).strict().superRefine((value,ctx)=>{if(!value.text&&value.attachments.length===0)ctx.addIssue({code:'custom',message:'room_post 必须包含非空正文或至少一个附件'})}).parse(args);
+      if (input.text) assertRoomPostLength(agent,input.text);
       return this.service.execute({ version: VERSION, commandId, roomId, type: 'message.send', payload: input }, actor);
     }
     if (name === 'task_propose') {
@@ -1139,6 +1139,7 @@ export class Worker {
       }
       return { roomId, fromSeq: startSeq, throughSeq: cursor, timeout: true, messages: [], head:this.store.room(roomId)!.seq, historyFloor, resetRequired:startSeq<historyFloor };
     }
+    if (['image_upload_begin','image_upload_chunk','image_upload_complete'].includes(String(name))) throw new ProtocolError('image_upload_unavailable','图片上传通道尚未启用',503);
     throw new Error('不支持的房间工具');
   }
   async close() {

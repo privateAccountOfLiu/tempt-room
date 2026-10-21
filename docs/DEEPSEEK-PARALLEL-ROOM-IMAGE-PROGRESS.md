@@ -28,7 +28,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | R03 删除请求、停止执行与清理 | in_progress | afterCommit、room.delete 短事务、Worker finalizer、写入口拒绝、pending wake/input-batch/inbox delivery 清理已通过 6 个用例；outbound delivery 停止、image-upload 失效、全入口二次校验仍未覆盖 |
 | R04 API、WebSocket、SDK 与列表语义 | in_progress | activeRooms/410/WS 终态/owner 导出/artifact 防绕过/RoomClient 命令/删除房间导入新身份已通过 8 个用例；agent room_wait 直接测试与双窗口 WS 同步仍未覆盖 |
 | R05 房间设置与删除 UI | in_progress | 设置改为单条 room.configure（带 revision）、冲突/忙错误保留表单、删除确认与空状态已实现；新增 Agent 自动回填与删除后双窗口浏览器验收仍待补 |
-| I01 图片协议、工具参数与权限 | not_started | |
+| I01 图片协议、工具参数与权限 | verified | images.ts 冻结分块/元数据/操作 ID；artifact 图片元数据；image 工具名与写权限映射；attachment-only 消息；7+3 个用例通过；真实上传实现归 I02/I05 |
 | I02 有界可恢复的上传临时状态 | not_started | |
 | I03 解码验真、原图与安全预览 | not_started | |
 | I04 托管 bridge/host/AppContainer 传输 | not_started | |
@@ -695,6 +695,73 @@ delivery/image-upload 细节与全入口 assertActiveRoom 仍待补）
   验收；revision_conflict/member_busy 的真实双窗口交互未自动化；
   设置/删除的完整浏览器验收（取消删除、最后房间、手机删除）仍待补
 下一张卡与依赖：I01（图片协议、工具参数与权限）
+```
+
+## I01 — 冻结协议、工具参数与统一权限
+
+```
+卡号与状态：I01 / verified（真实上传状态机与连接器便利工具分别归 I02/I05）
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 dbc61c0（R05 提交）；实现见本次提交
+修改文件和关键符号：
+  packages/protocol/src/images.ts（新增）
+    IMAGE_CHUNK_BYTES=192 KiB、base64 上限 262144、单图 1 B–10 MiB；
+    imageUploadBegin/Chunk/Complete 严格 schema；规范 base64 + 解码字节校验；
+    imageMetadataSchema（verified=true/width/height/alt/preview hash+size）；
+    roomSendImageArgsSchema 仅连接器本地使用，不接受 actor/roomId/pathToWrite；
+    imageOperationIds(root) 派生 begin/part:index/complete/post 四类稳定 ID；
+    begin/complete result 类型
+  packages/protocol/src/index.ts
+    导出 images 协议与类型；roomToolNames/agentToolNameSchema 增加
+    image_upload_begin/chunk/complete；message.send 允许空 text，
+    superRefine 要求非空正文或至少一个附件
+  packages/protocol/src/models.ts
+    artifactSchema 增加可选 contentHash/image；Artifact 接口同步
+  apps/server/src/tool-authorization.ts
+    image 三个低层工具加入 writeTools（与 room_post 同一写权限）；
+    dataBase64 不进入通用 path 检查，避免把 base64 当路径
+  apps/server/src/service.ts
+    message.send 使用 payloadSchemas 的 attachment-only 规则；
+    附件必须同房间；已验真图片附件检查；纯图片 @ 唤醒使用“图片消息”prompt
+  apps/server/src/worker.ts
+    room_post 允许 attachments/replyTo/空 text（superRefine 非空正文或附件）；
+    image 三个低层工具在当前阶段返回明确 image_upload_unavailable(503)，
+    等 I02 接上真实状态机
+  apps/web/src/main.tsx
+    roomToolLabels 增加三个图片工具显示名
+  scripts/schema.ts + packages/protocol/schema/**
+    新增 image-metadata/image-upload-*/room-send-image-args schema；
+    artifact/agent-tool-call/command 等重新生成
+  tests/image-protocol.test.ts（新增 7 个用例）
+  tests/image-message.test.ts（新增 3 个用例）
+变更前触发条件 / 变更后行为：
+  变更前：没有图片上传协议、图片 artifact 元数据或 image 工具权限；
+  message.send 必须有非空正文，纯图片消息无法表达。
+  变更后：低层图片操作有严格 bounded schema 和稳定 operation ID；
+  image 写权限与 room_post 一样受 preToolGate/run fence 约束；
+  artifact 可携带 verified 图片元数据；纯图片消息可发布。
+接口/事件/迁移/兼容性：
+  不新增表/迁移或 image message kind；仍用 artifact.created +
+  chat.message.created；旧 artifact 无新字段可回放；旧 text-only 消息兼容。
+执行命令、cwd、环境、开始结束、退出码：
+  npm run typecheck                                            exit 0
+  npx tsx --test tests/image-protocol.test.ts                    exit 0（7 pass / 0 fail）
+  npx tsx --test tests/image-message.test.ts                     exit 0（3 pass / 0 fail）
+  npm test                                                     exit 0（502 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-21 22:40–23:10 CST
+证据路径：
+  .state/parallel-room-image/i01-final-tests-20261021.log
+实际覆盖的模式和失败分支：
+  文件大小/哈希/不安全文件名/保留设备名；规范 base64/分块上限/index 越界；
+  complete 不接受新参数；稳定操作 ID 长度与唯一性；artifact 旧/新元数据；
+  image 工具写权限拒绝未验证能力；attachment-only / 空消息 / 跨房间附件；
+  纯图片消息正文保持空字符串
+尚未验证项及明确原因：
+  低层上传的真实分块状态机、解码验真与落盘属 I02；
+  room_send_image 连接器便利工具、外部 MCP/插件属 I05；
+  讨论运行中图片消息的完整副作用（只允许总结人发布文本报告的限制）
+  仍需在 I02/I04 后做端到端回归
+下一张卡与依赖：I02（有界、可恢复的上传临时状态）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移

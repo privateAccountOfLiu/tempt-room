@@ -157,9 +157,13 @@ export class RoomService {
       }
       case 'message.send': {
         const roomId = this.requireRoom(command);
-        const input = z.object({ text: z.string().trim().min(1).max(32000), mentions: z.array(z.string()).max(20).default([]), replyTo: z.string().optional(), attachments: z.array(z.string()).max(10).default([]) }).parse(p);
+        const input = payloadSchemas['message.send'].parse(p);
         if (input.replyTo && this.store.get<Message>('messages', input.replyTo)?.roomId !== roomId) throw new ProtocolError('invalid_reply', '引用消息不属于此房间');
-        for (const id of input.attachments) if (this.store.get<Artifact>('artifacts', id)?.roomId !== roomId) throw new ProtocolError('invalid_attachment', '附件不属于此房间');
+        for (const id of input.attachments) {
+          const attachment = this.store.get<Artifact>('artifacts', id);
+          if (!attachment || attachment.roomId !== roomId) throw new ProtocolError('invalid_attachment', '附件不属于此房间');
+          if (attachment.image && attachment.image.verified !== true) throw new ProtocolError('invalid_attachment', '图片附件尚未通过服务端验真');
+        }
         const room = this.store.room(roomId)!;
         for (const id of input.mentions) if (!room.members.includes(id)) throw new ProtocolError('invalid_mention', '提及的成员不在房间内');
         const message: Message = { id: uid('msg'), roomId, actor, ...input, createdAt: now(), trust: trustForActor(this.store,actor) };
@@ -170,7 +174,7 @@ export class RoomService {
         if ((actor.kind === 'human'||agentWake)&&input.mentions.length){
           let chainDepth=0;
           if(agentWake&&scope){const parent=this.store.get<Run>('runs',scope.runId);chainDepth=(parent?.wakeChainDepth??0)+1;if(chainDepth>wakeSettings.maxWakeChainDepth){this.store.event(roomId,'audit.recorded',SYSTEM,{action:'wake.chain.limit:'+scope.runId},command.commandId);chainDepth=-1;}}
-          if(chainDepth>=0){const contextId=this.saveContext(roomId,event.seq);for (const agentId of new Set(input.mentions)){const agent=this.checkAgent(roomId,agentId);if(agent.connectionMode==='external')this.store.event(roomId,'agent.wake.requested',actor,{agentId,messageId:message.id,connectionMode:'external'},command.commandId);else {for(const old of this.store.list<Run>('runs',roomId))if(old.agentId===agentId&&!old.taskId&&!old.discussionId&&!terminalStates.has(old.status))this.cancel(old,'superseded');this.enqueue(roomId, agentId, input.text, event.seq, { causationId: event.eventId,contextId,wakeChainDepth:chainDepth });}}}
+          if(chainDepth>=0){const contextId=this.saveContext(roomId,event.seq);for (const agentId of new Set(input.mentions)){const agent=this.checkAgent(roomId,agentId);if(agent.connectionMode==='external')this.store.event(roomId,'agent.wake.requested',actor,{agentId,messageId:message.id,connectionMode:'external'},command.commandId);else {for(const old of this.store.list<Run>('runs',roomId))if(old.agentId===agentId&&!old.taskId&&!old.discussionId&&!terminalStates.has(old.status))this.cancel(old,'superseded');this.enqueue(roomId, agentId, input.text || '图片消息', event.seq, { causationId: event.eventId,contextId,wakeChainDepth:chainDepth });}}}
         }
         return { messageId: message.id };
       }

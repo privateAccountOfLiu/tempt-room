@@ -20,7 +20,7 @@ const discussionStatus=(d:Discussion)=>{
  return d.status==='completed'?'已完成':'已停止';
 };
 const capabilityLabels:Record<string,string>={streamOutput:'流式输出',nextTurnInput:'下一轮输入',toolBoundaryInput:'工具边界输入',steerDuringRun:'运行中补投',cancelOwnedTree:'取消自有进程树',cancelRemoteTask:'取消远程任务',resumeSession:'恢复会话',queryOutcome:'查询结果',usageScope:'用量口径',preToolGate:'工具前置门禁'};
-const roomToolLabels:Record<string,string>={room_read:'读取房间',room_status:'房间状态',room_inbox:'增量读取',room_post:'发言',task_propose:'提议任务',task_claim:'领取任务',task_context:'核对任务上下文',task_complete:'完成任务',task_heartbeat:'任务心跳',artifact_publish:'发布交付物'};
+const roomToolLabels:Record<string,string>={room_read:'读取房间',room_status:'房间状态',room_inbox:'增量读取',room_post:'发言',task_propose:'提议任务',task_claim:'领取任务',task_context:'核对任务上下文',task_complete:'完成任务',task_heartbeat:'任务心跳',artifact_publish:'发布交付物',image_upload_begin:'开始图片上传',image_upload_chunk:'上传图片分块',image_upload_complete:'完成图片上传'};
 const providerLabels:Record<string,string>={codex:'ChatGPT App Server',claude:'Claude Code CLI',deepseek:'DeepSeek Harness · ACP',minimax:'MiniMax Code · 外部 MCP',api:'自建模型 API',a2a:'A2A 1.0',demo:'确定性演示'};
 const marks:Record<string,string>={codex:'Cx',claude:'Cl',deepseek:'Ds',minimax:'Mi',api:'Ai',a2a:'A2',demo:'De'};
 function Icon({name,size=18}:{name:string;size?:number}) {

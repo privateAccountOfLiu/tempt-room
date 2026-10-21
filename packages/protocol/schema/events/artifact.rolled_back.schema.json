@@ -5,6 +5,55 @@
     "artifact": {
       "type": "object",
       "properties": {
+        "contentHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "image": {
+          "type": "object",
+          "properties": {
+            "verified": {
+              "type": "boolean",
+              "const": true
+            },
+            "width": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 100000
+            },
+            "height": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 100000
+            },
+            "alt": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "previewMediaType": {
+              "type": "string",
+              "const": "image/png"
+            },
+            "previewHash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "previewSize": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 10485760
+            }
+          },
+          "required": [
+            "verified",
+            "width",
+            "height",
+            "previewMediaType",
+            "previewHash",
+            "previewSize"
+          ],
+          "additionalProperties": false
+        },
         "traceId": {
           "type": "string",
           "minLength": 1,

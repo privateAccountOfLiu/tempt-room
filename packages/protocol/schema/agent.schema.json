@@ -68,7 +68,10 @@
         "task_complete",
         "task_heartbeat",
         "artifact_publish",
-        "room_input_ack"
+        "room_input_ack",
+        "image_upload_begin",
+        "image_upload_chunk",
+        "image_upload_complete"
       ],
       "minItems": 1,
       "type": "array",
@@ -85,7 +88,10 @@
           "task_complete",
           "task_heartbeat",
           "artifact_publish",
-          "room_input_ack"
+          "room_input_ack",
+          "image_upload_begin",
+          "image_upload_chunk",
+          "image_upload_complete"
         ]
       }
     },

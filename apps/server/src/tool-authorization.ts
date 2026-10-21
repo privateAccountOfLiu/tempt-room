@@ -19,7 +19,7 @@ export interface AuthorizeToolInput {
   transport?: 'managed' | 'external';
 }
 
-const writeTools = new Set<string>(['room_post', 'task_propose', 'task_claim', 'task_context', 'task_complete', 'task_heartbeat', 'artifact_publish', 'room_input_ack']);
+const writeTools = new Set<string>(['room_post', 'task_propose', 'task_claim', 'task_context', 'task_complete', 'task_heartbeat', 'artifact_publish', 'room_input_ack', 'image_upload_begin', 'image_upload_chunk', 'image_upload_complete']);
 const knownTools = new Set<string>(roomToolNames);
 
 /** Shared pre-tool policy for room tools. It only narrows existing permissions;
@@ -27,7 +27,7 @@ const knownTools = new Set<string>(roomToolNames);
 export function authorizeTool(input: AuthorizeToolInput): ToolAuthorizationResult {
   const argumentDigest = digest({tool: input.tool, args: input.args});
   if (!knownTools.has(input.tool)) return {decision: 'deny', reason: 'unknown_tool', argumentDigest};
-  const unsafe = unsafePathReason(input.args);
+  const unsafe = unsafePathReason(input.args, input.tool === 'image_upload_chunk' ? new Set(['dataBase64']) : undefined);
   if (unsafe) return {decision: 'deny', reason: unsafe, argumentDigest};
   if (input.actor.kind === 'agent') {
     if (input.transport !== 'external' && (!input.runFence?.runId || !input.runFence.generation || !input.runFence.executionId)) return {decision: 'deny', reason: 'run_fence_missing', argumentDigest};
@@ -39,10 +39,11 @@ export function authorizeTool(input: AuthorizeToolInput): ToolAuthorizationResul
   return {decision: 'allow', argumentDigest};
 }
 
-function unsafePathReason(value: unknown): ToolAuthorizationResult['reason'] | undefined {
+function unsafePathReason(value: unknown, skipKeys?: ReadonlySet<string>, key?: string): ToolAuthorizationResult['reason'] | undefined {
+  if (key && skipKeys?.has(key)) return undefined;
   if (typeof value === 'string') return checkPathLikeString(value);
-  if (Array.isArray(value)) { for (const item of value) { const reason = unsafePathReason(item); if (reason) return reason; } return undefined; }
-  if (value && typeof value === 'object') { for (const item of Object.values(value as Record<string, unknown>)) { const reason = unsafePathReason(item); if (reason) return reason; } }
+  if (Array.isArray(value)) { for (const item of value) { const reason = unsafePathReason(item, skipKeys); if (reason) return reason; } return undefined; }
+  if (value && typeof value === 'object') { for (const [childKey, item] of Object.entries(value as Record<string, unknown>)) { const reason = unsafePathReason(item, skipKeys, childKey); if (reason) return reason; } }
   return undefined;
 }
 

@@ -29,7 +29,10 @@
         "room_wait",
         "room_inbox",
         "session_inbox",
-        "session_ack"
+        "session_ack",
+        "image_upload_begin",
+        "image_upload_chunk",
+        "image_upload_complete"
       ]
     },
     "arguments": {
