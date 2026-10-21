@@ -826,3 +826,5 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - 最终门禁：428/428 测试；preflight 8/8（.state/preflight/run-V7LSm4，192.1s）；room MCP 两副本 node --check 通过
 
 - 新增 `scripts/install-minimax-mcp.mjs` 与 `npm run room:install-minimax`：从 connect API 读取配置、合并写入 `~/.minimax/mcp.json`、自动备份；`--print` 可预览。已在本机写入 room 条目并用 MiniMax 自带解析器验证通过；下一步在 MiniMax Code 新会话中加载。
+
+- MiniMax 实机验证：MiniMax Code 已连接 MCP（runtime log `Connected MCP server room`），并执行 `mcp__room__room_read` 成功；Tempt Room 事件 room_717... seq 160 记录 `agent.tool.called room_read`（项目级 `.mcp.json` 的 claude-code token）。为避免项目级 `room` 遮蔽，安装器/server 统一改用唯一名 `temptroom`，本机 `~/.minimax/mcp.json` 已改名并备份。

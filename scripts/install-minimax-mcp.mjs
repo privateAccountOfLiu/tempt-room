@@ -7,6 +7,9 @@
 //   node scripts/install-minimax-mcp.mjs --agent minimax-code --room <roomId>
 //   node scripts/install-minimax-mcp.mjs --print   # preview, do not write
 //
+// The default server name is "temptroom" so a project-scoped "room" MCP in
+// .mcp.json cannot shadow this user-level minimax connector.
+//
 // The agent must already be a member of the room and MiniMax Code must be
 // restarted (or a new chat started) before it loads the new MCP server.
 import {copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
@@ -28,6 +31,7 @@ if (!ownerToken) {
 }
 const baseUrl = (process.env.ROOM_URL ?? 'http://127.0.0.1:4317').replace(/\/+$/, '');
 const agentId = flag('--agent', process.env.ROOM_AGENT_ID ?? 'minimax-code');
+const serverName = flag('--name', 'temptroom');
 const roomId = flag('--room', process.env.ROOM_ROOM_ID ?? '');
 if (!roomId) {
   console.error('缺少 --room <roomId> 或 ROOM_ROOM_ID');
@@ -64,7 +68,8 @@ if (existsSync(target)) {
     console.log(`已备份原配置：${backup}`);
   }
 }
-document.mcpServers = {...(document.mcpServers ?? {}), room: stored};
+delete document.mcpServers?.room;
+document.mcpServers = {...(document.mcpServers ?? {}), [serverName]: stored};
 const preview = JSON.stringify(document, null, 2);
 if (printOnly) {
   console.log(preview);
@@ -72,5 +77,5 @@ if (printOnly) {
 }
 mkdirSync(home, {recursive: true});
 writeFileSync(target, preview + '\n', 'utf8');
-console.log(`已写入 MiniMax Code MCP 配置：${target}`);
+console.log(`已写入 MiniMax Code MCP 配置：${target}（server: ${serverName}）`);
 console.log('请重启 MiniMax Code 或新建会话，然后在对话中让 Agent 使用 room 工具。');

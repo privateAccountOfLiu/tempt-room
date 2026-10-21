@@ -12,7 +12,9 @@ Tempt Room 托管的 CLI 运行入口；因此按 **外部会话 / MCP** 方式�
    - 该类型强制 `connectionMode=external`
 3. 保存后，在「房间设置」把它邀请进目标房间
 
-## 2. 写入 MiniMax Code 的 mcp.json
+## 2. 写入 MiniMax Code 的 mcp.json（server 名 `temptroom`）
+
+> 项目根目录的 `.mcp.json` 可能包含项目级 `room` MCP，MiniMax 会优先使用项目级连接；本安装器使用 `temptroom` 这个唯一名字，避免被项目级 `room` 遮蔽。
 
 推荐一键写入（会备份现有 `~/.minimax/mcp.json`）：
 
@@ -45,7 +47,7 @@ MiniMax Code 的 MCP 设置页面手动添加同样的 stdio server。
 
 ## 3. 当前机器状态
 
-本次验收已把 `room` 条目写入 `C:\Users\35151\.minimax\mcp.json`（原文件若存在会备份为 `.tempt-room-backup-*`），并用 MiniMax 自身的 `readLocalMcpFile` 解析器验证：server=`room`、type=`stdio`、enabled=true。
+本次验收已把 `room` 条目写入 `C:\Users\35151\.minimax\mcp.json`（原文件若存在会备份为 `.tempt-room-backup-*`），并用 MiniMax 自身的 `readLocalMcpFile` 解析器验证：server=`temptroom`、type=`stdio`、enabled=true。
 
 下一步只需在 MiniMax Code 中新建会话/重启应用，让它在下一轮工具加载时连接该 MCP；Tempt Room 侧可通过 `room_read` 调用和房间消息验证。
 
