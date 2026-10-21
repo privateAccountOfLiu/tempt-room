@@ -885,6 +885,37 @@ try {
     step('two-window-delete-sync', {room: visualRoom});
     await send('Target.closeTarget', {targetId: secondWindowTarget.targetId});
 
+    // Cancel delete keeps the room and the modal open.
+    const cancelRoom = appHandle!.store.activeRooms()[0];
+    if (!cancelRoom) fail('取消删除测试缺少 active 房间');
+    if (await evaluate(`(() => { const button = document.querySelector('button[aria-label="房间设置"]'); if (!button) return 'missing'; button.click(); return 'ok'; })()`) !== 'ok') fail('找不到取消删除测试的房间设置入口');
+    await waitFor('取消删除测试设置', async () => (await bodyText()).includes('保存设置'), 10000);
+    if (await clickByText('dialog.modal button', '删除房间…') !== 'ok') fail('取消删除测试找不到删除按钮');
+    await waitFor('取消删除确认', async () => (await bodyText()).includes('确认删除'), 10000);
+    if (await clickByText('dialog.modal button', '取消') !== 'ok') fail('取消删除测试找不到取消按钮');
+    await waitFor('取消删除后设置仍在', async () => (await bodyText()).includes('保存设置') && !(await bodyText()).includes('确认删除'), 10000);
+    if (appHandle!.store.room(cancelRoom.id)?.status !== 'active') fail('取消删除后房间状态被改变');
+    step('ui-cancel-delete', {room: cancelRoom.id});
+    const closeCancelDialog = await evaluate(`(() => { const button = document.querySelector('dialog.modal button[aria-label="关闭"]'); if (!button) return 'missing'; button.click(); return 'ok'; })()`);
+    if (closeCancelDialog !== 'ok') fail('无法关闭取消删除后的设置');
+
+    // Mobile room settings can delete a disposable room.
+    const disposable = (await command(roomId, 'room.create', {name: `移动删除房间 ${Date.now() % 100000}`, members: ['demo-planner']}) as any).result.roomId;
+    const mobileDeleteLoaded = waitEvent('Page.loadEventFired');
+    await send('Page.navigate', {url: `${base}/?room=${disposable}`}, sessionId);
+    await mobileDeleteLoaded;
+    await waitFor('移动删除房间已打开', async () => (await bodyText()).includes('移动删除房间'), 15000);
+    await send('Emulation.setDeviceMetricsOverride', {width: 390, height: 844, deviceScaleFactor: 1, mobile: true}, sessionId);
+    await sleep(300);
+    if (await evaluate(`(() => { const button = document.querySelector('button[aria-label="房间设置"]'); if (!button) return 'missing'; button.click(); return 'ok'; })()`) !== 'ok') fail('移动端找不到房间设置入口');
+    await waitFor('移动端房间设置', async () => (await bodyText()).includes('保存设置'), 10000);
+    if (await clickByText('dialog.modal button', '删除房间…') !== 'ok') fail('移动端找不到删除房间按钮');
+    await waitFor('移动端删除确认', async () => (await bodyText()).includes('确认删除'), 10000);
+    if (await clickByText('dialog.modal button', '确认删除') !== 'ok') fail('移动端无法确认删除');
+    await waitFor('移动端房间已删除', async () => !appHandle!.store.activeRooms().some(room => room.id === disposable), 15000);
+    await send('Emulation.clearDeviceMetricsOverride', {}, sessionId);
+    step('ui-mobile-delete', {room: disposable});
+
     // Last room: deleting all remaining rooms must show the empty state after reload.
     const remainingRooms = appHandle!.store.activeRooms();
     for (const room of remainingRooms) {
