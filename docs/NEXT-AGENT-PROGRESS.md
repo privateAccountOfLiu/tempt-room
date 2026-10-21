@@ -1,6 +1,7 @@
 # Next Agent 进度
 
 > 能力完成定义（E04）见 [CAPABILITY-COMPLETION.md](CAPABILITY-COMPLETION.md)。
+> 计划闭环审计见 [PLAN-CLOSURE.md](PLAN-CLOSURE.md)。
 
 # Next Agent 实施进度（v1.1 / M0 波次）
 
@@ -738,3 +739,9 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - 新增 GET /api/tool-approvals 与 POST /api/tool-approvals/:id（approve:boolean）；协作面板新增「工具审批」允许/拒绝
 - 新增 tool-approval 测试 2 项：批准后执行、拒绝/未知 fail closed
 - 客户端宿主权限 UI 仍在宿主侧不可拦截，已在 interceptionGaps 明示；房间侧提供可审计的 owner 审批桥
+
+## 计划闭环审计（第 131 轮）
+
+- 新增 docs/PLAN-CLOSURE.md：A–F 波次逐项状态与证据
+- A–E 核心闭环完成；F02 完成；F01/F03 为计划标注的可选 P2，未实施但仍保留为可选
+- 外部边界：宿主 CLI 权限 UI、ACP/Claude steer 协议、Job launcher dotnet 构建
