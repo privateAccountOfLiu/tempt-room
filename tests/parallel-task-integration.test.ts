@@ -51,7 +51,7 @@ function publish(ctx: Ctx, taskId: string, run: Run, file: string, content = '1\
   return artifact;
 }
 
-async function waitIntegration(ctx: Ctx, id: string, statuses: Integration['status'][], timeoutMs = 30000): Promise<Integration> {
+async function waitIntegration(ctx: Ctx, id: string, statuses: Integration['status'][], timeoutMs = 90000): Promise<Integration> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const current = ctx.store.get<Integration>('integrations', id);

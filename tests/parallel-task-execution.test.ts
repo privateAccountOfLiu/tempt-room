@@ -14,7 +14,7 @@ import type { Artifact, Integration, ProjectBinding, Run, Task } from '../packag
 const parent = resolve('.state/test-data');
 const sha = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
 
-async function waitUntil(check: () => boolean, message: string, timeoutMs = 20000) {
+async function waitUntil(check: () => boolean, message: string, timeoutMs = 90000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (check()) return;

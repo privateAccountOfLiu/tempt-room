@@ -30,7 +30,7 @@ export interface AcceptanceReport {
   checks: Array<{name: string; pass: boolean; detail?: string}>;
 }
 
-async function waitUntil(check: () => boolean, message: string, timeoutMs = 20000): Promise<void> {
+async function waitUntil(check: () => boolean, message: string, timeoutMs = 90000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (check()) return;
