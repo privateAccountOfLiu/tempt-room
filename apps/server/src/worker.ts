@@ -549,7 +549,7 @@ export class Worker {
       }
       // Host chat uses an isolated per-run directory. Record an observed-change
       // artifact; never commit the room-shared tree on the Agent's behalf.
-      if (hostMode && !attached && !run.taskId) {
+      if (hostMode && !attached && !run.taskId && !run.discussionId) {
         this.publishArtifact(run, '本机对话变更清单', hostChangeReport(workspace, baseline));
       }
       this.finish(run, 'completed');

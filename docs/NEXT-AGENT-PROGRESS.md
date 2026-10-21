@@ -773,3 +773,11 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - 浏览器 E2E 新增 owner/品牌图标断言与 provider-icons.png 截图
 
 - 品牌图标验证：浏览器 E2E 通过并生成 provider-icons.png（ChatGPT/Claude/DeepSeek 官方图标）；preflight 8/8（run-VUoN9k，187.0s）
+
+## 严重修复：host 模式讨论发言被误当作交付物发布（第 132 轮）
+
+- 根因：run 完成时 hostMode 且无 taskId 会额外发布「本机对话变更清单」artifact；该自动发布未排除 discussionId，讨论参与者触发 publishArtifact 的 discussion_artifact_disabled 守卫，导致 run failed、轮次无法收口，表现成讨论进行到一半被停止
+- 修复：该自动 artifact 增加 `!run.discussionId` 守卫；讨论参与者只发言，讨论总结人仍由 publishDiscussionSummary 生成唯一总结 artifact
+- 回归测试：tests/discussion-host-artifact.test.ts（移除守卫时测试失败，恢复后通过）
+- 真实回归：room_c6a08a5927b645ea9ae69bfef510a05a / disc_f1ccdf0e9a7a48e0b9021a4a29de7d75，Codex+DeepSeek 1 轮 2 人讨论 completed、两个 run completed、无 error，中文目标完整
+- 顺带修复：live DB 中 ChatGPT agent role 因先前 PowerShell API 编码产生的问号，已用 UTF-8 请求恢复为「开发实现与测试」
