@@ -7,7 +7,7 @@ import sharp from 'sharp';
 import { Store, SYSTEM, now, uid } from '../apps/server/src/store.ts';
 import { RoomService } from '../apps/server/src/service.ts';
 import { ImageUploads } from '../apps/server/src/image-uploads.ts';
-import { imageOperationIds, type Run } from '../packages/protocol/src/index.ts';
+import { imageOperationIds, type Run, type Task } from '../packages/protocol/src/index.ts';
 import { Worker } from '../apps/server/src/worker.ts';
 import { createApp } from '../apps/server/src/app.ts';
 import { executionFence } from '../apps/server/src/execution.ts';
@@ -199,4 +199,82 @@ test('deleting the last room survives restart, keeps the room list empty and hid
   assert.deepEqual(roomsResponse.json(), []);
   const imageResponse = await app.app.inject({method: 'GET', url: `/api/artifacts/${image.artifactId}/image`, headers: {authorization: 'Bearer last-room-token'}});
   assert.equal(imageResponse.statusCode, 410);
+});
+
+test('cancelling the managed run rejects the in-flight image commit', async t => {
+  mkdirSync(parent, {recursive: true});
+  const root = mkdtempSync(join(parent, 'managed-image-cancel-'));
+  const store = new Store(join(root, 'room.sqlite'));
+  const service = new RoomService(store);
+  const roomId = store.rooms()[0].id;
+  const bytes = await picture(3, 3);
+  let worker!: Worker;
+  const captured: {uploadId?: string; code?: string; error?: string} = {};
+  worker = new Worker(store, service, root, {adapter: async function* (ctx: any) {
+    try {
+      const fence = executionFence(ctx.run);
+      const begin = await worker.executeTool(ctx.run.id, {name: 'image_upload_begin', arguments: {name: 'cancelled.png', size: bytes.byteLength, sha256: sha(bytes)}, operationId: 'cancel_root'}, fence);
+      captured.uploadId = begin.uploadId;
+      service.execute({version: '0.1', commandId: uid(), roomId, type: 'run.cancel', payload: {runId: ctx.run.id}});
+      const result = await worker.executeTool(ctx.run.id, {name: 'image_upload_chunk', arguments: {uploadId: begin.uploadId, index: 0, dataBase64: bytes.toString('base64'), sha256: sha(bytes)}, operationId: 'cancel_chunk'}, fence);
+      captured.code = result?.code; captured.error = result?.error;
+    } catch (error) { captured.code = (error as any).code; captured.error = (error as Error).message; }
+    yield {type: 'text', text: 'cancelled'};
+  }});
+  t.after(async () => { await worker.close(); try { store.close(); } catch { /* closed */ } rmSync(root, {recursive: true, force: true}); });
+  service.execute({version: '0.1', commandId: uid(), roomId, type: 'task.create', payload: {title: 'cancel image task', agentId: 'demo-planner'}});
+  worker.start();
+  const deadline = Date.now() + 15000;
+  while (!captured.code && Date.now() < deadline) { worker.tick(); await new Promise(done => setTimeout(done, 20)); }
+  assert.equal(captured.code, 'run_not_active', JSON.stringify(captured));
+  assert.equal(store.list<any>('artifacts', roomId).length, 0);
+});
+
+test('a task version change rejects the in-flight managed image commit', async t => {
+  mkdirSync(parent, {recursive: true});
+  const root = mkdtempSync(join(parent, 'managed-image-task-version-'));
+  const store = new Store(join(root, 'room.sqlite'));
+  const service = new RoomService(store);
+  const roomId = store.rooms()[0].id;
+  const bytes = await picture(3, 3);
+  let worker!: Worker;
+  const captured: {uploadId?: string; code?: string; error?: string} = {};
+  worker = new Worker(store, service, root, {adapter: async function* (ctx: any) {
+    try {
+      const fence = executionFence(ctx.run);
+      const begin = await worker.executeTool(ctx.run.id, {name: 'image_upload_begin', arguments: {name: 'revised.png', size: bytes.byteLength, sha256: sha(bytes)}, operationId: 'version_root'}, fence);
+      captured.uploadId = begin.uploadId;
+      const task = store.get<Task>('tasks', ctx.run.taskId)!;
+      store.event(roomId, 'task.revised', SYSTEM, {task: {...task, version: task.version + 1}});
+      const result = await worker.executeTool(ctx.run.id, {name: 'image_upload_chunk', arguments: {uploadId: begin.uploadId, index: 0, dataBase64: bytes.toString('base64'), sha256: sha(bytes)}, operationId: 'version_chunk'}, fence);
+      captured.code = result?.code; captured.error = result?.error;
+    } catch (error) { captured.code = (error as any).code; captured.error = (error as Error).message; }
+    yield {type: 'text', text: 'revised'};
+  }});
+  t.after(async () => { await worker.close(); try { store.close(); } catch { /* closed */ } rmSync(root, {recursive: true, force: true}); });
+  service.execute({version: '0.1', commandId: uid(), roomId, type: 'task.create', payload: {title: 'version image task', agentId: 'demo-planner'}});
+  worker.start();
+  const deadline = Date.now() + 15000;
+  while (!captured.code && Date.now() < deadline) { worker.tick(); await new Promise(done => setTimeout(done, 20)); }
+  assert.equal(captured.code, 'stale_task_version', JSON.stringify(captured));
+  assert.equal(store.list<any>('artifacts', roomId).length, 0);
+});
+
+test('adding a member while another task is queued lets the new member upload without cancelling the task', async t => {
+  const ctx = await fixture(t);
+  const baseRoom = ctx.store.room(ctx.roomId)!;
+  ctx.service.execute({version: '0.1', commandId: uid(), roomId: ctx.roomId, type: 'room.configure', payload: {name: baseRoom.name, description: baseRoom.description, members: ['demo-planner'], expectedRevision: baseRoom.revision}});
+  const taskId = ctx.service.execute({version: '0.1', commandId: uid(), roomId: ctx.roomId, type: 'task.create', payload: {title: 'queued while member added', agentId: 'demo-planner'}}).result.taskId as string;
+  const before = ctx.store.get<Task>('tasks', taskId)!;
+  const current = ctx.store.room(ctx.roomId)!;
+  ctx.service.execute({version: '0.1', commandId: uid(), roomId: ctx.roomId, type: 'room.configure', payload: {name: current.name, description: current.description, members: ['demo-planner', 'demo-reviewer'], expectedRevision: current.revision}});
+  const after = ctx.store.get<Task>('tasks', taskId)!;
+  assert.equal(after.version, before.version);
+  assert.equal(after.status, before.status);
+  const bytes = await picture(4, 4);
+  const upload = ctx.uploads.begin({roomId: ctx.roomId, agentId: 'demo-reviewer', rootOperationId: 'new_member_image', name: 'member.png', size: bytes.byteLength, sha256: sha(bytes)});
+  await ctx.uploads.chunk(upload.uploadId, 0, bytes, sha(bytes), {roomId: ctx.roomId, agentId: 'demo-reviewer'});
+  const image = await ctx.uploads.finalize(upload.uploadId, {roomId: ctx.roomId, agentId: 'demo-reviewer'});
+  assert.match(image.artifactId, /^artifact_/);
+  assert.equal(ctx.store.get<Task>('tasks', taskId)?.status, before.status);
 });

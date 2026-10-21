@@ -966,6 +966,17 @@ try {
     step('ui-two-window-conflict-save', {room: conflictRoom});
     await send('Target.closeTarget', {targetId: conflictTarget.targetId});
 
+    // A verified image artifact whose file is missing must degrade to a file card.
+    const missingRoom = (await command(roomId, 'room.create', {name: `缺失文件房间 ${Date.now() % 100000}`, members: ['demo-planner']}) as any).result.roomId;
+    const missingArtifact = {id: 'artifact_missing_ui', roomId: missingRoom, name: 'missing-preview.png', kind: 'file', mediaType: 'image/png', size: 10, createdAt: new Date().toISOString(), contentHash: 'c'.repeat(64), image: {verified: true, width: 4, height: 2, alt: 'missing preview', previewMediaType: 'image/png', previewHash: 'd'.repeat(64), previewSize: 8}};
+    appHandle!.store.event(missingRoom, 'artifact.created', {id: 'owner', kind: 'human'}, {artifact: missingArtifact});
+    appHandle!.service.execute({version: '0.1', commandId: `missing_${Date.now()}`, roomId: missingRoom, type: 'message.send', payload: {text: 'missing artifact message', attachments: [missingArtifact.id]}});
+    const missingLoaded = waitEvent('Page.loadEventFired');
+    await send('Page.navigate', {url: `${base}/?room=${missingRoom}`}, sessionId);
+    await missingLoaded;
+    await waitFor('缺失预览降级文件卡', async () => { const text = await bodyText(); return text.includes('missing artifact message') && text.includes('预览不可用') && text.includes('missing-preview.png'); }, 15000);
+    step('ui-missing-artifact-fallback', {artifact: missingArtifact.id});
+
     // Last room: deleting all remaining rooms must show the empty state after reload.
     const remainingRooms = appHandle!.store.activeRooms();
     for (const room of remainingRooms) {

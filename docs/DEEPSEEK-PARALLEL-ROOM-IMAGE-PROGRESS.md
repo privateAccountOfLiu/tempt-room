@@ -34,7 +34,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | I04 托管 bridge/host/AppContainer 传输 | verified | host HostRoomPipe 与 AppContainer 真 sandbox（staged Node+bridge）两种模式固定图上传均 verified=true；sandbox probe 23/23；helper symlink 祖先检查改为只到允许根 |
 | I05 外部 MCP、插件与 SDK 发图 | in_progress | SDK、外部 MCP room_send_image、真实 stdio→HTTP 重试幂等、timeout/401/403/410 分类、两个独立 MCP 进程并发上传不同图通过 5 个用例；真实宿主手动发图待验证 |
 | I06 安全内联路由与图片展示 | verified | 私有 `/api/artifacts/:id/image`（active/verified/hash/no-store）、缩略图、失败降级、键盘 Lightbox、纯图不渲染空 Markdown 已完成并通过 3 个接口用例与完整浏览器 E2E |
-| I07 跨功能竞态 | in_progress | 10 个用例覆盖删房/移除成员/并行上传/丢回执/导出回放/删后审计/解码期间删房/托管 stale generation/最后房间 restart/删除后 accepted integration 变 blocked 且 apply 拒绝；Run cancel/task-version 变体与缺失 artifact 文件 UI 断言待补 |
+| I07 跨功能竞态 | verified | 13 个用例覆盖 I07 清单：删房/移除成员/并行/丢回执/导出回放/删后审计/解码期间删房/托管 cancel+task-version+stale generation/最后房间 restart/删除 vs accepted integration apply/新增成员上传/缺失 artifact UI 降级 |
 | V01 开发/发布报告分模式 | in_progress | schemaVersion 2、sourceBefore/sourceAfter、tracked/working/untracked+lockfile hash、`--release --expected-head` 前置失败 not_run、source_changed 检测与 checksPassed/releaseEligible 已通过 5 个用例；CLI 入口已由 V02 preflight 接入，真实 clean release 运行待 CI |
 | V02 CI/preflight 接入真实入口 | in_progress | preflight 改为 collaboration release/development 单次入口 + 连接器/并行/图片检查；外层 sourceBefore/After 与 releaseEligible/verdict；CI 传 github.sha、上传证据；本地 skip 模式 preflight PASS（development_only）；真实 release CI 运行待下次推送验证 |
 | V03 固定版本真实 CLI 与三组对照 | not_started | |
@@ -1717,6 +1717,25 @@ tick 至 ready_to_apply；room.delete 后该 integration 变为 blocked/errorCod
 artifact.apply 被拒绝，项目 a.txt 保持 0，artifact.applied 未设置。
 验证：npm test 546/546；证据 .state/parallel-room-image/i07-apply-tests-20261022.log。
 未验证：Run cancel/task-version 变化的图片提交变体、artifact 文件缺失的 UI 卡片断言。
+下一张卡：V03（等待付费授权）
+```
+
+## I07 — 剩余竞态与缺失文件 UI
+
+```
+基线 SHA：de6de48；实现见本次提交
+修改：tests/room-image-races.test.ts（+3 用例）、scripts/browser-e2e.ts（+1 步）
+- managed run cancel：begin 后 run.cancel → chunk executeTool 返回 run_not_active；
+- task version change：begin 后 task.version+1 → chunk 返回 stale_task_version；
+- 新增成员：成员列表加 reviewer 时 queued task version/status 不变，
+  reviewer 并发上传成功；
+- 缺失 artifact 文件：浏览器创建 verified 元数据但无文件的 image artifact，
+  reload 后显示“预览不可用”文件卡，不把缺失伪装成图片。
+验证：npm test 549/549；npm run test:browser PASS（含 ui-missing-artifact-fallback）；
+       npx tsc --noEmit exit 0。
+证据：.state/parallel-room-image/i07-final-races-20261022.log、
+      .state/browser-e2e/run-gJbKB0/report.json。
+未验证：真实宿主手动发图（I05 剩余）、CI release 首跑。
 下一张卡：V03（等待付费授权）
 ```
 
