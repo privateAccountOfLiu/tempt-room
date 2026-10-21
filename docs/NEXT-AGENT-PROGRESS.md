@@ -23,11 +23,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: ec8b2b3faa12620d333dc91d36cf32fe4add508f (dirty)
+source HEAD: a0487355b3c07655fe52e1fab11a28f6346dfa6e (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-21T00-22-19-639Z-60433526/report.json
+report: .state/collaboration-baseline/run-2026-10-21T00-29-16-335Z-4e78ea16/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -224,19 +224,19 @@ report: .state/collaboration-baseline/run-2026-10-21T00-22-19-639Z-60433526/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-kHRPLG/report.json`，167.5s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-pnj1Gm/report.json`，170.4s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-VW2Fw5/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-xLq5Lo/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-21T00-22-19-639Z-60433526/report.json`
-- `.state/collaboration-baseline/run-2026-10-21T00-22-19-639Z-60433526/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-21T00-22-19-639Z-60433526/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-21T00-22-19-639Z-60433526/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-21T00-29-16-335Z-4e78ea16/report.json`
+- `.state/collaboration-baseline/run-2026-10-21T00-29-16-335Z-4e78ea16/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-21T00-29-16-335Z-4e78ea16/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-21T00-29-16-335Z-4e78ea16/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -698,3 +698,9 @@ report: .state/collaboration-baseline/run-2026-10-21T00-22-19-639Z-60433526/repo
 - 新增 GET /api/rooms/:id/wake-intents：owner 可见 wake intent 状态、deliveryMode、suppressionReason、sourceSeq
 - 协作面板新增「补投/唤醒」区：显示状态与抑制原因（如 steer_unverified），无待处理时明确空状态
 - 不改 B06 语义：steer 未验证仍保留 inbox/下一轮投递，不冒充运行中补投
+
+## A00 稳健性 — Windows runtime staging EPERM
+
+- 新增 retryIo：对 EPERM/EACCES/EBUSY/ENOTEMPTY 做指数退避重试（默认 8 次，40ms 起）
+- stageAgentRuntime 的 rename 接入 retryIo，缓解杀软/安装器短暂持有句柄导致的 preflight 抖动
+- 新增 retry-io 测试 2 项：瞬时错误重试成功、永久错误不重试/耗尽后抛出

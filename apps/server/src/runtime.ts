@@ -4,6 +4,7 @@ import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 
 import { createHash, randomUUID } from 'node:crypto';
 import type { AgentDescriptor } from '../../../packages/protocol/src/index.ts';
 import { probeClaudeVersion, probeCodexVersion } from './executable-version.ts';
+import { retryIo } from './retry.ts';
 
 export interface RuntimeLayout { source: string; entry: string; kind: 'native'|'deepseek-desktop'|'deepseek-node'; curated: boolean }
 const inside=(root:string,path:string)=>{const rel=relative(root,path);return rel!==''&&!isAbsolute(rel)&&rel!=='..'&&!rel.startsWith('..\\')&&!rel.startsWith('../');};
@@ -109,6 +110,6 @@ export async function stageAgentRuntime(layout:RuntimeLayout,stateRoot:string,ag
   }
   if(copiedHash.digest('hex')!==fingerprint)throw new Error('复制期间运行文件发生变化，请关闭更新程序后重试');
   await writeFile(join(temporary,'complete.json'),JSON.stringify({fingerprint,kind:layout.kind,createdAt:new Date().toISOString(),files:files.length}));
-  try{await rename(temporary,destination);}catch(error){try{if(JSON.parse(await readFile(complete,'utf8')).fingerprint!==fingerprint)throw error;}catch{throw error;}}
+  try{await retryIo(()=>rename(temporary,destination));}catch(error){try{if(JSON.parse(await readFile(complete,'utf8')).fingerprint!==fingerprint)throw error;}catch{throw error;}}
   return destination;
 }
