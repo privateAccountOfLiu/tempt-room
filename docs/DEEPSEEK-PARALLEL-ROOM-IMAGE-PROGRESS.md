@@ -35,8 +35,8 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | I05 外部 MCP、插件与 SDK 发图 | in_progress | SDK、外部 MCP room_send_image、真实 stdio→HTTP 重试幂等、timeout/401/403/410 分类、两个独立 MCP 进程并发上传不同图通过 5 个用例；真实宿主手动发图待验证 |
 | I06 安全内联路由与图片展示 | verified | 私有 `/api/artifacts/:id/image`（active/verified/hash/no-store）、缩略图、失败降级、键盘 Lightbox、纯图不渲染空 Markdown 已完成并通过 3 个接口用例与完整浏览器 E2E |
 | I07 跨功能竞态 | verified | 13 个用例覆盖 I07 清单：删房/移除成员/并行/丢回执/导出回放/删后审计/解码期间删房/托管 cancel+task-version+stale generation/最后房间 restart/删除 vs accepted integration apply/新增成员上传/缺失 artifact UI 降级 |
-| V01 开发/发布报告分模式 | in_progress | schemaVersion 2、sourceBefore/sourceAfter、tracked/working/untracked+lockfile hash、`--release --expected-head` 前置失败 not_run、source_changed 检测与 checksPassed/releaseEligible 已通过 5 个用例；CLI 入口已由 V02 preflight 接入，真实 clean release 运行待 CI |
-| V02 CI/preflight 接入真实入口 | in_progress | preflight 改为 collaboration release/development 单次入口 + 连接器/并行/图片检查；外层 sourceBefore/After 与 releaseEligible/verdict；CI 传 github.sha、上传证据；本地 skip 模式 preflight PASS（development_only）；真实 release CI 运行待下次推送验证 |
+| V01 开发/发布报告分模式 | verified | schemaVersion 2、sourceBefore/After、tracked/working/untracked+lockfile hash、release 前置/not_run/source_changed；在 clean HEAD e5b372b 上真实 release 通过（typecheck/test/replay，checksPassed=true, releaseEligible=true） |
+| V02 CI/preflight 接入真实入口 | in_progress | preflight 单次 collaboration + 连接器/并行/图片/build/sdk/browser/production；在 clean HEAD ef0b54b 上完整 release preflight PASS（11 步，releaseEligible=true, sourceStable=true）；GitHub-hosted CI 首跑仍待推送 |
 | V03 固定版本真实 CLI 与三组对照 | not_started | |
 | V04 文档、备份导入导出与统一口径 | in_progress | 备份/restore（水位+文件 hash+三类目录）、导出 omittedArtifacts、导入重验真/重生成 preview；10 个文档已补统一 24 卡口径与验证矩阵；真实 CI/V03 仍待 |
 
@@ -1736,6 +1736,30 @@ artifact.apply 被拒绝，项目 a.txt 保持 0，artifact.applied 未设置。
 证据：.state/parallel-room-image/i07-final-races-20261022.log、
       .state/browser-e2e/run-gJbKB0/report.json。
 未验证：真实宿主手动发图（I05 剩余）、CI release 首跑。
+下一张卡：V03（等待付费授权）
+```
+
+## V01/V02 — 本地真实 release 证据
+
+```
+时间：2026-10-21 23:37–00:02 CST
+基线：clean HEAD e5b372b（V01 direct release）、ef0b54b（V02 full preflight）
+V01：npm run verify:collaboration:release -- --expected-head e5b372b...
+     typecheck/test/replay passed；checksPassed=true releaseEligible=true sourceStable=true。
+V02：ROOM_EXPECTED_HEAD=ef0b54b npm run test:preflight
+     collaboration-release、secret-scan、room-plugin、mcp-connectors、
+     acceptance-parallel、acceptance-room-images、job-launcher、build、
+     sdk-consumer、browser-e2e、production-smoke 全部 PASS；
+     verdict=release_eligible releaseEligible=true sourceStable=true，11 步 473s。
+过程中修复了嵌套 release 负载下的测试超时：parallel-task-execution、
+parallel-task-integration、acceptance-parallel-tasks、native-acceptance 子进程
+预算提高；这些只放宽等待，不改变通过条件。
+证据：.state/parallel-room-image/v01-release-20261022.log
+      .state/parallel-room-image/v02-release-preflight-20261022c.log
+      .state/collaboration-baseline/run-2026-10-21T15-37-34-830Z-124f126a/report.json
+      .state/preflight/run-MNQaec/report.json
+未验证：GitHub-hosted Actions 首跑（需推送/授权）；本报告只证明本地 clean
+HEAD 的 release 路径，不等于已发布或已获发布授权。
 下一张卡：V03（等待付费授权）
 ```
 
