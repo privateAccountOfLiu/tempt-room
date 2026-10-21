@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import sharp from 'sharp';
 import { Store, SYSTEM, now, uid } from '../apps/server/src/store.ts';
@@ -9,6 +9,7 @@ import { RoomService } from '../apps/server/src/service.ts';
 import { ImageUploads } from '../apps/server/src/image-uploads.ts';
 import { imageOperationIds, type Run } from '../packages/protocol/src/index.ts';
 import { Worker } from '../apps/server/src/worker.ts';
+import { createApp } from '../apps/server/src/app.ts';
 import { executionFence } from '../apps/server/src/execution.ts';
 
 const parent = resolve('.state/test-data');
@@ -157,7 +158,7 @@ test('managed tool image commits reject a stale generation before writing an art
     } catch (error) { captured.error = (error as Error).message; captured.code = (error as any).code; }
     yield {type: 'text', text: 'done'};
   }});
-  t.after(async () => { await worker.close(); try { store.close(); } catch { /* closed */ } rmSync(root, {recursive: true, force: true}); });
+  t.after(async () => { try { await worker.close(); } catch { /* closed */ } try { store.close(); } catch { /* closed */ } });
   service.execute({version: '0.1', commandId: uid(), roomId, type: 'task.create', payload: {title: 'managed image race', agentId: 'demo-planner'}});
   worker.start();
   const deadline = Date.now() + 15000;
@@ -165,4 +166,37 @@ test('managed tool image commits reject a stale generation before writing an art
   assert.ok(captured.uploadId, 'managed image adapter did not run: ' + JSON.stringify(captured));
   assert.match(String(captured.code) + ' ' + String(captured.error), /stale_generation|Stale run generation/, 'captured=' + JSON.stringify(captured));
   assert.equal(store.list<any>('artifacts', roomId).length, 0);
+});
+
+test('deleting the last room survives restart, keeps the room list empty and hides the old image URL', async t => {
+  mkdirSync(parent, {recursive: true});
+  const root = mkdtempSync(join(parent, 'image-last-room-restart-'));
+  const store = new Store(join(root, 'room.sqlite'));
+  const service = new RoomService(store);
+  const uploads = new ImageUploads(store, root);
+  const roomId = store.rooms()[0].id, agentId = 'demo-planner';
+  const worker = new Worker(store, service, root, {adapter: async function* () { yield {type: 'text', text: 'unused'}; }});
+  t.after(async () => { try { await worker.close(); } catch { /* closed */ } try { store.close(); } catch { /* closed */ } });
+  const bytes = await picture(4, 4);
+  const upload = await pending({root, store, service, uploads, roomId, agentId}, bytes);
+  const image = await uploads.finalize(upload.uploadId, {roomId, agentId});
+  assert.ok(existsSync(join(root, 'artifacts', image.artifactId)));
+  service.execute({version: '0.1', commandId: uid(), roomId, type: 'room.delete', payload: {expectedRevision: store.room(roomId)!.revision}});
+  for (let index = 0; index < 50 && store.room(roomId)?.status !== 'deleted'; index++) { worker.tick(); await new Promise(done => setTimeout(done, 10)); }
+  assert.equal(store.room(roomId)?.status, 'deleted');
+  assert.deepEqual(store.activeRooms().map(room => room.id), []);
+  assert.equal(store.events(roomId).filter(event => event.type === 'artifact.created').length, 1);
+  await worker.close(); store.close();
+  const reopened = new Store(join(root, 'room.sqlite'));
+  assert.equal(reopened.room(roomId)?.status, 'deleted', 'projection rebuild must retain the tombstone');
+  assert.deepEqual(reopened.activeRooms().map(room => room.id), []);
+  assert.equal(reopened.events(roomId).filter(event => event.type === 'artifact.created').length, 1);
+  reopened.close();
+  const app = await createApp({root, token: 'last-room-token', startWorker: false});
+  t.after(async () => { await app.app.close(); try { app.worker.close(); } catch { /* closed */ } try { app.store.close(); } catch { /* closed */ } try { rmSync(root, {recursive: true, force: true}); } catch { /* Windows handle release delay */ } });
+  const roomsResponse = await app.app.inject({method: 'GET', url: '/api/rooms', headers: {authorization: 'Bearer last-room-token', 'room-protocol-version': '0.1'}});
+  assert.equal(roomsResponse.statusCode, 200);
+  assert.deepEqual(roomsResponse.json(), []);
+  const imageResponse = await app.app.inject({method: 'GET', url: `/api/artifacts/${image.artifactId}/image`, headers: {authorization: 'Bearer last-room-token'}});
+  assert.equal(imageResponse.statusCode, 410);
 });

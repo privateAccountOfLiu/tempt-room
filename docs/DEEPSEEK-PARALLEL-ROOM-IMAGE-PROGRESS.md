@@ -34,7 +34,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | I04 托管 bridge/host/AppContainer 传输 | in_progress | Worker 三段式工具、helper、bridge `room_send_image`、toolchain 复制；真实 HostRoomPipe 固定图 smoke 通过（`test:room-images-native --mode host`）；AppContainer 模式明确 not_verified |
 | I05 外部 MCP、插件与 SDK 发图 | in_progress | SDK、外部 MCP room_send_image、真实 stdio→HTTP 重试幂等、HTTP timeout/401/403/410 分类与 no-retry 语义通过 4 个用例；并发双图与手动宿主验证待补 |
 | I06 安全内联路由与图片展示 | verified | 私有 `/api/artifacts/:id/image`（active/verified/hash/no-store）、缩略图、失败降级、键盘 Lightbox、纯图不渲染空 Markdown 已完成并通过 3 个接口用例与完整浏览器 E2E |
-| I07 跨功能竞态 | in_progress | 删房/移除成员/并行上传/丢回执重试/导出回放/删后审计 + 解码期间删房/托管 stale generation 共 8 个用例通过；删除与最终 apply、最后房间 restart 组合仍未覆盖 |
+| I07 跨功能竞态 | in_progress | 9 个用例覆盖删房/移除成员/并行上传/丢回执/导出回放/删后审计/解码期间删房/托管 stale generation/最后房间 restart + 列表为空 + 旧图片 URL 410；删除与最终 project apply 并发仍未覆盖 |
 | V01 开发/发布报告分模式 | in_progress | schemaVersion 2、sourceBefore/sourceAfter、tracked/working/untracked+lockfile hash、`--release --expected-head` 前置失败 not_run、source_changed 检测与 checksPassed/releaseEligible 已通过 5 个用例；CLI 入口已由 V02 preflight 接入，真实 clean release 运行待 CI |
 | V02 CI/preflight 接入真实入口 | in_progress | preflight 改为 collaboration release/development 单次入口 + 连接器/并行/图片检查；外层 sourceBefore/After 与 releaseEligible/verdict；CI 传 github.sha、上传证据；本地 skip 模式 preflight PASS（development_only）；真实 release CI 运行待下次推送验证 |
 | V03 固定版本真实 CLI 与三组对照 | not_started | |
@@ -1364,6 +1364,38 @@ delivery/image-upload 细节与全入口 assertActiveRoom 仍待补）
   并发、最后房间删除后 restart/重建投影仍待补；host/sandbox 真管道证据在
   I04 已单列
 下一张卡与依赖：V03（等待付费授权）或最后房间 restart 竞态
+```
+
+## I07 — 最后房间删除后 restart / 重建投影
+
+```
+卡号与状态：I07 补充切片 / in_progress
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 bcea651（I07 前次提交）；实现见本次提交
+修改文件和关键符号：
+  tests/room-image-races.test.ts（+1 个用例）
+    用 Store/RoomService/ImageUploads/Worker 完成图片上传 → room.delete →
+    tick 到 deleted → 关闭并重新打开 Store 重建投影：
+      房间 tombstone 保留、activeRooms() 为空、artifact.created 只一个；
+      再用同一 root 创建 createApp 注入 /api/rooms（空数组）与
+      旧 /api/artifacts/<id>/image（410）
+变更前触发条件 / 变更后行为：
+  变更前：没有覆盖“最后房间删除后重启/重建投影+旧图片 URL”的组合。
+  变更后：删除事实跨 restart 持久；旧图片不会因为文件仍在而被内联读取。
+执行命令、cwd、环境、开始结束、退出码：
+  npx tsc --noEmit                                              exit 0
+  npx tsx --test tests/room-image-races.test.ts                  exit 0（9 pass / 0 fail）
+  npm test                                                       exit 0（539 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-22 05:40–06:00 CST
+证据路径：
+  .state/parallel-room-image/i07-last-room-tests-20261022.log
+实际覆盖的模式和失败分支：
+  最后房间 deleting→deleted、Store 重开投影重建、active room 列表为空、
+  旧 artifact 文件仍在但 inline image 410
+尚未验证项及明确原因：
+  “房间删除与最终 project apply 并发”仍无专门测试（属项目 apply/集成锁
+  交叉域）；真实 CI release job 仍未推送
+下一张卡与依赖：V03（等待付费授权）或项目 apply 删除竞态
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移
