@@ -27,7 +27,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | R02 单事务保存房间设置与成员 | verified | 纯规划 + 单事件 room.configured；revision CAS、成员去重/校验、忙成员移除拒绝、闲置会话结束、legacy 命令复用；5 个用例通过 |
 | R03 删除请求、停止执行与清理 | in_progress | afterCommit、room.delete 短事务、Worker finalizer、写入口拒绝、pending wake/input-batch/inbox delivery 清理已通过 6 个用例；outbound delivery 停止、image-upload 失效、全入口二次校验仍未覆盖 |
 | R04 API、WebSocket、SDK 与列表语义 | in_progress | activeRooms/410/WS 终态/owner 导出/artifact 防绕过/RoomClient 命令/删除房间导入新身份已通过 8 个用例；agent room_wait 直接测试与双窗口 WS 同步仍未覆盖 |
-| R05 房间设置与删除 UI | not_started | |
+| R05 房间设置与删除 UI | in_progress | 设置改为单条 room.configure（带 revision）、冲突/忙错误保留表单、删除确认与空状态已实现；新增 Agent 自动回填与删除后双窗口浏览器验收仍待补 |
 | I01 图片协议、工具参数与权限 | not_started | |
 | I02 有界可恢复的上传临时状态 | not_started | |
 | I03 解码验真、原图与安全预览 | not_started | |
@@ -648,6 +648,53 @@ delivery/image-upload 细节与全入口 assertActiveRoom 仍待补）
   room-import/export 的 lifecycle 与图片引用映射（R04 #13/#14）未实现；
   房间设置/删除 UI 属 R05
 下一张卡与依赖：R05（房间设置和删除 UI）
+```
+
+## R05 — 房间设置和删除 UI（核心切片）
+
+```
+卡号与状态：R05 / in_progress（设置单命令、错误保留、删除确认、空状态通过现有浏览器 E2E）
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 77dc1b1（R04 收尾提交）；实现见本次提交
+修改文件和关键符号：
+  apps/web/src/main.tsx
+    RoomForm 保存 existing.revision；打开/切换房间时重置 name/description/members
+    设置保存改为单条 room.configure（不再顺序 room.update + room.members.set）
+    revision_conflict / member_busy / 其他错误保留表单并在 Modal 内展示
+    成员区显示已选人数、provider、connectionMode、启用状态；提供“新增 Agent”
+    设置底部增加删除区：明确说明“从列表移除、停止后续活动、历史保留审计”，
+    二次确认显示房间名与当前活动数；删除期间禁用按钮
+    新增 afterRoomDeleted()：递增 generation、注销旧订阅、清 snapshot/streaming/
+    draft/mentions/reply/attachments，重新获取 activeRooms，选择下一房间并更新 URL；
+    无剩余房间时进入空状态与“创建房间”，不渲染旧消息
+  tests/browser E2E
+    沿用现有房间设置/邀请/移除成员流程并通过；UI 设置保存现在走 room.configure
+变更前触发条件 / 变更后行为：
+  变更前：设置保存是两个顺序命令，失败会留下半更新；没有删除 UI；删除后页面
+  可能继续渲染旧房间并异步切回。
+  变更后：设置一次命令提交、失败保留表单；删除有明确确认与活动提示；删除响应后
+  清空旧状态并切到剩余房间，最后房间显示空状态。
+接口/事件/迁移/兼容性：
+  只改 Web UI；命令通过 R02 的 room.configure 与 R03 的 room.delete。
+执行命令、cwd、环境、开始结束、退出码：
+  npm run typecheck                                            exit 0
+  npm run test:browser                                        exit 0（现有 45 项 UI/浏览器步骤全部通过）
+  npm test                                                    exit 0（492 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-21 22:10–22:40 CST
+证据路径：
+  .state/parallel-room-image/r05-browser-20261021.log
+  .state/parallel-room-image/r05-tests-20261021.log
+实际覆盖的模式和失败分支：
+  房间改名/邀请/移除成员后设置保存；Modal 错误提示路径（代码保留表单）；
+  删除确认 UI 与 activityCount；删除后切房间/空状态代码路径；
+  现有移动端房间设置与手风琴布局通过
+尚未验证项及明确原因：
+  “新增 Agent 后自动把新 ID 加入待保存 members”未实现（当前新增 Agent 会关闭
+  设置，需重新打开设置并勾选）；
+  删除流程未加入 browser-e2e 自动断言；双窗口同时打开的删除同步未做浏览器级
+  验收；revision_conflict/member_busy 的真实双窗口交互未自动化；
+  设置/删除的完整浏览器验收（取消删除、最后房间、手机删除）仍待补
+下一张卡与依赖：I01（图片协议、工具参数与权限）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移
