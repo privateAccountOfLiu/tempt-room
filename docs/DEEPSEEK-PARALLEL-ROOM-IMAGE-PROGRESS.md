@@ -38,7 +38,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | V01 开发/发布报告分模式 | in_progress | schemaVersion 2、sourceBefore/sourceAfter、tracked/working/untracked+lockfile hash、`--release --expected-head` 前置失败 not_run、source_changed 检测与 checksPassed/releaseEligible 已通过 5 个用例；CLI 入口已由 V02 preflight 接入，真实 clean release 运行待 CI |
 | V02 CI/preflight 接入真实入口 | in_progress | preflight 改为 collaboration release/development 单次入口 + 连接器/并行/图片检查；外层 sourceBefore/After 与 releaseEligible/verdict；CI 传 github.sha、上传证据；本地 skip 模式 preflight PASS（development_only）；真实 release CI 运行待下次推送验证 |
 | V03 固定版本真实 CLI 与三组对照 | not_started | |
-| V04 文档、备份导入导出与统一口径 | in_progress | 备份扩展为 DB+artifact/baselines/apply journal+水位/文件 hash manifest，restore 校验并恢复三类目录，测试通过；文档统一、图片导出 omitted/导入重验真仍待补 |
+| V04 文档、备份导入导出与统一口径 | in_progress | 备份/restore 带水位与文件 hash；导出 omittedArtifacts（单件 8MiB/总量 32MiB/缺失）；导入图片重新解码验真、重生成 preview、清除客户端伪造尺寸；7 个导入/导出用例通过；文档统一仍待补 |
 
 ## G00 — 开工记录与测试隔离
 
@@ -1442,6 +1442,52 @@ delivery/image-upload 细节与全入口 assertActiveRoom 仍待补）
   图片二进制导出 8 MiB 单件/32 MiB 总量限制与 omittedArtifacts 报告未实现；
   导入图片重新生成 preview 的流程仍待 I07/导入路径补；release 文档口径未定
 下一张卡与依赖：V03（需用户明确付费模型/CLI 授权）
+```
+
+## V04 — 图片导出/导入边界
+
+```
+卡号与状态：V04 补充切片 / in_progress
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 249895a（V04 备份提交）；实现见本次提交
+修改文件和关键符号：
+  apps/server/src/app.ts
+    GET /api/rooms/:id/export?includeArtifacts=1
+      返回 omittedArtifacts：file_missing / single_item_over_8MiB /
+      total_over_32MiB，并记录 artifactId/name/size/reason，不再静默丢弃；
+    POST /api/rooms/import 改为 async prepare + 短 Store.atomic：
+      客户端 image.verified 不可信；对 image/* 重新 validateAndPreview，
+      服务端重算 contentHash/width/height/预览 hash/size；
+      伪造尺寸会被实际解码结果覆盖；无效伪图降级为普通文件元数据
+      （删除 image 字段），不 inline；安装原图+preview 后才写事件；
+      返回 revalidatedImages/invalidImages/artifactIntegrityFailures
+  tests/room-import.test.ts（+2 个用例）
+    9MiB artifact 导出 omittedArtifacts 且不出现 contentBase64；
+    合法 PNG 导出后篡改 image width/height=9999，导入后重新验真为 7×3，
+    预览文件存在、inline image 返回 200
+变更前触发条件 / 变更后行为：
+  变更前：导出超过 8MiB/32MiB 的文件静默消失；导入直接信任源 image.verified
+  与尺寸并只写原图，无 preview；伪图可造成 inline 不一致。
+  变更后：省略项可审计；导入图片由服务端重新解码验真并生成安全预览，
+  旧 hash/尺寸/verified 不可作为可信证明。
+接口/事件/迁移/兼容性：
+  export 新增 omittedArtifacts；import 新增结果字段；无 DB 迁移；
+  非法图片保留为文件引用/文件卡，不生成伪造 image 元数据。
+执行命令、cwd、环境、开始结束、退出码：
+  npx tsc --noEmit                                              exit 0
+  npx tsx --test tests/room-import.test.ts                      exit 0（7 pass / 0 fail）
+  npm test                                                       exit 0（541 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-22 06:35–07:05 CST
+证据路径：
+  .state/parallel-room-image/v04-import-tests-20261022.log
+实际覆盖的模式和失败分支：
+  超单件导出 omitted；图片导入重验真/重生成权限内预览/inline；伪造尺寸覆盖
+尚未验证项及明确原因：
+  V04 #1–7 文档统一（AGENT-PARALLEL-PROGRESS、CAPABILITY-COMPLETION、
+  PLAN-CLOSURE、VERIFICATION-MATRIX、ACCEPTANCE、PROTOCOL、EXTERNAL-MCP、
+  UI-WORKBENCH）未批量改写；总量 32MiB 与多件导出省略的专门断言未加；
+  无二进制导入时 UI 缺失卡片未做浏览器断言；V03 仍等待付费授权
+下一张卡与依赖：V03（需明确付费模型/CLI 授权）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移

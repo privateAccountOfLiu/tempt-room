@@ -14,6 +14,8 @@ import { VERSION,payloadSchemas, agentToolCallSchema, ProtocolError, type AgentD
 import { Store, digest, now, OWNER, SYSTEM, uid } from './store.ts';
 import { planRoomImport } from './room-import.ts';
 import { redactArtifactContent, redactExport } from './export-redaction.ts';
+import { validateAndPreview } from './image-validation.ts';
+import { installArtifactFiles } from './artifact-files.ts';
 import { summarizeOutboundAudit, summarizeOutboundDeliveries } from './outbound-summary.ts';
 import {agentCapabilityFingerprint,agentInterceptionGaps,capabilityNames,probeConfiguredAgent,verifiedCapabilityState} from './adapter-capabilities.ts';
 import { aggregateUsage } from './usage.ts';
@@ -257,23 +259,51 @@ export async function createApp(options: AppOptions = {}) {
     const room=store.room(request.params.id);if(!room)throw new ProtocolError('not_found','房间不存在',404);
     return summarizeOutboundDeliveries(store.events(room.id),store.settings().outboundMaxAttempts);
   });
-  app.post<{Body:{export?:any;name?:string}}>('/api/rooms/import',request=>{
+  app.post<{Body:{export?:any;name?:string}}>('/api/rooms/import',async request=>{
     const source=request.body?.export;
     if(!source||typeof source!=='object'||!Array.isArray(source.events)||!source.room)throw new ProtocolError('invalid_import','导入数据格式无效',400);
     if(source.exportHash){const expected=digest({room:source.room,events:source.events,...(Array.isArray(source.artifacts)?{artifactHashes:source.artifacts.map((item:any)=>[item.artifact?.id,item.contentHash])}:{})});if(expected!==source.exportHash)throw new ProtocolError('invalid_import','导出完整性校验失败：exportHash 不匹配',400);}
+    let artifactIntegrityFailures=0,invalidImages=0;
+    const prepared=new Map<string,{bytes:Buffer;decoded?:Awaited<ReturnType<typeof validateAndPreview>>;invalidImage?:boolean}>();
+    for(const item of (source.artifacts??[]).slice(0,200)){
+      if(!item?.artifact?.id||typeof item.contentBase64!=='string')continue;
+      if(typeof item.contentHash==='string'&&digest(item.contentBase64)!==item.contentHash){artifactIntegrityFailures++;continue;}
+      const bytes=Buffer.from(item.contentBase64,'base64');
+      if(bytes.length>8*1024*1024)continue;
+      const looksImage=item.artifact.image?.verified===true||/^image\//.test(String(item.artifact.mediaType??''));
+      if(!looksImage){prepared.set(item.artifact.id,{bytes});continue;}
+      if(bytes.length>10*1024*1024){invalidImages++;prepared.set(item.artifact.id,{bytes,invalidImage:true});continue;}
+      try{prepared.set(item.artifact.id,{bytes,decoded:await validateAndPreview(bytes,item.artifact.image?.alt)});}
+      catch{invalidImages++;prepared.set(item.artifact.id,{bytes,invalidImage:true});}
+    }
     return store.atomic(()=>{
       const newRoomId=uid('room'),plan=planRoomImport(source,{newRoomId,name:request.body?.name,salt:uid('import'),now:now()});
+      for(const event of plan.events){
+        if(event.type!=='artifact.created')continue;
+        const artifact=(event.payload as any)?.artifact;if(!artifact?.id)continue;
+        const oldId=Object.keys(plan.idMap).find(key=>plan.idMap[key]===artifact.id);
+        const sourceArtifact=(source.artifacts??[]).find((item:any)=>item?.artifact?.id===oldId)?.artifact;
+        const preparedItem=oldId?prepared.get(oldId):undefined;
+        if(!preparedItem)continue;
+        if(preparedItem.decoded){
+          const decoded=preparedItem.decoded;
+          artifact.mediaType=decoded.mediaType;artifact.size=preparedItem.bytes.length;artifact.contentHash=decoded.contentHash;
+          artifact.image={verified:true,width:decoded.width,height:decoded.height,...(sourceArtifact?.image?.alt?{alt:sourceArtifact.image.alt}:{}),previewMediaType:'image/png',previewHash:createHash('sha256').update(decoded.preview).digest('hex'),previewSize:decoded.previewSize};
+        }else{
+          delete artifact.image;artifact.contentHash=createHash('sha256').update(preparedItem.bytes).digest('hex');
+        }
+      }
       store.putRoom(plan.room as any,SYSTEM);
       for(const event of plan.events)store.event(newRoomId,event.type,(event.actor??SYSTEM) as any,event.payload as any);
-      let importedArtifacts=0,artifactIntegrityFailures=0;
-      for(const item of (source.artifacts??[]).slice(0,200)){
-        if(!item?.artifact?.id||typeof item.contentBase64!=='string')continue;
-        const artifactId=plan.idMap[item.artifact.id];if(!artifactId)continue;
-        if(typeof item.contentHash==='string'&&digest(item.contentBase64)!==item.contentHash){artifactIntegrityFailures++;continue;}
-        const bytes=Buffer.from(item.contentBase64,'base64');if(bytes.length>8*1024*1024)continue;
-        mkdirSync(join(root,'artifacts'),{recursive:true});writeFileSync(join(root,'artifacts',artifactId),bytes);importedArtifacts++;
+      let importedArtifacts=0,revalidatedImages=0;
+      for(const [oldId,preparedItem] of prepared){
+        const artifactId=plan.idMap[oldId];if(!artifactId)continue;
+        if(preparedItem.decoded){
+          installArtifactFiles(root,artifactId,preparedItem.bytes,preparedItem.decoded.preview);importedArtifacts++;revalidatedImages++;continue;
+        }
+        mkdirSync(join(root,'artifacts'),{recursive:true});writeFileSync(join(root,'artifacts',artifactId),preparedItem.bytes);importedArtifacts++;
       }
-      return {roomId:newRoomId,events:plan.events.length,remappedIds:plan.remappedIds,importedArtifacts,artifactIntegrityFailures,exportHash:digest({room:plan.room,events:plan.events})};
+      return {roomId:newRoomId,events:plan.events.length,remappedIds:plan.remappedIds,importedArtifacts,artifactIntegrityFailures,invalidImages,revalidatedImages,exportHash:digest({room:plan.room,events:plan.events})};
     });
   });
   app.get<{Params:{id:string};Querystring:{includeArtifacts?:string;redact?:string}}>('/api/rooms/:id/export',request=>{
@@ -282,12 +312,12 @@ export async function createApp(options: AppOptions = {}) {
     const roomValue=applied.value.room as typeof room,events=applied.value.events;
     const base={version:VERSION,exportedAt:new Date().toISOString(),room:roomValue,events,redactions:applied.redactions,exportHash:digest({room:roomValue,events})};
     if(!['1','true'].includes(String(request.query.includeArtifacts??'')))return base;
-    let total=0,artifactRedactions=0;const artifacts=store.list<Artifact>('artifacts',room.id).slice(0,200).flatMap(artifact=>{
-      try{const bytes=readFileSync(join(root,'artifacts',artifact.id));if(bytes.length>8*1024*1024||total+bytes.length>32*1024*1024)return [];total+=bytes.length;
+    let total=0,artifactRedactions=0;const omittedArtifacts:{artifactId:string;name:string;size?:number;reason:string}[]=[];const artifacts=store.list<Artifact>('artifacts',room.id).slice(0,200).flatMap(artifact=>{
+      try{const bytes=readFileSync(join(root,'artifacts',artifact.id));if(bytes.length>8*1024*1024){omittedArtifacts.push({artifactId:artifact.id,name:artifact.name,size:bytes.length,reason:'single_item_over_8MiB'});return [];}if(total+bytes.length>32*1024*1024){omittedArtifacts.push({artifactId:artifact.id,name:artifact.name,size:bytes.length,reason:'total_over_32MiB'});return [];}total+=bytes.length;
         const processed=redacted?redactArtifactContent(bytes,artifact.mediaType):{content:bytes,redactions:0,scanned:false};artifactRedactions+=processed.redactions;
-        return [{artifact,contentBase64:processed.content.toString('base64'),contentHash:digest(processed.content.toString('base64')),...(redacted?{scanned:processed.scanned}:{})}];}catch{return [];}
+        return [{artifact,contentBase64:processed.content.toString('base64'),contentHash:digest(processed.content.toString('base64')),...(redacted?{scanned:processed.scanned}:{})}];}catch{omittedArtifacts.push({artifactId:artifact.id,name:artifact.name,reason:'file_missing'});return [];}
     });
-    return {...base,redactions:base.redactions+artifactRedactions,artifacts,exportHash:digest({room:roomValue,events,artifactHashes:artifacts.map(item=>[item.artifact.id,item.contentHash])})};
+    return {...base,redactions:base.redactions+artifactRedactions,artifacts,omittedArtifacts,exportHash:digest({room:roomValue,events,artifactHashes:artifacts.map(item=>[item.artifact.id,item.contentHash])})};
   });
   app.get<{Params:{id:string;discussionId:string}}>('/api/rooms/:id/discussions/:discussionId/rounds',request=>{
     const room=store.room(request.params.id);if(!room)throw new ProtocolError('not_found','房间不存在',404);
