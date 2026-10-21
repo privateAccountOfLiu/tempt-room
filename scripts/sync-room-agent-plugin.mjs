@@ -23,6 +23,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 /** Fixed manifest: workspace source -> shipped plugin path. */
 const MANIFEST = [
   { from: 'scripts/room-agent-mcp.mjs', to: 'plugins/tempt-room-claude/server/room-agent-mcp.mjs' },
+  { from: 'scripts/room-image-transfer.mjs', to: 'plugins/tempt-room-claude/server/room-image-transfer.mjs' },
 ];
 
 const check = process.argv.slice(2).includes('--check');

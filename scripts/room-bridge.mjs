@@ -1,10 +1,12 @@
 import net from 'node:net';
 import readline from 'node:readline';
 import { createHash,randomUUID } from 'node:crypto';
+import { roomSendImage, roomSendImageTool, imageRoots } from './room-image-transfer.mjs';
 const bridgeInstance=randomUUID();
 const tools = [
   { name: 'room_read', description: 'Read the current room history and accepted decisions.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'room_post', description: 'Post a public message as yourself. Mentions do not grant execution authority.', inputSchema: { type: 'object', properties: { text: { type: 'string' }, mentions: { type: 'array', items: { type: 'string' } } }, required: ['text'], additionalProperties: false } },
+  { name: 'room_post', description: 'Post a public message as yourself. Mentions do not grant execution authority. Use attachments returned by image uploads for image messages.', inputSchema: { type: 'object', properties: { text: { type: 'string' }, mentions: { type: 'array', items: { type: 'string' } }, replyTo: { type: 'string' }, attachments: { type: 'array', items: { type: 'string' }, maxItems: 10 } }, additionalProperties: false } },
+  roomSendImageTool,
   { name: 'task_propose', description: 'Propose a task for human review; never authorizes execution.', inputSchema: { type: 'object', properties: { title: { type: 'string' }, agentId: { type: 'string' } }, required: ['title', 'agentId'], additionalProperties: false } },
   { name: 'artifact_publish', description: 'Publish a text report as an artifact in this room.', inputSchema: { type: 'object', properties: { name: { type: 'string' }, text: { type: 'string' } }, required: ['name', 'text'], additionalProperties: false } }
 ];
@@ -36,8 +38,17 @@ for await (const line of lines) {
       if (!tools.some(t => t.name === request.params?.name)) throw new Error('Unknown room tool');
       const {operationId:explicitId,...args}=request.params.arguments??{};
       const operationId=explicitId??'mcp_'+createHash('sha256').update(JSON.stringify([bridgeInstance,request.id])).digest('hex');
-      const response = await call(request.params.name,args,operationId);
-      result = { content: [{ type: 'text', text: JSON.stringify(response) }], isError: Boolean(response.error) };
+      if (request.params.name === 'room_send_image') {
+        try {
+          const image = await roomSendImage(call, {...args, operationId}, imageRoots());
+          result = { content: [{ type: 'text', text: JSON.stringify(image) }], isError: false };
+        } catch (error) {
+          result = { content: [{ type: 'text', text: JSON.stringify({ error: { code: error.code ?? 'image_transfer_failed', message: error.message, stage: error.stage, artifactId: error.artifactId } }) }], isError: true };
+        }
+      } else {
+        const response = await call(request.params.name,args,operationId);
+        result = { content: [{ type: 'text', text: JSON.stringify(response) }], isError: Boolean(response.error) };
+      }
     } else { process.stdout.write(JSON.stringify({ jsonrpc:'2.0', id:request.id, error:{code:-32601,message:'Method not found'} })+'\n'); continue; }
     process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result }) + '\n');
   } catch (e) { if (request?.id !== undefined) process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, error: { code: -32603, message: e.message } }) + '\n'); }

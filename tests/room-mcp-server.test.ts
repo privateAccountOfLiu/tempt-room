@@ -46,8 +46,8 @@ test('room MCP server exposes the full room tool set over stdio', async t => {
   child.stdin.write(JSON.stringify({jsonrpc: '2.0', method: 'notifications/initialized'}) + '\n');
   const listed = await request('tools/list', {});
   const names = listed.tools.map((tool: any) => tool.name);
-  for (const required of ['room_read', 'room_post', 'room_wait', 'session_inbox', 'session_ack', 'task_claim', 'task_complete', 'artifact_publish']) {
+  for (const required of ['room_read', 'room_post', 'room_wait', 'session_inbox', 'session_ack', 'task_claim', 'task_complete', 'artifact_publish', 'room_send_image']) {
     assert.ok(names.includes(required), `missing ${required}`);
   }
-  assert.equal(names.length, 13);
+  assert.equal(names.length, 14);
 });

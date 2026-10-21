@@ -31,8 +31,8 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | I01 图片协议、工具参数与权限 | verified | images.ts 冻结分块/元数据/操作 ID；artifact 图片元数据；image 工具名与写权限映射；attachment-only 消息；7+3 个用例通过；真实上传实现归 I02/I05 |
 | I02 有界可恢复的上传临时状态 | verified | image_uploads/parts 表 + migration 19、分块状态机、配额/TTL、原子落盘、缺失块检测、GC 与 Worker image 工具/删除房间失效接线完成；重启进程 E2E 仍由 I04 覆盖 |
 | I03 解码验真、原图与安全预览 | verified | sharp 0.35.5 + 签名/结构检查 + 完整解码 + 1920 PNG 预览 + 原子落盘/稳定 artifactId；Worker 三个低层工具已接线并通过 3+3 用例；bridge/helper 归 I04 |
-| I04 托管 bridge/host/AppContainer 传输 | in_progress | Worker executeTool/agentTool 已接上 begin/chunk/complete（托管 fence 与外部身份）并通过 3 个用例；bridge helper、toolchain 复制与真实 pipe chunk smoke 仍待实现 |
-| I05 外部 MCP、插件与 SDK 发图 | in_progress | Browser/Node SDK uploadImage/sendImage（Web Crypto、稳定 commandId、错误 stage）与 RoomAgentClient 方法已完成并通过 4 个用例；外部 MCP room_send_image、helper 与插件同步仍未接线 |
+| I04 托管 bridge/host/AppContainer 传输 | in_progress | Worker 三段式工具、room-image-transfer helper、bridge `room_send_image`、toolchain fingerprint/复制已接通并通过 3 个用例；真实 HostRoomPipe/AppContainer chunk smoke 仍待跑 |
+| I05 外部 MCP、插件与 SDK 发图 | in_progress | SDK 上传、外部 MCP `room_send_image`、路径边界/分块 helper、插件副本同步与 14 工具契约通过；真实 stdio→HTTP 丢回复/并发 e2e 仍待补 |
 | I06 安全内联路由与图片展示 | verified | 私有 `/api/artifacts/:id/image`（active/verified/hash/no-store）、缩略图、失败降级、键盘 Lightbox、纯图不渲染空 Markdown 已完成并通过 3 个接口用例与完整浏览器 E2E |
 | I07 跨功能竞态 | in_progress | 删房/移除成员/并行上传/丢回执重试/导出回放/删后审计 6 类竞态通过 6 个用例；`acceptance:room-images --check` 通过；托管取消、删除与最终 apply、最后房间重启组合仍未覆盖 |
 | V01 开发/发布报告分模式 | in_progress | schemaVersion 2、sourceBefore/sourceAfter、tracked/working/untracked+lockfile hash、`--release --expected-head` 前置失败 not_run、source_changed 检测与 checksPassed/releaseEligible 已完成并通过 5 个用例；真实 release 运行与 expected-head 参数化脚本入口待补 |
@@ -1166,6 +1166,66 @@ delivery/image-upload 细节与全入口 assertActiveRoom 仍待补）
   native-image-pipe smoke 仍需要 Windows sandbox 环境；evidence 路径中的
   acceptance-parallel 实际输出目录需以 CI 首跑确认
 下一张卡与依赖：V03（固定版本真实 CLI 与三组对照）
+```
+
+## I04/I05 — 连接器 room_send_image 与共享 helper
+
+```
+卡号与状态：I04/I05 补充切片 / 仍 in_progress（bridge/MCP 便利工具已接线；真实 pipe/stdin e2e 未跑）
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 45e45cd（V02 提交）；实现见本次提交
+修改文件和关键符号：
+  scripts/room-image-transfer.mjs（新增，无第三方依赖）
+    readLocalImage：拒绝 URL/UNC/设备/备用数据流、必须绝对路径、只能在
+      ROOM_IMAGE_ROOTS 或 cwd 内、检查 raw 路径每级 symlink、open+fstat+
+      完整读取+fstat/hash 二次校验；单文件 1B–10MiB
+    uploadImage/sendImage：begin→逐块 192KiB base64→complete→room_post，
+      稳定 imageOperationIds；错误保留 stage/commandId/artifactId，不打印
+      base64 或本地源路径；room_post 兼容 Receipt 包装
+    roomSendImage：MCP 便利入口，只读取 bytes 后再走低层工具
+  scripts/room-bridge.mjs
+    tools/list 增加 room_send_image（path/text/alt/mentions/replyTo/operationId）；
+    room_post 增加 attachments/replyTo、text 可选；tools/call 便利编排，
+    错误 isError + 稳定 code；低层调用仍一帧一块
+  scripts/room-agent-mcp.mjs
+    同样增加 room_send_image/room_post 参数；commandId 由显式 operationId 或
+    稳定请求派生；REAL/非图片工具错误维持原有 JSON-RPC 错误通道
+  scripts/sync-room-agent-plugin.mjs
+    MANIFEST 增加 scripts/room-image-transfer.mjs → 插件 server 副本；
+    --check 同时检查两个文件
+  apps/server/src/toolchain.ts
+    helper 来源加入 fingerprint 与复制清单：runtimes/tools/<fp>/node/room-image-transfer.mjs，
+    防旧 helper 继续运行
+  plugins/tempt-room-claude/server/*
+    同步后的 room-agent-mcp.mjs + room-image-transfer.mjs
+  tests/room-image-transfer.test.ts（新增 3 个用例）
+  tests/room-mcp-server.test.ts（工具数 13→14，新增 room_send_image）
+变更前触发条件 / 变更后行为：
+  变更前：connectors 只有 room_post 文本，不能本地读图/分块上传；MCP host
+  无法发图；toolchain 不识别 helper。
+  变更后：托管 bridge 与外部 MCP 都以 room_send_image 读取允许根内的本地
+  图片，分块上传后发一条纯图片/图文消息；插件副本与 toolchain 指纹一致。
+接口/事件/迁移/兼容性：
+  连接器工具面新增 room_send_image；服务端协议不变，仍走 image_upload_* +
+  room_post；无迁移；旧 room_post 文本调用兼容。
+执行命令、cwd、环境、开始结束、退出码：
+  node --check scripts/room-agent-mcp.mjs / room-bridge.mjs          exit 0
+  node scripts/sync-room-agent-plugin.mjs --check                     exit 0（2 files in-sync）
+  npx tsx --test tests/room-image-transfer.test.ts                     exit 0（3 pass / 0 fail）
+  npm run test:mcp-connectors                                         exit 0（15 pass / 0 fail）
+  npm test                                                             exit 0（532 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-22 03:20–04:10 CST
+证据路径：
+  .state/parallel-room-image/i04-i05-connectors-tests-20261022b.log
+实际覆盖的模式和失败分支：
+  允许根内读取→三段式上传→一条附件消息；缺失/越界/URL/UNC/symlink 拒绝；
+  两个 connector 的 room_send_image schema 一致；插件副本 byte-identical；
+  toolchain fingerprint 包含 helper；room_post Receipt 解包
+尚未验证项及明确错误：
+  真实 HostRoomPipe/AppContainer 管道分块 smoke 与外部 stdio→HTTP 端到端
+  （包括丢回复同 ID 重试、并发两张图）未跑；ROOM_IMAGE_ROOTS 各宿主注入
+  仍由 adapter 配置工作；真实连接器发图需用户运行环境验证
+下一张卡与依赖：V03（固定版本真实 CLI 与三组对照，需付费授权）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移

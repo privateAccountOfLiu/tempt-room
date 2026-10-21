@@ -1,5 +1,6 @@
 import readline from 'node:readline';
 import { createHash, randomUUID } from 'node:crypto';
+import { roomSendImage, roomSendImageTool, imageRoots } from './room-image-transfer.mjs';
 
 /**
  * External room MCP connector.
@@ -22,7 +23,8 @@ const connectorId = randomUUID();
 const tools = [
   { name: 'room_read', description: 'Read this room: recent messages, members and accepted decisions.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name:'room_inbox',description:'Read contiguous room events after a durable cursor. This does not acknowledge task context.',inputSchema:{type:'object',properties:{afterSeq:{type:'integer',minimum:0},limit:{type:'integer',minimum:1,maximum:200}},additionalProperties:false} },
-  { name: 'room_post', description: 'Post a public message as yourself. Mentions do not grant execution authority.', inputSchema: { type: 'object', properties: { text: { type: 'string' }, mentions: { type: 'array', items: { type: 'string' } } }, required: ['text'], additionalProperties: false } },
+  { name: 'room_post', description: 'Post a public message as yourself. Mentions do not grant execution authority. Use attachments returned by image uploads for image messages.', inputSchema: { type: 'object', properties: { text: { type: 'string' }, mentions: { type: 'array', items: { type: 'string' } }, replyTo: { type: 'string' }, attachments: { type: 'array', items: { type: 'string' }, maxItems: 10 } }, additionalProperties: false } },
+  roomSendImageTool,
   { name: 'task_propose', description: 'Propose a task for human review. Optional dependencies are task ids in this room; the human still has to accept it.', inputSchema: { type: 'object', properties: { title: { type: 'string' }, agentId: { type: 'string' }, dependencies: { type: 'array', items: { type: 'string' } } }, required: ['title', 'agentId'], additionalProperties: false } },
   { name: 'task_claim', description: 'Claim an open task in this room. External connectors claim without starting a Tempt Room managed run, then finish it with task_complete.', inputSchema: { type: 'object', properties: { taskId: { type: 'string' } }, required: ['taskId'], additionalProperties: false } },
   { name: 'task_context', description: 'Read a bounded context delta for your active external task lease. Reconcile your existing candidate with the returned input; fetch further pages while hasMore. Use the returned contextToken in task_complete. This does not renew the lease or authorize new work.', inputSchema: {type:'object',properties:{taskId:{type:'string'},taskVersion:{type:'integer',minimum:1},generation:{type:'integer',minimum:1}},required:['taskId','taskVersion'],additionalProperties:false} },
@@ -35,12 +37,12 @@ const tools = [
   { name:'session_ack', description:'Acknowledge specific pending inbox deliveries for your explicit AgentSession. Repeating the same acknowledgement is idempotent.', inputSchema:{ type:'object', properties:{ agentSessionId:{type:'string'}, deliveryIds:{type:'array',items:{type:'string'},minItems:1,maxItems:500} }, required:['agentSessionId','deliveryIds'], additionalProperties:false } },
 ];
 
-async function call(name, args, requestId) {
+async function call(name, args, commandId) {
   if (!token || !roomId) throw new Error('缺少 ROOM_AGENT_TOKEN 或 ROOM_ROOM_ID');
   const response = await fetch(base + '/api/agent/tool', {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token, 'room-protocol-version': '0.1' },
-    body: JSON.stringify({ commandId: `mcp_${connectorId}_${createHash('sha256').update(JSON.stringify(requestId)).digest('hex')}`, roomId, name, arguments: args ?? {} })
+    body: JSON.stringify({ commandId, roomId, name, arguments: args ?? {} })
   });
   const text = await response.text();
   let body;
@@ -62,8 +64,20 @@ for await (const line of lines) {
     else if (request.method === 'tools/list') result = { tools };
     else if (request.method === 'tools/call') {
       if (!tools.some(tool => tool.name === request.params?.name)) throw new Error('Unknown room tool');
-      const response = await call(request.params.name, request.params.arguments ?? {}, request.id);
-      result = { content: [{ type: 'text', text: JSON.stringify(response) }], isError: Boolean(response?.error) };
+      const {operationId:explicitId,...args}=request.params.arguments??{};
+      const rootOperationId=explicitId??`mcp_${createHash('sha256').update(JSON.stringify([connectorId,request.id])).digest('hex')}`;
+      const commandId=`mcp_${connectorId}_${createHash('sha256').update(JSON.stringify([request.id,request.params.name])).digest('hex')}`;
+      if (request.params.name === 'room_send_image') {
+        try {
+          const image = await roomSendImage(call, {...args, operationId: rootOperationId}, imageRoots());
+          result = { content: [{ type: 'text', text: JSON.stringify(image) }], isError: false };
+        } catch (error) {
+          result = { content: [{ type: 'text', text: JSON.stringify({ error: { code: error.code ?? 'image_transfer_failed', message: error.message, stage: error.stage, artifactId: error.artifactId } }) }], isError: true };
+        }
+      } else {
+        const response = await call(request.params.name, args, explicitId ? `mcp_${createHash('sha256').update(explicitId).digest('hex')}` : commandId);
+        result = { content: [{ type: 'text', text: JSON.stringify(response) }], isError: Boolean(response?.error) };
+      }
     } else { process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, error: { code: -32601, message: 'Method not found' } }) + '\n'); continue; }
     process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result }) + '\n');
   } catch (error) {

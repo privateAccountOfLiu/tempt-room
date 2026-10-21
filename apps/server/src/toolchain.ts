@@ -47,9 +47,9 @@ async function materialize(root:string):Promise<Toolchain> {
   const gitSource=process.env.ROOM_SANDBOX_GIT?resolve(process.env.ROOM_SANDBOX_GIT):await find('git.exe');if(!gitSource||!existsSync(gitSource))throw new Error('找不到 Git for Windows，请安装 Git 后重启服务');
   const gitDirectory=['cmd','bin'].includes(basename(dirname(gitSource)).toLowerCase())?dirname(dirname(gitSource)):dirname(gitSource);
   if(!existsSync(join(gitDirectory,'mingw64','bin','git.exe')))throw new Error('需要标准 Git for Windows 运行文件（mingw64/bin/git.exe）');
-  const bridgeSource=resolve('scripts/room-bridge.mjs'),compatSource=resolve('scripts/room-realpath.cjs'),pipesSource=resolve('scripts/room-pipes.cjs'),deepseekSource=resolve('scripts/room-deepseek.cjs'),nativePipes=resolve('sandbox/RoomPipeCompat/bin/x64/room-pipe-compat.node');
+  const bridgeSource=resolve('scripts/room-bridge.mjs'),imageTransferSource=resolve('scripts/room-image-transfer.mjs'),compatSource=resolve('scripts/room-realpath.cjs'),pipesSource=resolve('scripts/room-pipes.cjs'),deepseekSource=resolve('scripts/room-deepseek.cjs'),nativePipes=resolve('sandbox/RoomPipeCompat/bin/x64/room-pipe-compat.node');
   if(!existsSync(nativePipes))throw new Error('请先运行 npm run build:pipe-compat，编译隔离 Node 管道兼容模块');
-  const fingerprint=createHash('sha256').update(await readFile(nodeSource)).update(await readFile(join(gitDirectory,'mingw64','bin','git.exe'))).update(await readFile(bridgeSource)).update(await readFile(compatSource)).update(await readFile(pipesSource)).update(await readFile(deepseekSource)).update(await readFile(nativePipes)).update(await readFile(join(npmSource,'package.json'))).digest('hex').slice(0,24);
+  const fingerprint=createHash('sha256').update(await readFile(nodeSource)).update(await readFile(join(gitDirectory,'mingw64','bin','git.exe'))).update(await readFile(bridgeSource)).update(await readFile(imageTransferSource)).update(await readFile(compatSource)).update(await readFile(pipesSource)).update(await readFile(deepseekSource)).update(await readFile(nativePipes)).update(await readFile(join(npmSource,'package.json'))).digest('hex').slice(0,24);
   const destination=join(root,'runtimes','tools',fingerprint),complete=join(destination,'complete.json');
   if(!existsSync(complete)){
     const temporary=destination+'.preparing-'+randomUUID();await mkdir(temporary,{recursive:true});
@@ -62,6 +62,7 @@ async function materialize(root:string):Promise<Toolchain> {
       const from=join(gitDirectory,part);if(existsSync(from))await copyRuntimeTree(from,join(temporary,'git',part),budget);
     }
     await copyFile(bridgeSource,join(nodeTarget,'room-bridge.mjs'));
+    await copyFile(imageTransferSource,join(nodeTarget,'room-image-transfer.mjs'));
     await copyFile(compatSource,join(nodeTarget,'room-realpath.cjs'));
     await copyFile(pipesSource,join(nodeTarget,'room-pipes.cjs'));
     await copyFile(nativePipes,join(nodeTarget,'room-pipe-compat.node'));
