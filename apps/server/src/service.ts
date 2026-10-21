@@ -62,7 +62,15 @@ export class RoomService {
       case 'room.create': {
         const input = z.object({ name: z.string().trim().min(1).max(80), description: z.string().max(300).default(''), members: z.array(z.string()).default([]) }).parse(p);
         for (const id of input.members) if (!this.store.get('agents', id)) throw new ProtocolError('invalid_member', '成员不存在');
-        const room = { id: uid('room'), ...input, createdAt: now(), seq: 0 }; this.store.putRoom(room,actor); return { roomId: room.id };
+        const room = { id: uid('room'), ...input, members: [...new Set(input.members)], revision: 1, status: 'active' as const, createdAt: now(), seq: 0 }; this.store.putRoom(room,actor); return { roomId: room.id };
+      }
+      case 'room.configure': {
+        // R02 owns the transactional settings/members update.
+        throw new ProtocolError('not_implemented', '房间设置命令尚未启用', 409);
+      }
+      case 'room.delete': {
+        // R03 owns deletion request/cleanup.
+        throw new ProtocolError('not_implemented', '房间删除命令尚未启用', 409);
       }
       case 'room.update': {
         const roomId = this.requireRoom(command), room = this.store.room(roomId)!;

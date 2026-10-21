@@ -30,6 +30,46 @@
     ]
   },
   {
+    "type": "room.configured",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "room",
+    "schemaVersion": 1,
+    "kinds": [
+      "room.configured"
+    ]
+  },
+  {
+    "type": "room.deleting",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "room",
+    "schemaVersion": 1,
+    "kinds": [
+      "room.lifecycle"
+    ]
+  },
+  {
+    "type": "room.deletion.updated",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "room",
+    "schemaVersion": 1,
+    "kinds": [
+      "room.lifecycle"
+    ]
+  },
+  {
+    "type": "room.deleted",
+    "durability": "durable",
+    "aggregate": "room",
+    "projector": "room",
+    "schemaVersion": 1,
+    "kinds": [
+      "room.lifecycle"
+    ]
+  },
+  {
     "type": "chat.message.created",
     "durability": "durable",
     "aggregate": "room",

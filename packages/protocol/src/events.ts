@@ -11,9 +11,10 @@ import { integrationSchema } from './integration.ts';
 import { usageSampleSchema } from './usage.ts';
 import { budgetReservationSchema } from './budget-reservation.ts';
 import { resourceLeaseSchema } from './resource-lease.ts';
+import { roomSchema } from './room.ts';
 
 const id=z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/);
-const room=z.object({id,name:z.string(),description:z.string(),members:z.array(id),createdAt:z.string().datetime(),seq:z.number().int().nonnegative()}).passthrough();
+const room = roomSchema.passthrough();
 const decision=z.object({id,roomId:id.optional(),text:z.string(),accepted:z.boolean(),actor:actorSchema}).passthrough();
 const body=(fields:Record<string,z.ZodType>)=>z.object(fields).passthrough();
 export const projectionTableNames=['messages','tasks','runs','artifacts','discussions','decisions','contexts','operations','agent_sessions','subscriptions','inbox_deliveries','input_batches','wake_intents','capability_evidence','discussion_rounds','project_bindings','integrations','usage_samples','budget_reservations','resource_leases','capability_evidence_history'] as const;
@@ -34,6 +35,8 @@ function register(types:string[],kind:EventDefinition['kind'],aggregate:EventDef
 }
 register(['room.created','room.updated'],'room.state','room','room',body({room}));
 register(['room.members.updated'],'room.members','room','room',body({members:z.array(id)}));
+register(['room.configured'],'room.configured','room','room',body({room,addedMemberIds:z.array(id),removedMemberIds:z.array(id)}));
+register(['room.deleting','room.deletion.updated','room.deleted'],'room.lifecycle','room','room',body({room}));
 register(['chat.message.created','message.posted'],'message.posted','room','message',body({message:messageSchema.passthrough()}));
 register(['task.created'],'task.created','task','task',body({task:taskSchema.passthrough()}));
 register(['task.updated','task.accepted','task.completed','task.state'],'task.state','task','task',body({task:taskSchema.passthrough()}));

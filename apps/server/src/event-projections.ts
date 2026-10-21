@@ -1,5 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
-import { eventRegistry, projectionTableNames,validateRunTransition,PARTIAL_INTERVAL_MS,terminalStates, type ProjectionTable, type Room, type RoomEvent, type RoomSnapshot, type AgentDescriptor } from '../../../packages/protocol/src/index.ts';
+import { eventRegistry, projectionTableNames,validateRunTransition,PARTIAL_INTERVAL_MS,terminalStates,normalizeRoom, type ProjectionTable, type Room, type RoomEvent, type RoomSnapshot, type AgentDescriptor } from '../../../packages/protocol/src/index.ts';
 
 /** Stable JSON bytes, with the same undefined/array semantics as JSON.stringify. */
 export function projectionJson(value:unknown):string {
@@ -31,8 +31,24 @@ export function projectEvent(sink:ProjectionSink,event:RoomEvent){
   };
   switch(definition.projector){
     case 'room':{
-      const value=payload.room??{...sink.room()!,members:payload.members};
-      if(value.id!==event.roomId)throw new Error('Room projection identity mismatch');
+      const previous=sink.room();
+      const value=payload.room??(previous?{...previous,members:payload.members}:undefined);
+      if(!value||value.id!==event.roomId)throw new Error('Room projection identity mismatch');
+      if(event.schemaVersion!==0&&previous){
+        const before=normalizeRoom(previous),after=normalizeRoom(value);
+        if(after.revision<before.revision)throw new Error('Room revision cannot decrease');
+        if(before.status==='deleted'&&after.status!=='deleted')throw new Error('Deleted room cannot become active again');
+        if(before.status==='deleted'&&event.type==='room.configured')throw new Error('Deleted room cannot accept configuration');
+        if(event.type==='room.deleting'&&after.status!=='deleting')throw new Error('room.deleting must move the room to deleting');
+        if(event.type==='room.deleted'&&after.status!=='deleted')throw new Error('room.deleted must move the room to deleted');
+        if(event.type==='room.configured'){
+          const added=new Set(after.members.filter((member: string)=>!before.members.includes(member))),removed=new Set(before.members.filter((member: string)=>!after.members.includes(member)));
+          if([...(payload.addedMemberIds??[])].sort().join(',')!==[...added].sort().join(',')||[...(payload.removedMemberIds??[])].sort().join(',')!==[...removed].sort().join(','))throw new Error('Room member diff does not match the configured room');
+        }
+        if(event.type==='room.deletion.updated'&&before.deletion&&after.deletion){
+          if(before.deletion.requestedAt!==after.deletion.requestedAt||before.deletion.requestedBy!==after.deletion.requestedBy||before.deletion.commandId!==after.deletion.commandId)throw new Error('Deletion request identity cannot change');
+        }
+      }
       sink.putRoom(value,event.seq);break;
     }
     case 'message':{

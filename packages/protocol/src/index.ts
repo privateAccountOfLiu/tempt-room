@@ -12,10 +12,12 @@ export { runFenceSchema,toolOperationSchema,nativeOperationSchema,nativeReconcil
 export { classifyFailure, type FailureInfo, type FailureKind } from './failure.ts';
 export {contextPolicySchema,contextDeltaSchema,taskContextSchema,contextSeqOf,type ContextPolicy,type ContextDelta,type TaskContext} from './reconciliation.ts';
 import {contextPolicySchema,type ContextPolicy,type TaskContext} from './reconciliation.ts';
+import {roomConfigurePayloadSchema,roomDeletePayloadSchema,type Room} from './room.ts';
 export {runStatusSchema,terminalStates,runPartialSchema,PARTIAL_INTERVAL_MS,PARTIAL_MAX_BYTES,validateRunTransition,type RunStatus,type RunPartial} from './run-state.ts';
 import type {RunStatus,RunPartial} from './run-state.ts';
 
 export {discussionSchema,discussionBallotSchema,parseDiscussionReply,defaultDiscussionResponses,type DiscussionBallot} from './discussion.ts';
+export {roomSchema,roomStatusSchema,roomDeletionSchema,normalizeRoom,type Room,type RoomStatus,type RoomDeletion,type NormalizedRoom} from './room.ts';
 export {taskContractSchema,taskAcceptanceSchema,taskDependencyConditionSchema,type TaskContract,type TaskAcceptance,type TaskDependencyCondition} from './task-contract.ts';
 export {projectBindingSchema,projectManifestEntrySchema,projectExecutionModeSchema,type ProjectBinding,type ProjectManifestEntry} from './project-binding.ts';
 export {taskAcceptanceStatusSchema,taskAcceptanceCheckSchema,dependencyRequirementSchema,taskVerificationRecordSchema,type TaskAcceptanceStatus,type DependencyRequirement,type TaskVerificationRecord,type DependencyRequirementKind} from './task-acceptance.ts';
@@ -87,6 +89,8 @@ const commandEnvelope = z.object({
 const title=z.string().trim().min(1).max(5000);
 export const payloadSchemas={
   'room.create':z.object({name:z.string().trim().min(1).max(80),description:z.string().max(300).default(''),members:z.array(idSchema).max(30).default([])}).strict(),
+  'room.configure':roomConfigurePayloadSchema,
+  'room.delete':roomDeletePayloadSchema,
   'room.update':z.object({name:z.string().trim().min(1).max(80),description:z.string().max(300).default('')}).strict(),
   'room.members.set':z.object({members:z.array(idSchema).max(30)}).strict(),
   'message.send':z.object({text:z.string().trim().min(1).max(32000),mentions:z.array(idSchema).max(20).default([]),replyTo:idSchema.optional(),attachments:z.array(idSchema).max(10).default([])}).strict(),
@@ -137,7 +141,6 @@ export type AgentToolName=z.infer<typeof agentToolNameSchema>;
 export const agentToolCallSchema=z.object({commandId:idSchema,roomId:idSchema,name:agentToolNameSchema,arguments:z.record(z.string(),z.unknown()).default({})}).strict();
 export type AgentToolCall=z.infer<typeof agentToolCallSchema>;
 export interface ServerCapabilities {version:typeof VERSION;supportedVersions:(typeof VERSION)[];clientType:'browser'|'sdk';actor:Actor;commands:string[];messageFormats:string[];visibility:['room-public'];transports:['http','websocket'];}
-export interface Room { id: string; name: string; description: string; members: string[]; createdAt: string; seq: number }
 export interface Message { supersedes?:string; final?:boolean; id: string; roomId: string; actor: Actor; text: string; mentions: string[]; replyTo?: string; attachments: string[]; createdAt: string; runId?: string;taskId?:string;taskVersion?:number; basedOnSeq?: number; generation?:number; executionId?:string; stale?: boolean; trust?: 'owner'|'managed'|'external'|'remote' }
 export interface RunContext { fromSeq:number;throughSeq:number;messages:Message[];decisions:Decision[];members:{id:string;name:string;role:string}[] }
 export interface Run { traceId?:string; resourceLeaseId?:string; sessionLeaseId?:string; effectScope?:'conversation-only'|'unrestricted'; usageByGeneration?:Record<string,NonNullable<Run['usage']>>; contextPolicy?:ContextPolicy; contextSeq?:number; deltaContextId?:string; contextRound?:number; contextPending?:boolean; contextConfirmedSeq?:number; lifecycleVersion?:1; partial?:RunPartial; finalMessageId?:string; stopReason?:'superseded'|'user_cancel'; generation?:number; executionId?:string; leaseUntil?:string; id: string; roomId: string; agentId: string; status: RunStatus; prompt: string; basedOnSeq: number; contextId?:string; limits?:RunLimits; inputArtifacts?:string[];dependencyVersions?:Record<string,number>;taskId?: string; discussionId?: string; discussionRole?:'summary'; discussionBallot?:DiscussionBallot; round?: number; taskVersion?: number; autoRetryOf?: string; autoRetryCount?: number; wakeChainDepth?: number; recoveryCount?: number; agentSessionId?: string; inputBatchId?: string; inputDeliveryMode?: import('./collaboration.ts').InputDeliveryMode; operationScopeId?: string; responseSlotId?: string; startedAt?: string; finishedAt?: string; adapterFingerprint?: string; projectBindingId?: string; bindingVersion?: number; sourceCommit?: string; dirtyBaselineHash?: string; /** Managed immutable baseline this run materialised from. */ baselineId?:string; /** Frozen workspace mode of this run. */ workspaceMode?:'isolated'|'source'; workspacePath?: string; nativeSessionId?: string; codex?: CodexRunState; remoteTaskId?:string; sandbox?: SandboxProfile & { verifiedAt:string }; cleanupProof?: {checkedAt:string;remainingProcesses:number;remainingProcessesKnown?:boolean;evidence:string;exitCode?:number}; externalReads?: {kind:'file'|'database'|'network';source:string;version?:string;hash?:string;fetchedAt:string}[]; error?: string; createdAt: string; updatedAt: string; usage?: { inputTokens?: number; outputTokens?: number; costUsd?: number;scope?:'run'|'last-request'|'session-total' }; }

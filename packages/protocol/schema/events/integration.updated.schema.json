@@ -60,6 +60,26 @@
           "type": "string",
           "pattern": "^[a-f0-9]{64}$"
         },
+        "verifiedTargetManifestHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "stagedManifestHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "appliedTargetManifestHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "appliedArtifactSetHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "verifierManifestHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
         "expectedTargetVersion": {
           "type": "integer",
           "exclusiveMinimum": 0,

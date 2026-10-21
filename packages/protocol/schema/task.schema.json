@@ -16,6 +16,13 @@
           "minLength": 1,
           "maxLength": 20000
         },
+        "workspaceMode": {
+          "type": "string",
+          "enum": [
+            "isolated",
+            "source"
+          ]
+        },
         "projectBinding": {
           "type": "object",
           "properties": {

@@ -5,7 +5,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { VERSION, capabilitiesFor, executionSettingsSchema,eventSchema,eventMetadata,EventContractError,projectionTableNames,type ProjectionTable,type ExecutionSettings, type Actor, type AgentDescriptor, type Room, type RoomEvent, type RoomSnapshot, type Run, type Task, type Discussion,type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { MemoryProjectionSink,SqlProjectionSink,projectEvent,projectionJson } from './event-projections.ts';
 import type { EventStore } from './ports/event-store.ts';
-export const DATABASE_VERSION=16;
+export const DATABASE_VERSION=18;
 
 export const uid = (prefix = 'id') => `${prefix}_${randomUUID().replaceAll('-', '')}`;
 export const now = () => new Date().toISOString();
@@ -111,13 +111,15 @@ CREATE TABLE IF NOT EXISTS capability_evidence_history(id TEXT PRIMARY KEY, room
         CREATE UNIQUE INDEX IF NOT EXISTS runs_response_slot ON runs(json_extract(body,'$.responseSlotId')) WHERE json_extract(body,'$.responseSlotId') IS NOT NULL;
         CREATE UNIQUE INDEX IF NOT EXISTS runs_agent_session_active ON runs(json_extract(body,'$.agentSessionId')) WHERE json_extract(body,'$.agentSessionId') IS NOT NULL AND json_extract(body,'$.status') NOT IN ('completed','failed','canceled','superseded','interrupted','unknown');
         PRAGMA user_version=10;`);
-    if(version<11)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS project_bindings(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS project_bindings_room ON project_bindings(room_id); CREATE UNIQUE INDEX IF NOT EXISTS project_binding_room_version ON project_bindings(room_id,json_extract(body,'$.version')); PRAGMA user_version=11;`);});
-    if(version<12)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS integrations(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS integrations_room ON integrations(room_id); PRAGMA user_version=12;`);});
-    if(version<13)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS usage_samples(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS usage_samples_room ON usage_samples(room_id); PRAGMA user_version=13;`);});
-    if(version<14)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS budget_reservations(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS budget_reservations_room ON budget_reservations(room_id); PRAGMA user_version=14;`);});
-    if(version<15)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS resource_leases(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS resource_leases_room ON resource_leases(room_id); PRAGMA user_version=15;`);});
-    if(version<16)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS capability_evidence_history(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS capability_evidence_history_room ON capability_evidence_history(room_id); PRAGMA user_version=16;`);});
     });
+if(version<11)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS project_bindings(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS project_bindings_room ON project_bindings(room_id); CREATE UNIQUE INDEX IF NOT EXISTS project_binding_room_version ON project_bindings(room_id,json_extract(body,'$.version')); PRAGMA user_version=11;`);});
+if(version<12)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS integrations(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS integrations_room ON integrations(room_id); PRAGMA user_version=12;`);});
+if(version<13)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS usage_samples(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS usage_samples_room ON usage_samples(room_id); PRAGMA user_version=13;`);});
+if(version<14)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS budget_reservations(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS budget_reservations_room ON budget_reservations(room_id); PRAGMA user_version=14;`);});
+if(version<15)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS resource_leases(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS resource_leases_room ON resource_leases(room_id); PRAGMA user_version=15;`);});
+if(version<16)this.atomic(()=>{this.db.exec(`CREATE TABLE IF NOT EXISTS capability_evidence_history(id TEXT PRIMARY KEY, room_id TEXT NOT NULL, body TEXT NOT NULL, as_of_seq INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS capability_evidence_history_room ON capability_evidence_history(room_id); PRAGMA user_version=16;`);});
+    if(version<17)this.atomic(()=>this.db.exec('PRAGMA user_version=17'));
+    if(version<18)this.atomic(()=>this.db.exec('PRAGMA user_version=18'));
     this.seed();
     this.atomic(() => {
       for (const run of this.list<Run>('runs')) if (['running', 'waiting_input', 'cancel_requested'].includes(run.status) || (run.status==='queued' && run.codex)) {
@@ -316,7 +318,7 @@ CREATE TABLE IF NOT EXISTS capability_evidence_history(id TEXT PRIMARY KEY, room
       ]) this.put('agents', { executable: '', endpoint: '', model: '', credentialEnv: '', version: '',runtimeDirectory:'',executionMode:'sandbox',responseFormat:'text',connectionMode:'managed', enabled: false, ...agent,capabilities:capabilitiesFor(agent.provider as AgentDescriptor['provider']) } as AgentDescriptor);
     }
     if (this.rooms().length === 0) this.atomic(() => {
-      const room: Room = { id: uid('room'), name: '项目工作室', description: '把想法变成共同完成的工作', members: this.list<AgentDescriptor>('agents').map(a => a.id), createdAt: now(), seq: 0 };
+      const room: Room = { id: uid('room'), name: '项目工作室', description: '把想法变成共同完成的工作', members: [...new Set(this.list<AgentDescriptor>('agents').map(a => a.id))], revision: 1, status: 'active', createdAt: now(), seq: 0 };
       this.putRoom(room,OWNER);
       const message = { id: uid('msg'), roomId: room.id, actor: SYSTEM, text: '欢迎来到工作室。使用 @ 点名成员，或开启一场有目标的讨论。演示成员无需模型额度；真实 Agent 需先配置并通过沙箱诊断。', mentions: [], attachments: [], createdAt: now() };
       this.event(room.id, 'chat.message.created', SYSTEM, { message });

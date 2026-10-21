@@ -23,7 +23,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | P04 staging 精确组合 | verified | staging 由当前已认可目标 + 候选组成；目标/候选/verifier 篡改与无关文件变化均在 apply 前拒绝；journal 记录目标前后摘要 |
 | P05 双启动屏障与真实派发 | verified | 可控 adapter 由真实 Worker 派发；两个 Run 同时进入后才释放，独立工作区、真实产物、owner 验收和 integration 全链路通过 |
 | P06 M1 七项可失败用例 | in_progress | 1–6 的模拟切片已覆盖（并发=1 负例、共同基线、整体组合、局部失败/重试、幂等/fence、同文件冲突保留双方 patch）；第 7 项真实 CLI 对照依赖 V03 尚未执行 |
-| R01 Room schema/事件/迁移 | not_started | |
+| R01 Room schema/事件/迁移 | verified | room.ts 统一 schema/normalizeRoom；新增 room.configured/deleting/deletion.updated/deleted 与状态守卫；迁移整理为 v10→v18 有序升级；生成物更新 |
 | R02 单事务保存房间设置与成员 | not_started | |
 | R03 删除请求、停止执行与清理 | not_started | |
 | R04 API、WebSocket、SDK 与列表语义 | not_started | |
@@ -404,6 +404,67 @@ P02 后续补充（第 5 轮已覆盖）：
   第 7 项“真实实验与对照”未执行：需要按 V03 固定两个真实 CLI 版本并记录
   可观察执行区间；本卡当前只关闭模拟切片，不能宣称 P06 全量完成
 下一张卡与依赖：V03（固定版本真实 CLI 与三组对照）；P06 剩余第 7 项依赖它
+```
+
+## R01 — Room schema、事件和迁移先定义清楚
+
+```
+卡号与状态：R01 / verified（schema/事件/迁移/生成物完成；R02/R03 的业务命令实现不在本卡）
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 6af0d53（P02 补充提交）；实现见本次提交
+修改文件和关键符号：
+  packages/protocol/src/room.ts（新增）
+    roomStatusSchema / roomDeletionSchema / roomSchema / normalizeRoom；
+    roomConfigurePayloadSchema（name/description/members/expectedRevision）；
+    roomDeletePayloadSchema（expectedRevision）
+  packages/protocol/src/index.ts
+    删除手写 Room 接口，改为从 room.ts 推导/导出；payloadSchemas 增加
+    room.configure、room.delete
+  packages/protocol/src/events.ts
+    room 局部 schema 改为统一 roomSchema；注册 room.configured（携带完整
+    room + addedMemberIds/removedMemberIds）与 room.deleting/deletion.updated/
+    deleted（均为 room projector 的状态事件）
+  apps/server/src/event-projections.ts
+    room 投影加入前后状态检查：禁止 deleted→active、删除后接受配置、
+    revision 倒退、deletion 请求身份变化；room.configured 的成员差集必须
+    与 added/removedMemberIds 一致；旧事件仍按当时 payload 回放
+  apps/server/src/service.ts
+    room.create 显式写入 revision=1/status=active 并去重 members；
+    room.configure/room.delete 已进入 command schema，但业务实现保留为
+    显式 not_implemented（R02/R03 负责）
+  apps/server/src/store.ts
+    DATABASE_VERSION 16→18；修复 v11–v16 迁移嵌在 if(version<10) 内的问题，
+    改为 v10/v11/.../v16/v17/v18 独立有序迁移；每步事务成功后推进 user_version
+  scripts/schema.ts + packages/protocol/schema/**
+    新增 room.schema.json 与 room.configured/deleted/deleting/
+    deletion.updated 事件 schema；重新生成 command/event-registry 及相关事件 schema
+变更前触发条件 / 变更后行为：
+  变更前：Room 形状在 index.ts、events.ts、store 读取三处分散；没有状态事件，
+  无法表达删除中/已删除；v11–v16 迁移在 v10 条件内，v10 数据库无法补齐新表。
+  变更后：一个 roomSchema + normalizeRoom 读取默认；生命周期是独立状态事件；
+  v10/v11/v16 数据库都能沿有序迁移到达 v18；旧事件字节不被重写。
+接口/事件/迁移/兼容性：
+  新字段 revision/status/deletion 均为可选，旧事件仍可重放；normalizeRoom
+  只用于读取，不写旧事件。新增事件 schema、命令 schema；DATABASE_VERSION=18；
+  旧客户端未传 expectedRevision 的 room.update/members.set 兼容行为保留到 R02。
+执行命令、cwd、环境、开始结束、退出码：
+  npm run typecheck                                             exit 0
+  npx tsx --test tests/room-lifecycle.test.ts                    exit 0（5 pass / 0 fail）
+  npx tsx --test tests/event-replay.test.ts                      exit 0（16 pass / 0 fail）
+  npx tsx scripts/schema.ts                                     exit 0
+  npm test                                                      exit 0（473 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-21 20:05–20:35 CST
+证据路径：
+  .state/parallel-room-image/r01-tests-20261021.log
+实际覆盖的模式和失败分支：
+  旧 room 缺省字段 normalize；新房间 revision=1/status=active/成员去重；
+  room.configured/停删/已删状态事件；deleted→active、删除后配置、revision 倒退、
+  deletion 身份变化、成员差集不一致均被拒绝；snapshotAt 旧水位仍为 active；
+  v10 fixture 升级到 v18；重复打开；较新版本拒绝；历史 room 事件字节不变
+尚未验证项及明确原因：
+  room.configure/room.delete 的真实事务行为、API/WS/SDK 语义与 UI 在 R02–R05；
+  本卡只保证 schema/事件/迁移地基可用，不宣称房间设置/删除已对用户开放
+下一张卡与依赖：R02（一个事务保存房间设置与成员）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移
