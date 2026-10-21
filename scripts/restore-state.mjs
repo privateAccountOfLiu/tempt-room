@@ -5,6 +5,7 @@
 //   npm run restore -- --latest
 //   npm run restore -- --backup .state/backups/<timestamp>
 import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { join, resolve } from 'node:path';
 
@@ -47,10 +48,26 @@ if (existsSync(dbPath)) {
 }
 for (const suffix of ['-wal', '-shm']) { try { rmSync(dbPath + suffix, { force: true }); } catch { /* best effort */ } }
 copyFileSync(snapshotPath, dbPath);
-if (existsSync(join(backup, 'artifacts'))) {
-  mkdirSync(join(root, 'artifacts'), { recursive: true });
-  cpSync(join(backup, 'artifacts'), join(root, 'artifacts'), { recursive: true });
+const restoredDataDirs = [];
+for (const dir of ['artifacts', 'baselines', 'apply']) {
+  if (!existsSync(join(backup, dir))) continue;
+  mkdirSync(join(root, dir), { recursive: true });
+  cpSync(join(backup, dir), join(root, dir), { recursive: true, force: true });
+  restoredDataDirs.push(dir);
 }
+const manifestPath = join(backup, 'manifest.json');
+let restoredFiles = 0, fileMismatch = 0;
+if (existsSync(manifestPath)) {
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  for (const file of manifest.files ?? []) {
+    const absolute = join(root, ...String(file.path).split('/'));
+    if (!existsSync(absolute)) { fileMismatch += 1; continue; }
+    const hash = createHash('sha256').update(readFileSync(absolute)).digest('hex');
+    if (hash !== file.sha256) fileMismatch += 1; else restoredFiles += 1;
+  }
+}
+if (fileMismatch) { console.error(`恢复后文件校验失败：${fileMismatch} 个缺失或 hash 不匹配`); process.exitCode = 1; }
 const restored = new DatabaseSync(dbPath, { readOnly: true });
 try { console.log(`restore: ${backup}`); console.log(`restored user_version=${restored.prepare('PRAGMA user_version').get().user_version} rooms=${restored.prepare('SELECT COUNT(*) AS count FROM rooms').get().count} (backup had user_version=${info.userVersion} rooms=${info.rooms})`); }
 finally { restored.close(); }
+console.log(`restoredDataDirs=${restoredDataDirs.join(',') || 'none'} files=${restoredFiles}`);

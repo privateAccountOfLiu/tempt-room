@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { join, resolve } from 'node:path';
 import { createApp } from '../apps/server/src/app.ts';
@@ -18,6 +18,13 @@ test('backup command captures a consistent snapshot and restore command applies 
   const project = resolve('.');
   const { app } = await createApp({ root: source, token: 'backup-test', startWorker: false });
   await app.close();
+  mkdirSync(join(source, 'artifacts'), { recursive: true });
+  mkdirSync(join(source, 'baselines'), { recursive: true });
+  mkdirSync(join(source, 'apply'), { recursive: true });
+  writeFileSync(join(source, 'artifacts', 'artifact_fixture'), 'image-bytes');
+  writeFileSync(join(source, 'artifacts', 'artifact_fixture.preview.png'), 'preview-bytes');
+  writeFileSync(join(source, 'baselines', 'baseline_fixture'), 'baseline-bytes');
+  writeFileSync(join(source, 'apply', 'journal_fixture'), 'journal-bytes');
   const env = { ...process.env, ROOM_STATE_DIR: source };
   const backup = spawnSync(process.execPath, [join(project, 'scripts', 'backup-state.mjs')], { cwd: project, env, encoding: 'utf8' });
   assert.equal(backup.status, 0, backup.stderr);
@@ -26,6 +33,12 @@ test('backup command captures a consistent snapshot and restore command applies 
   const stamp = readdirSync(backupsDir).filter(name => existsSync(join(backupsDir, name, 'room.sqlite'))).sort().at(-1);
   assert.ok(stamp);
   assert.equal(existsSync(join(backupsDir, stamp!, 'manifest.json')), true);
+  const manifest = JSON.parse(readFileSync(join(backupsDir, stamp!, 'manifest.json'), 'utf8'));
+  assert.equal(manifest.consistency.consistent, true);
+  assert.ok(manifest.files.some((file: any) => file.path === 'artifacts/artifact_fixture'));
+  assert.ok(manifest.files.some((file: any) => file.path === 'baselines/baseline_fixture'));
+  assert.ok(manifest.files.some((file: any) => file.path === 'apply/journal_fixture'));
+  assert.equal(manifest.omittedPendingUploads, 0);
   const snapshot = new DatabaseSync(join(backupsDir, stamp!, 'room.sqlite'), { readOnly: true });
   const snapshotRooms = Number((snapshot.prepare('SELECT COUNT(*) AS count FROM rooms').get() as any).count);
   snapshot.close();

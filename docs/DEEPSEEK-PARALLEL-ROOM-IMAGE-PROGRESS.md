@@ -38,7 +38,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | V01 开发/发布报告分模式 | in_progress | schemaVersion 2、sourceBefore/sourceAfter、tracked/working/untracked+lockfile hash、`--release --expected-head` 前置失败 not_run、source_changed 检测与 checksPassed/releaseEligible 已通过 5 个用例；CLI 入口已由 V02 preflight 接入，真实 clean release 运行待 CI |
 | V02 CI/preflight 接入真实入口 | in_progress | preflight 改为 collaboration release/development 单次入口 + 连接器/并行/图片检查；外层 sourceBefore/After 与 releaseEligible/verdict；CI 传 github.sha、上传证据；本地 skip 模式 preflight PASS（development_only）；真实 release CI 运行待下次推送验证 |
 | V03 固定版本真实 CLI 与三组对照 | not_started | |
-| V04 文档、备份导入导出与统一口径 | not_started | |
+| V04 文档、备份导入导出与统一口径 | in_progress | 备份扩展为 DB+artifact/baselines/apply journal+水位/文件 hash manifest，restore 校验并恢复三类目录，测试通过；文档统一、图片导出 omitted/导入重验真仍待补 |
 
 ## G00 — 开工记录与测试隔离
 
@@ -1396,6 +1396,52 @@ delivery/image-upload 细节与全入口 assertActiveRoom 仍待补）
   “房间删除与最终 project apply 并发”仍无专门测试（属项目 apply/集成锁
   交叉域）；真实 CI release job 仍未推送
 下一张卡与依赖：V03（等待付费授权）或项目 apply 删除竞态
+```
+
+## V04 — 备份/恢复与统一完成口径（备份切片）
+
+```
+卡号与状态：V04 / in_progress（备份/恢复完成；文档统一与图片导入导出重验真待补）
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 bcea651（I07 前次提交）；实现见本次提交
+修改文件和关键符号：
+  scripts/backup-state.mjs
+    备份 SQLite（VACUUM INTO）+ artifacts + baselines + apply 三类目录；
+    pending image uploads 明确不恢复，只记录 omittedPendingUploads；
+    一致性：复制文件前后记录 events MAX(seq)，最多重试 3 次，必须相等；
+    manifest 记录 watermarkEventSeq/filesCopiedEventsThrough/consistent、
+      每文件 path/size/SHA256、fileCount/fileBytes、restoredDataDirs；
+    失败清理目标目录；保留 5 个最新备份
+  scripts/restore-state.mjs
+    恢复 artifacts/baselines/apply；读取 manifest 对每个文件重新 SHA256 校验，
+    缺失/hash 不匹配 exitCode=1；继续拒绝运行中服务
+  tests/backup-restore.test.ts
+    在 DB 外写入 artifact 原图/预览、baseline、apply journal；
+    断言 manifest 水位一致、三类文件均出现；恢复后文件内容一致
+变更前触发条件 / 变更后行为：
+  变更前：只备份 room.sqlite + artifacts，丢失 baselines/apply journal；
+  没有事件水位或文件 manifest，DB 与文件可能跨时刻仍被当作完整。
+  变更后：备份包含三类文件与每文件 hash；事件序列前后不一致会重试/失败；
+  restore 重新校验文件，不把不完整备份假称为完整。
+接口/事件/迁移/兼容性：
+  备份 manifest 向后兼容增加字段；现有 restore 命令参数不变；
+  未完成上传不恢复，完成 artifact 必须恢复；无 DB 迁移。
+执行命令、cwd、环境、开始结束、退出码：
+  node --check scripts/backup-state.mjs / restore-state.mjs       exit 0
+  npx tsx --test tests/backup-restore.test.ts                      exit 0（1 pass / 0 fail）
+  npm test                                                         exit 0（539 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-22 06:00–06:35 CST
+证据路径：
+  .state/parallel-room-image/v04-backup-tests-20261022.log
+实际覆盖的模式和失败分支：
+  DB + artifacts + baselines + apply 备份；manifest 文件 hash；恢复后 hash 校验；
+  pending upload 计数 omitted；restore 仍拒绝 live lock
+尚未验证项及明确原因：
+  V04 文档统一（AGENT-PARALLEL-PROGRESS/NEXT-AGENT/CAPABILITY/PLAN-CLOSURE/
+  VERIFICATION-MATRIX/ACCEPTANCE、PROTOCOL/EXTERNAL-MCP/UI 文档）尚未批量重写；
+  图片二进制导出 8 MiB 单件/32 MiB 总量限制与 omittedArtifacts 报告未实现；
+  导入图片重新生成 preview 的流程仍待 I07/导入路径补；release 文档口径未定
+下一张卡与依赖：V03（需用户明确付费模型/CLI 授权）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移
