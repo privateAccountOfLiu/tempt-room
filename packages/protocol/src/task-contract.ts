@@ -15,8 +15,18 @@ export const taskAcceptanceSchema = z.object({
 
 export const taskDependencyConditionSchema = z.enum(['execution', 'accepted_artifact', 'integrated']);
 
+/**
+ * Where the run may work.
+ *
+ * `isolated` materialises an independent directory from the frozen baseline.
+ * `source` keeps the legacy behaviour of working directly in the project.
+ * Older contracts without this field keep the legacy behaviour.
+ */
+export const workspaceModeSchema = z.enum(['isolated', 'source']);
+
 export const taskContractSchema = z.object({
   objective: z.string().trim().min(1).max(20000),
+  workspaceMode: workspaceModeSchema.optional(),
   projectBinding: z.object({
     id,
     version: z.number().int().positive(),

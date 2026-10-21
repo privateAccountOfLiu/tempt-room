@@ -15,7 +15,8 @@ import {InputDeliveryService} from './input-delivery.ts';
 import { validateOutboundUrl } from './outbound.ts';
 import { summarizeOutboundDeliveries } from './outbound-summary.ts';
 import {acquireResource,releaseResource} from './resource-manager.ts';
-import {canonicalProjectPath,buildProjectManifest,projectBaseCommit} from './project-manifest.ts';
+import {canonicalProjectPath,projectBaseCommit} from './project-manifest.ts';
+import type { PreparedProjectBinding } from './command-executor.ts';
 import {taskVerificationRecordSchema} from '../../../packages/protocol/src/index.ts';
 
 /** External (non-managed) claims must heartbeat within this window or the worker recycles the task. */
@@ -29,7 +30,7 @@ export class RoomService {
   readonly inputDelivery: InputDeliveryService;
   private activeTraceId?:string;
   constructor(public store: EventStore) { this.inputDelivery = new InputDeliveryService(store); }
-  execute(raw: unknown, actor: Actor = OWNER,scope?:{runId:string;generation?:number;executionId?:string}): Receipt {
+  execute(raw: unknown, actor: Actor = OWNER,scope?:{runId:string;generation?:number;executionId?:string},prepared?:PreparedProjectBinding): Receipt {
     const parsed = commandSchema.safeParse(raw); if (!parsed.success) throw new ProtocolError('invalid_command', parsed.error.message);
     const command = parsed.data, hash = digest({ command, actor,...(scope?{scope}:{}) });
     const previousTrace=this.activeTraceId;this.activeTraceId=uid('trace');
@@ -44,13 +45,13 @@ export class RoomService {
       }
       if(scope){const run=this.store.get<Run>('runs',scope.runId);if(actor.kind!=='agent'||!run||run.roomId!==command.roomId||run.agentId!==actor.id||!['running','waiting_input'].includes(run.status))throw new ProtocolError('forbidden','工具消息不属于当前活动运行',403);}
       if(scope&&['message.send','task.create','task.claim'].includes(command.type))assertContextCurrent(this.store,this.store.get<Run>('runs',scope.runId)!);
-      const result = this.dispatch(command, actor,scope);
+      const result = this.dispatch(command, actor, scope, prepared);
       const receipt: Receipt = { commandId: command.commandId, accepted: true, result };
       this.store.saveReceipt(command.commandId, hash, receipt); return receipt;
     });}finally{this.activeTraceId=previousTrace;}
   }
   private requireRoom(command: Command) { if (!command.roomId) throw new ProtocolError('room_required', '需要房间编号'); return command.roomId; }
-  private dispatch(command: Command, actor: Actor,scope?:{runId:string;generation?:number;executionId?:string}): Record<string, unknown> {
+  private dispatch(command: Command, actor: Actor,scope?:{runId:string;generation?:number;executionId?:string},prepared?:PreparedProjectBinding): Record<string, unknown> {
     const p = command.payload as Record<string,unknown>;
     switch (command.type) {
       case 'settings.update':{
@@ -109,11 +110,14 @@ export class RoomService {
         if (actor.kind !== 'human') throw new ProtocolError('forbidden', '只有 owner 可以绑定项目', 403);
         const input = payloadSchemas['project.bind'].parse(p);
         const sourcePath = canonicalProjectPath(input.sourcePath);
-        const manifest = buildProjectManifest(sourcePath);
+        // The immutable baseline is prepared outside this transaction. A binding
+        // without a prepared baseline would freeze a moving directory.
+        if (!prepared) throw new ProtocolError('baseline_preparation_required', '项目绑定需要先准备不可变基线', 409);
+        if (prepared.sourcePath !== sourcePath) throw new ProtocolError('baseline_mismatch', '基线与请求的项目目录不一致', 409);
         const version = this.store.list<ProjectBinding>('project_bindings', roomId).reduce((max, binding) => Math.max(max, binding.version), 0) + 1;
-        const binding: ProjectBinding = {id: uid('binding'), roomId, sourcePath, ...(input.baseCommit ?? projectBaseCommit(sourcePath) ? {baseCommit: input.baseCommit ?? projectBaseCommit(sourcePath)!} : {}), manifestHash: manifest.manifestHash, manifestFileCount: manifest.fileCount, manifestBytes: manifest.bytes, allowedExecutionModes: input.allowedExecutionModes, verificationRefs: input.verificationRefs, version, createdAt: now(), updatedAt: now()};
+        const binding: ProjectBinding = {id: uid('binding'), roomId, sourcePath, ...(input.baseCommit ?? projectBaseCommit(sourcePath) ? {baseCommit: input.baseCommit ?? projectBaseCommit(sourcePath)!} : {}), manifestHash: prepared.manifestHash, manifestFileCount: prepared.fileCount, manifestBytes: prepared.bytes, baselineId: prepared.baselineId, manifestAlgorithm: prepared.manifestAlgorithm, allowedExecutionModes: input.allowedExecutionModes, verificationRefs: input.verificationRefs, version, createdAt: now(), updatedAt: now()};
         this.store.event(roomId, 'project.bound', actor, {projectBinding: binding});
-        return {bindingId: binding.id, version, manifestHash: binding.manifestHash, fileCount: manifest.fileCount, bytes: manifest.bytes};
+        return {bindingId: binding.id, version, manifestHash: binding.manifestHash, fileCount: prepared.fileCount, bytes: prepared.bytes, baselineId: binding.baselineId};
       }
       case 'capability.verify': {
         const roomId = this.requireRoom(command);
@@ -271,12 +275,12 @@ export class RoomService {
         if (input.open) {
           if (actor.kind !== 'human') throw new ProtocolError('forbidden', 'Agent 不能创建开放认领任务', 403);
           if (input.agentId) throw new ProtocolError('validation_error', '开放认领任务不需要指定成员', 400);
-          const task: Task = { ...(this.activeTraceId?{traceId:this.activeTraceId}:{}), id: uid('task'), roomId, title: input.title, agentId: 'unassigned', projectPath: binding?.sourcePath??input.projectPath, dependencies: input.dependencies, ...(input.contract?{contract:input.contract}:{}), ...strictFields, ...(binding?{projectBindingId:binding.id,bindingVersion:binding.version,baselineManifestHash:binding.manifestHash}:{}), open: true, generation:1,version: 1, status: 'proposed', createdAt: now() };
+          const task: Task = { ...(this.activeTraceId?{traceId:this.activeTraceId}:{}), id: uid('task'), roomId, title: input.title, agentId: 'unassigned', projectPath: binding?.sourcePath??input.projectPath, dependencies: input.dependencies, ...(input.contract?{contract:input.contract}:{}), ...(input.contract?.workspaceMode?{workspaceMode:input.contract.workspaceMode}:{}), ...strictFields, ...(binding?{projectBindingId:binding.id,bindingVersion:binding.version,baselineManifestHash:binding.manifestHash}:{}), open: true, generation:1,version: 1, status: 'proposed', createdAt: now() };
            this.store.event(roomId, 'task.created', actor, { task },command.commandId,scope?.runId??null); return { taskId: task.id };
         }
         if (!input.agentId) throw new ProtocolError('validation_error', '请指定执行成员或选择开放认领', 400);
         this.checkAgent(roomId, input.agentId);
-        const task: Task = { ...(this.activeTraceId?{traceId:this.activeTraceId}:{}), id: uid('task'), roomId, title: input.title, agentId: input.agentId, projectPath: binding?.sourcePath??input.projectPath, dependencies: input.dependencies, ...(input.contract?{contract:input.contract}:{}), ...strictFields, ...(binding?{projectBindingId:binding.id,bindingVersion:binding.version,baselineManifestHash:binding.manifestHash}:{}), generation:1,version: 1, status: actor.kind === 'agent' ? 'proposed' : 'queued', createdAt: now() };
+        const task: Task = { ...(this.activeTraceId?{traceId:this.activeTraceId}:{}), id: uid('task'), roomId, title: input.title, agentId: input.agentId, projectPath: binding?.sourcePath??input.projectPath, dependencies: input.dependencies, ...(input.contract?{contract:input.contract}:{}), ...(input.contract?.workspaceMode?{workspaceMode:input.contract.workspaceMode}:{}), ...strictFields, ...(binding?{projectBindingId:binding.id,bindingVersion:binding.version,baselineManifestHash:binding.manifestHash}:{}), generation:1,version: 1, status: actor.kind === 'agent' ? 'proposed' : 'queued', createdAt: now() };
          const event = this.store.event(roomId, 'task.created', actor, { task },command.commandId,scope?.runId??null);
         if (actor.kind === 'human'&&this.store.get<AgentDescriptor>('agents',task.agentId)?.connectionMode!=='external') this.enqueue(roomId, task.agentId, task.title, event.seq, { taskId: task.id, taskVersion: 1 });
         return { taskId: task.id };

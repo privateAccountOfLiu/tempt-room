@@ -17,6 +17,10 @@ export const projectBindingSchema = z.object({
   allowedExecutionModes: z.array(projectExecutionModeSchema).min(1).max(2),
   verificationRefs: z.array(z.string().min(1).max(500)).max(50).default([]),
   version: z.number().int().positive(),
+  /** Managed immutable baseline this binding freezes. Older bindings may omit it. */
+  baselineId: id.optional(),
+  /** Hash algorithm of the frozen manifest; older bindings used a legacy digest. */
+  manifestAlgorithm: z.string().min(1).max(100).optional(),
   createdAt: time,
   updatedAt: time
 }).strict();

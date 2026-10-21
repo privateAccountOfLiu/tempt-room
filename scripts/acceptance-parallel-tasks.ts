@@ -4,6 +4,8 @@ import { pathToFileURL } from 'node:url';
 import { Store, uid, now } from '../apps/server/src/store.ts';
 import { RoomService } from '../apps/server/src/service.ts';
 import { Worker } from '../apps/server/src/worker.ts';
+import { CommandExecutor } from '../apps/server/src/command-executor.ts';
+import { ImmutableBaselines } from '../apps/server/src/immutable-baselines.ts';
 import type { Artifact, Integration, ProjectBinding, Run, Task } from '../packages/protocol/src/index.ts';
 
 const HASH = 'a'.repeat(64);
@@ -46,7 +48,8 @@ export async function runAcceptance(options: {root?: string} = {}): Promise<{rep
     const service = new RoomService(store), roomId = store.rooms()[0].id;
     const command = (type: string, payload: unknown) => service.execute({version: '0.1', commandId: uid(), roomId, type, payload});
     worker = new Worker(store, service, workRoot, {adapter: async function* () { yield {type: 'text', text: 'fixture'}; }});
-    const bindingId = command('project.bind', {sourcePath: project}).result.bindingId as string;
+    const executor = new CommandExecutor(service, new ImmutableBaselines(workRoot));
+    const bindingId = (await executor.execute({version: '0.1', commandId: uid(), roomId, type: 'project.bind', payload: {sourcePath: project}}, {id: 'owner', kind: 'human'})).result.bindingId as string;
     const binding = store.get<ProjectBinding>('project_bindings', bindingId)!;
     report.project = project;
     report.binding = {id: binding.id, version: binding.version, manifestHash: binding.manifestHash};

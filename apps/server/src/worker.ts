@@ -11,6 +11,7 @@ import { RoomService } from './service.ts';
 import type { EventStore } from './ports/event-store.ts';
 import { LocalAdapterTransport, localAgentTransport, type AgentTransport } from './ports/agent-transport.ts';
 import { Workspaces, safePath } from './workspaces.ts';
+import { ImmutableBaselines } from './immutable-baselines.ts';
 import { chatWorkspace,sessionKey } from './sessions.ts';
 import { redactDiagnostic } from './diagnostics.ts';
 import { runContext } from './context.ts';
@@ -70,6 +71,7 @@ function prepareChatWorkspace(root:string,run:Run):string{
 export class Worker {
   readonly host: SandboxHost;
   readonly workspaces: Workspaces;
+  readonly baselines: ImmutableBaselines;
   private active = new Map<string, AbortController>();
   private executions=new Map<string,Readonly<RunFence>>();
   private readonly transport: AgentTransport;
@@ -94,6 +96,7 @@ export class Worker {
     this.nativeOperations=new NativeOperations(store);
     this.host = new SandboxHost(root, resolve('sandbox/RoomSandbox/bin/Release/net10.0-windows/RoomSandbox.exe'));
     this.workspaces = new Workspaces(root);
+    this.baselines = new ImmutableBaselines(root);
     service.onCancel = id => this.active.get(id)?.abort(new Error('用户取消'));
     service.onInput = (id, text) => {
       const input=this.inputs.get(id);if(!input)throw new Error('输入通道已断开，请修改目标后重新启动');
@@ -442,6 +445,24 @@ export class Worker {
     return{started:true};
   }
   private schedulerWeights(){const weights=new Map<string,number>();for(const agent of this.store.list<AgentDescriptor>('agents'))weights.set(agent.id,agent.schedulerWeight??1);return weights;}
+  /** Frozen workspace mode of a task. Legacy tasks without one keep the old behaviour. */
+  private workspaceModeFor(task:Task|undefined):'isolated'|'source'{
+    return task?.workspaceMode??task?.contract?.workspaceMode??'source';
+  }
+  /**
+   * Materialise the run workspace.
+   *
+   * A bound task uses the frozen baseline, so every run of the same binding
+   * starts from identical bytes even when the source changed afterwards.
+   */
+  private materialiseWorkspace(task:Task,binding:ProjectBinding|undefined,runId:string){
+    if(binding?.baselineId){
+      const {record,files}=this.baselines.verify(binding.baselineId);
+      return this.workspaces.snapshotFromBaseline({baselineId:record.baselineId,sourcePath:record.sourcePath,manifestHash:record.manifestHash,manifestAlgorithm:record.manifestAlgorithm,files},runId);
+    }
+    // Legacy binding without a frozen baseline: the live source is scanned.
+    return this.workspaces.snapshot(task.projectPath,runId);
+  }
   /** Real project directory touched by a host-mode task run, if any. */
   private threadKey(run:Run):string|undefined {
     return run.codex?.binding.threadId ?? codexThreadKey(this.store.get<AgentDescriptor>('agents',run.agentId)!);
@@ -451,7 +472,11 @@ export class Worker {
     const agent=this.store.get<AgentDescriptor>('agents',run.agentId);
     if(agent?.executionMode!=='host')return undefined;
     const task=this.store.get<Task>('tasks',run.taskId);
-    return task?.projectPath?resolve(task.projectPath):undefined;
+    if(!task?.projectPath)return undefined;
+    // An isolated host run works in its own directory and must not take the
+    // exclusive lock of the real project. Applying its patch locks the source.
+    if(this.workspaceModeFor(task)==='isolated')return undefined;
+    return resolve(task.projectPath);
   }
   private context(run: Run, attachmentContext = '') {
     const inboundBatch=run.inputBatchId?this.store.get<InputBatch>('input_batches',run.inputBatchId):undefined;
@@ -540,32 +565,40 @@ export class Worker {
       const attached = agent.connectionMode === 'attach';
       const hostMode = agent.executionMode === 'host';
       const taskBinding = task?.projectBindingId ? this.store.get<ProjectBinding>('project_bindings',task.projectBindingId) : undefined;
+      const workspaceMode=this.workspaceModeFor(task);
       if(taskBinding){
         if(!taskBinding.allowedExecutionModes.includes(hostMode?'host':'sandbox'))throw new Error('项目绑定不允许当前执行模式');
         if(!task?.projectPath||resolve(task.projectPath).toLowerCase()!==resolve(taskBinding.sourcePath).toLowerCase())throw new Error('任务项目目录与项目绑定不一致');
         run.projectBindingId=taskBinding.id;run.bindingVersion=taskBinding.version;run.sourceCommit=taskBinding.baseCommit;
-        const baselineManifest=buildProjectManifest(taskBinding.sourcePath).manifestHash;run.dirtyBaselineHash=baselineManifest;
+        // The frozen baseline is the execution input. The mutable source is
+        // never re-scanned here, so a binding always yields the same inputs.
+        const baselineManifest=taskBinding.baselineId?this.baselines.record(taskBinding.baselineId).manifestHash:buildProjectManifest(taskBinding.sourcePath).manifestHash;
+        run.dirtyBaselineHash=baselineManifest;
         if(!(run.externalReads??[]).some(read=>read.kind==='file'&&read.source===taskBinding.sourcePath&&read.hash===baselineManifest))run.externalReads=[...(run.externalReads??[]),{kind:'file',source:taskBinding.sourcePath,...(taskBinding.baseCommit?{version:taskBinding.baseCommit}:{}),hash:baselineManifest,fetchedAt:now()}];
       }
       let workspace:string, baseline:Map<string,string>|undefined;
       if (attached) {
         workspace = agent.codexBinding!.expectedCwd;
         if(task?.projectPath && resolve(task.projectPath).toLowerCase()!==resolve(workspace).toLowerCase())throw new Error('任务项目目录与附着线程目录不一致');
+        if(workspaceMode==='isolated'&&task?.projectPath)throw new ProtocolError('workspace_mode_unsupported','附着线程的工作目录固定，无法为该任务提供独立工作区',409);
         if(task){task.status='running';this.store.atomic(()=>{this.store.event(run.roomId,'task.updated',SYSTEM,{task});});}
       } else if (run.taskId) {
-        if (hostMode && task?.projectPath) {
+        if (hostMode && task?.projectPath && workspaceMode==='source') {
           workspace = resolve(task.projectPath);
           try { if (!statSync(workspace).isDirectory()) throw new Error('不是目录'); }
           catch (error) { throw new Error(`本机直连无法访问项目目录 ${workspace}：${(error as Error).message}`); }
           baseline = hostStatus(workspace);
           if(!(run.externalReads??[]).some(read=>read.kind==='file'&&read.source===workspace))run.externalReads=[...(run.externalReads??[]),{kind:'file',source:workspace,hash:digest(baseline),fetchedAt:now()}];
+          run.workspaceMode='source';
           task.status = 'running'; this.store.atomic(() => {  this.store.event(run.roomId, 'task.updated', SYSTEM, { task }); });
         } else {
           workspace = join(this.root, 'sandboxes', run.id, 'workspace');
           if (task?.projectPath) {
-            const manifest = this.workspaces.snapshot(task.projectPath, run.id); workspace = manifest.workspace;
-            const sourcePath=resolve(task.projectPath),manifestHash=digest(Object.fromEntries(Object.entries(manifest.files).map(([name,file])=>[name,file.hash])));
+            const manifest=this.materialiseWorkspace(task,taskBinding,run.id);
+            workspace = manifest.workspace;
+            const sourcePath=resolve(task.projectPath),manifestHash=manifest.baselineId?manifest.manifestHash!:digest(Object.fromEntries(Object.entries(manifest.files).map(([name,file])=>[name,file.hash])));
             if(!(run.externalReads??[]).some(read=>read.kind==='file'&&read.source===sourcePath))run.externalReads=[...(run.externalReads??[]),{kind:'file',source:sourcePath,version:manifest.sourceCommit??undefined,hash:manifestHash,fetchedAt:now()}];
+            run.baselineId=manifest.baselineId;run.workspaceMode='isolated';
             task.workspaceId = run.id; task.status = 'running'; this.store.atomic(() => {  this.store.event(run.roomId, 'task.updated', SYSTEM, { task }); });
           } else mkdirSync(workspace, { recursive: true });
         }
@@ -602,9 +635,10 @@ export class Worker {
       }else if(!run.discussionId)for(const artifact of candidate.artifacts)this.publishArtifact(run,artifact.name,artifact.text,artifact.mediaType);
       if (text.trim()) this.publishFinalMessage(run, text, messageId);
       if (!attached && task?.projectPath) {
-        if (hostMode) {
+        if (hostMode && run.workspaceMode!=='isolated') {
           this.publishArtifact(run, `${task.title.slice(0,60)} · 本机变更清单`, hostChangeReport(workspace, baseline));
         } else {
+          // A sandbox or isolated host run always yields a reviewable patch.
           const changes = this.workspaces.changes(run.id);
           if (changes.changes.length) {
             const artifact = this.publishArtifact(run, `${task.title.slice(0,60)} · 文件差异`, changes.patch, 'text/x-diff', 'patch');

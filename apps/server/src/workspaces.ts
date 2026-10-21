@@ -4,12 +4,13 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { ProtocolError } from '../../../packages/protocol/src/index.ts';
 import { uid } from './store.ts';
+import { scanProjectFiles } from './project-files.ts';
 
 const excluded = new Set(['.git', '.state', '.cache', 'node_modules', 'dist', 'build', 'bin', 'obj', '.aws', '.ssh', '.codex', '.claude', '.dsh','.npmrc','.pypirc','.netrc','.git-credentials','.gitconfig','auth.json']);
 const sensitive = (name: string) => excluded.has(name.toLowerCase()) || /^\.env(?:\.|$)/i.test(name) || /(?:credentials|id_rsa|id_ed25519|\.pem$|\.key$)/i.test(name);
 const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 export interface FileChange { path: string; before: string | null; after: string | null; beforeText: string; afterText: string; binary: boolean }
-interface Manifest { id: string; source: string; workspace: string; files: Record<string, { hash: string; content: string }>; sourceCommit?: string }
+interface Manifest { id: string; source: string; workspace: string; files: Record<string, { hash: string; content: string }>; sourceCommit?: string; baselineId?: string; manifestHash?: string; manifestAlgorithm?: string }
 export function safePath(root: string, name: string): string {
   if (!name || isAbsolute(name) || name.includes(':') || name.includes('\0')) throw new ProtocolError('unsafe_path', '无效文件路径');
   const parts = name.replaceAll('\\', '/').split('/');
@@ -21,32 +22,50 @@ export function safePath(root: string, name: string): string {
   for (const part of parts) { current = join(current, part); if (existsSync(current) && lstatSync(current).isSymbolicLink()) throw new ProtocolError('unsafe_path', '不允许重解析链接'); }
   return target;
 }
+/** Shared scanner: binding and execution must agree on what a project contains. */
 function scan(root: string): Record<string, { hash: string; content: string }> {
-  const result: Record<string, { hash: string; content: string }> = {}; let bytes = 0, count = 0;
-  function walk(path: string) {
-    for (const entry of readdirSync(path, { withFileTypes: true })) {
-      if (sensitive(entry.name)) continue;
-      const full = join(path, entry.name); if (lstatSync(full).isSymbolicLink()) throw new ProtocolError('reparse_point', '工作区包含不支持的重解析链接');
-      if (entry.isDirectory()) walk(full);
-      else if (entry.isFile()) {
-        const data = readFileSync(full); bytes += data.length; count++;
-        if (bytes > 200 * 1024 * 1024 || count > 20000) throw new ProtocolError('snapshot_limit', '项目快照超过 200 MiB 或 20,000 个文件');
-        result[relative(root, full).split(sep).join('/')] = { hash: sha(data), content: data.toString('base64') };
-      }
-    }
-  } walk(root); return result;
+  const result = scanProjectFiles(root);
+  const files: Record<string, { hash: string; content: string }> = {};
+  for (const file of result.files) {
+    const content = result.contents.get(file.path);
+    if (!content) throw new ProtocolError('snapshot_limit', `无法读取项目文件：${file.path}`);
+    files[file.path] = { hash: file.sha256, content: content.toString('base64') };
+  }
+  return files;
 }
 export class Workspaces {
   constructor(public root: string) { mkdirSync(root, { recursive: true }); }
   snapshot(project: string, runId: string): Manifest {
     if (!isAbsolute(project) || !existsSync(project) || !lstatSync(project).isDirectory()) throw new ProtocolError('invalid_project', '请选择存在的绝对项目目录');
     if (lstatSync(project).isSymbolicLink()) throw new ProtocolError('invalid_project', '项目根目录不能是重解析链接');
-    const source = realpathSync(project), files = scan(source), workspace = join(this.root, 'sandboxes', runId, 'workspace');
-    mkdirSync(workspace, { recursive: true });
+    const source = realpathSync(project), files = scan(source);
     const git = spawnSync('git', ['-C', source, 'rev-parse', '--verify', 'HEAD'], { encoding: 'utf8', windowsHide: true });
-    let sourceCommit: string | undefined;
-    if (git.status === 0) {
-      sourceCommit = git.stdout.trim();
+    const sourceCommit = git.status === 0 ? git.stdout.trim() : undefined;
+    const workspace = join(this.root, 'sandboxes', runId, 'workspace');
+    this.materialize(workspace, source, files, sourceCommit);
+    return this.writeManifest(runId, { id: runId, source, workspace, files, sourceCommit });
+  }
+  /**
+   * Materialise a run workspace from a frozen baseline.
+   *
+   * The run never reads the mutable source directory: two runs of the same
+   * binding start from byte-identical inputs even when the source changed
+   * after the binding was created.
+   */
+  snapshotFromBaseline(baseline: { baselineId: string; sourcePath: string; manifestHash: string; manifestAlgorithm: string; files: Map<string, Buffer> }, runId: string): Manifest {
+    const workspace = join(this.root, 'sandboxes', runId, 'workspace');
+    rmSync(workspace, { recursive: true, force: true });
+    const files: Record<string, { hash: string; content: string }> = {};
+    for (const [path, content] of baseline.files) files[path] = { hash: sha(content), content: content.toString('base64') };
+    this.materialize(workspace, baseline.sourcePath, files, undefined);
+    return this.writeManifest(runId, {
+      id: runId, source: baseline.sourcePath, workspace, files,
+      baselineId: baseline.baselineId, manifestHash: baseline.manifestHash, manifestAlgorithm: baseline.manifestAlgorithm,
+    });
+  }
+  private materialize(workspace: string, source: string, files: Record<string, { hash: string; content: string }>, sourceCommit: string | undefined) {
+    mkdirSync(workspace, { recursive: true });
+    if (sourceCommit) {
       // Rebuild repository metadata from the selected file snapshot. Copying
       // historical objects would also copy deleted credentials and host paths.
       const clone = spawnSync('git', ['-c', 'init.templateDir=', 'init', '--ref-format=reftable', '--quiet', '--', workspace], { encoding: 'utf8', windowsHide: true });
@@ -62,8 +81,11 @@ export class Workspaces {
         const result=spawnSync('git',['-C',workspace,...args],{encoding:'utf8',windowsHide:true,env});if(result.status!==0)throw new Error('Git 快照基线创建失败：'+result.stderr.slice(-1000));
       }
     }
-    const manifest: Manifest = { id: runId, source, workspace, files, sourceCommit };
-    mkdirSync(join(this.root, 'manifests'), { recursive: true }); writeFileSync(join(this.root, 'manifests', `${runId}.json`), JSON.stringify(manifest)); return manifest;
+  }
+  private writeManifest(runId: string, manifest: Manifest): Manifest {
+    mkdirSync(join(this.root, 'manifests'), { recursive: true });
+    writeFileSync(join(this.root, 'manifests', `${runId}.json`), JSON.stringify(manifest));
+    return manifest;
   }
   changes(runId: string): { manifest: Manifest; changes: FileChange[]; patch: string } {
     const manifest: Manifest = JSON.parse(readFileSync(join(this.root, 'manifests', `${runId}.json`), 'utf8'));

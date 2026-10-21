@@ -19,6 +19,8 @@ import {agentCapabilityFingerprint,agentInterceptionGaps,capabilityNames,probeCo
 import { aggregateUsage } from './usage.ts';
 import { collectMetrics, metricsText } from './metrics.ts';
 import { RoomService } from './service.ts';
+import { CommandExecutor } from './command-executor.ts';
+import { ImmutableBaselines } from './immutable-baselines.ts';
 import { Worker } from './worker.ts';
 import { diagnose,probeAgentProtocol } from './adapters.ts';
 import { issueAgentToken, verifyAgentToken } from './agent-tokens.ts';
@@ -29,6 +31,7 @@ export interface AppOptions { root?: string; token?: string; dev?: boolean; star
 export async function createApp(options: AppOptions = {}) {
   const root = resolve(options.root ?? '.state'); mkdirSync(root, { recursive: true });
   const store = new Store(join(root, 'room.sqlite')), service = new RoomService(store), worker = new Worker(store, service, root);
+  const executor = new CommandExecutor(service, new ImmutableBaselines(root));
   const token = options.token ?? randomBytes(32).toString('hex'), tokenHash = createHash('sha256').update(token).digest();
   const tokenSecret = token;
   // Cookies share a host across ports. Bind the name to this data directory so
@@ -369,7 +372,7 @@ export async function createApp(options: AppOptions = {}) {
     const agent=store.get<AgentDescriptor>('agents',request.params.id);if(!agent)throw new ProtocolError('not_found','Agent 不存在',404);
     return probeAgentProtocol(agent,worker.host);
   });
-  app.post('/api/commands', request => service.execute(request.body));
+  app.post('/api/commands', async request => executor.execute(request.body, OWNER));
   app.post<{ Params: { roomId: string } }>('/api/rooms/:roomId/attachments', async request => {
     if (!store.room(request.params.roomId)) throw new ProtocolError('not_found', '房间不存在', 404);
     const part = await request.file(); if (!part) throw new ProtocolError('file_required', '请选择文件');
