@@ -147,7 +147,7 @@ function App(){
    <div className="section-heading"><span>连接与运行</span></div>
    <button className="sidebar-link" onClick={()=>setDialog('agents')}><Icon name="settings" size={17}/><span>Agent 连接</span><span className="number">{allAgents.filter(a=>a.enabled&&a.provider!=='demo').length}</span></button>
    <button className="sidebar-link" onClick={()=>{setDialog('agents');void testSandbox();}}><Icon name="shield" size={17}/><span>原生沙箱</span><span className={`tiny-dot ${sandbox?.ready?'online':''}`}/></button>
-   <button className="sidebar-link" onClick={()=>void client.request<ExecutionSettings>('/api/settings').then(value=>{setSettings(value);setDialog('execution');}).catch(error=>notify(error.message))}><Icon name="task" size={17}/><span>运行设置</span></button>
+   <button className="sidebar-link" onClick={()=>void client.request<ExecutionSettings>('/api/settings').then(value=>{setSettings(value);setDialog('execution');}).catch(error=>notify(error.message))}><Icon name="task" size={17}/><span>运行设置</span></button><a className="sidebar-link" href="/api/outbound/audit.csv" download><Icon name="file" size={17}/><span>外发审计</span></a>
    <div className="sidebar-spacer"/>
    <div className="sidebar-runtime"><Icon name="terminal" size={14}/><span>ROOM / 0.1</span><small>本地保存</small></div>
    <footer className="owner"><Avatar human/><div><strong>我的工作空间</strong><small>仅本机可访问</small></div><span className={`tiny-dot ${connected?'online':''}`}/></footer>

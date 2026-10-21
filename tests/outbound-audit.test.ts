@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { createApp } from '../apps/server/src/app.ts';
+import { uid } from '../apps/server/src/store.ts';
+
+const parent = resolve('.state/test-data');
+test('owner can export a cross-room outbound delivery audit as JSON and CSV', async t => {
+  mkdirSync(parent, {recursive: true});
+  const root = mkdtempSync(join(parent, 'outbound-audit-'));
+  const {app, store, service} = await createApp({root, startWorker: false, token: 'audit-owner'});
+  t.after(async () => { await app.close(); rmSync(root, {recursive: true, force: true}); });
+  const roomId = store.rooms()[0].id;
+  const headers = {host: '127.0.0.1:4317', authorization: 'Bearer audit-owner', 'room-protocol-version': '0.1'};
+  const command = (type: string, payload: unknown) => service.execute({version: '0.1', commandId: uid(), roomId, type, payload});
+  command('settings.update', {...store.settings(), outboundAllowPrivate: true, outboundMaxAttempts: 1});
+  const delivery = command('outbound.enqueue', {url: 'http://127.0.0.1:1/hook', throughSeq: store.room(roomId)!.seq}).result as any;
+  store.event(roomId, 'outbound.attempted', {id: 'system', kind: 'system'}, {deliveryId: delivery.deliveryId, attempt: 1, ok: false, error: 'connection refused', at: new Date().toISOString()});
+  const audit = await app.inject({url: '/api/outbound/audit', headers});
+  assert.equal(audit.statusCode, 200);
+  const body = audit.json() as {totals: {failed: number}; rooms: {roomId: string; deliveries: unknown[]}[]};
+  assert.equal(body.totals.failed, 1);
+  assert.ok(body.rooms.some(room => room.roomId === roomId && room.deliveries.length === 1));
+  const csv = await app.inject({url: '/api/outbound/audit.csv', headers});
+  assert.equal(csv.statusCode, 200);
+  assert.match(String(csv.headers['content-type']), /text\/csv/);
+  assert.ok(csv.body.includes('roomId,roomName,deliveryId,status,attempts,url,throughSeq,lastError'));
+  assert.ok(csv.body.includes(delivery.deliveryId));
+  assert.equal((await app.inject({url: '/api/outbound/audit'})).statusCode, 401);
+});

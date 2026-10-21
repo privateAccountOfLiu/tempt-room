@@ -37,3 +37,21 @@ export function summarizeOutboundDeliveries(events: readonly RoomEvent[], maxAtt
   }
   return [...deliveries.values()].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
+
+export interface OutboundAuditRoom {
+  roomId: string;
+  roomName: string;
+  pending: number;
+  delivered: number;
+  failed: number;
+  cleared: number;
+  deliveries: OutboundDeliverySummary[];
+}
+
+export function summarizeOutboundAudit(input: {generatedAt: string; rooms: readonly {roomId: string; roomName: string; deliveries: readonly OutboundDeliverySummary[]}[]}): {generatedAt: string; totals: {pending: number; delivered: number; failed: number; cleared: number}; rooms: OutboundAuditRoom[]} {
+  const rooms = input.rooms.map(room => {
+    const count = (status: OutboundDeliverySummary['status']) => room.deliveries.filter(delivery => delivery.status === status).length;
+    return {roomId: room.roomId, roomName: room.roomName, pending: count('pending'), delivered: count('delivered'), failed: count('failed'), cleared: count('cleared'), deliveries: [...room.deliveries]};
+  });
+  return {generatedAt: input.generatedAt, totals: {pending: rooms.reduce((sum, room) => sum + room.pending, 0), delivered: rooms.reduce((sum, room) => sum + room.delivered, 0), failed: rooms.reduce((sum, room) => sum + room.failed, 0), cleared: rooms.reduce((sum, room) => sum + room.cleared, 0)}, rooms};
+}

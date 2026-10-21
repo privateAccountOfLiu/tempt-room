@@ -23,11 +23,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: cd73849180624ec394d4a9500aa06e01979057ed (dirty)
+source HEAD: ec8b2b3faa12620d333dc91d36cf32fe4add508f (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-20T16-50-16-161Z-fb103f0b/report.json
+report: .state/collaboration-baseline/run-2026-10-21T00-22-19-639Z-60433526/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -223,19 +223,19 @@ report: .state/collaboration-baseline/run-2026-10-20T16-50-16-161Z-fb103f0b/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-6UB75Z/report.json`，232.9s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-kHRPLG/report.json`，167.5s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-xy9kU1/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-VW2Fw5/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-20T16-50-16-161Z-fb103f0b/report.json`
-- `.state/collaboration-baseline/run-2026-10-20T16-50-16-161Z-fb103f0b/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T16-50-16-161Z-fb103f0b/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-20T16-50-16-161Z-fb103f0b/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-21T00-22-19-639Z-60433526/report.json`
+- `.state/collaboration-baseline/run-2026-10-21T00-22-19-639Z-60433526/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-21T00-22-19-639Z-60433526/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-21T00-22-19-639Z-60433526/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -683,7 +683,9 @@ report: .state/collaboration-baseline/run-2026-10-20T16-50-16-161Z-fb103f0b/repo
 - /api/rooms/import 先校验 exportHash（含 artifactHashes），不匹配返回 400 invalid_import
 - 导入 artifact 时校验 contentHash，不匹配跳过并计入 artifactIntegrityFailures，不写坏文件
 - room-import 集成测试覆盖 exportHash 篡改 400 与 artifact contentBase64 篡改（重算 exportHash 后）→ importedArtifacts=0/failures=1
-- 尚未完成：跨房间外发审计报表
+- 新增 GET /api/outbound/audit（JSON totals/rooms/deliveries）与 /api/outbound/audit.csv（owner 下载）
+- 侧边栏新增「外发审计」CSV 下载入口；新增 outbound-audit 测试（JSON totals、failed 统计、CSV 头、401）
+- F02 导出/导入/脱敏/外发/重试/清理/审计闭环完成；剩余 C02 MCP 宿主桥、B06 steer、C04b Job Object
 
 ## E04 能力完成定义（第 109 轮）
 

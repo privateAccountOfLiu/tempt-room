@@ -14,7 +14,7 @@ import { VERSION,payloadSchemas, agentToolCallSchema, ProtocolError, type AgentD
 import { Store, digest, now, OWNER, SYSTEM, uid } from './store.ts';
 import { planRoomImport } from './room-import.ts';
 import { redactArtifactContent, redactExport } from './export-redaction.ts';
-import { summarizeOutboundDeliveries } from './outbound-summary.ts';
+import { summarizeOutboundAudit, summarizeOutboundDeliveries } from './outbound-summary.ts';
 import {agentCapabilityFingerprint,agentInterceptionGaps,capabilityNames,probeConfiguredAgent,verifiedCapabilityState} from './adapter-capabilities.ts';
 import { aggregateUsage } from './usage.ts';
 import { collectMetrics, metricsText } from './metrics.ts';
@@ -233,6 +233,8 @@ export async function createApp(options: AppOptions = {}) {
     const incremental=(batch?store.events(run.roomId).filter(event=>sourceIds.has(event.eventId)).map(event=>String((event.payload as any).message?.text??event.type)):[]).join('\n');
     return buildContextSegments(run,runContext(store,run),task,{...(incremental?{incrementalText:incremental}:{})});
   });
+  app.get('/api/outbound/audit',()=>summarizeOutboundAudit({generatedAt:new Date().toISOString(),rooms:store.rooms().map(room=>({roomId:room.id,roomName:room.name,deliveries:summarizeOutboundDeliveries(store.events(room.id),store.settings().outboundMaxAttempts)}))}));
+  app.get('/api/outbound/audit.csv',(request,reply)=>{const escape=(value:unknown)=>`"${String(value??'').replaceAll('"','""').slice(0,500)}"`,lines=['roomId,roomName,deliveryId,status,attempts,url,throughSeq,lastError'];for(const room of store.rooms())for(const item of summarizeOutboundDeliveries(store.events(room.id),store.settings().outboundMaxAttempts))lines.push([room.id,room.name,item.deliveryId,item.status,item.attempts,item.url,item.throughSeq,item.lastError??''].map(escape).join(','));return reply.header('content-type','text/csv; charset=utf-8').header('content-disposition','attachment; filename="outbound-audit.csv"').send(lines.join('\n')+'\n');});
   app.get<{Params:{id:string}}>('/api/rooms/:id/outbound',request=>{
     const room=store.room(request.params.id);if(!room)throw new ProtocolError('not_found','房间不存在',404);
     return summarizeOutboundDeliveries(store.events(room.id),store.settings().outboundMaxAttempts);
