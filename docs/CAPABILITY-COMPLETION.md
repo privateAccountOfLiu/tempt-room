@@ -66,3 +66,16 @@
 ## 结论
 
 核心房间协议、协作、资源、导入导出、证据链与 UI 已完成自动化与运行验证。真实模型实验、native 进程树证明、可靠外发属于明确的外部/原生依赖，未用演示结果冒充完成。
+
+﻿## 图片 / 房间生命周期批次完成口径（2026-10-21）
+
+| 分类 | 当前证据 |
+|---|---|
+| 机制实现 | 房间 lifecycle、图片上传/验真/预览/私有内联路由、连接器 helper、SDK、备份/导入导出 |
+| M1 模拟验收 | 541/541 测试；acceptance:room-images；acceptance:parallel；room-image-races 9/9；external image 4/4 |
+| M1 真实实验 | 未执行；V03 需要用户明确的模型/费用/时长授权 |
+| 本批新功能验收 | 房间设置/删除、图片缩略图/Lightbox、导入重验真、host pipe 图片 smoke；AppContainer true pipe 为 not_verified |
+| 发布证据 | V02 preflight 本地 development_only PASS；真实 CI release job 尚未推送验证 |
+
+未完成项不得写成完成：真实付费 CLI 三组对照、AppContainer 图片管道、真实宿主手动发图、
+GitHub Actions release 首跑。

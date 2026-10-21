@@ -828,3 +828,11 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - 新增 `scripts/install-minimax-mcp.mjs` 与 `npm run room:install-minimax`：从 connect API 读取配置、合并写入 `~/.minimax/mcp.json`、自动备份；`--print` 可预览。已在本机写入 room 条目并用 MiniMax 自带解析器验证通过；下一步在 MiniMax Code 新会话中加载。
 
 - MiniMax 实机验证：MiniMax Code 已连接 MCP（runtime log `Connected MCP server room`），并执行 `mcp__room__room_read` 成功；Tempt Room 事件 room_717... seq 160 记录 `agent.tool.called room_read`（项目级 `.mcp.json` 的 claude-code token）。为避免项目级 `room` 遮蔽，安装器/server 统一改用唯一名 `temptroom`，本机 `~/.minimax/mcp.json` 已改名并备份。
+
+﻿## 图片 / 房间生命周期批次（2026-10-21）
+
+本批 24 张卡（G00–G01、P01–P06、R01–R05、I01–I07、V01–V04）的统一状态与证据以
+`docs/DEEPSEEK-PARALLEL-ROOM-IMAGE-PROGRESS.md` 为准，本文件不再复制另一份完成状态。
+
+分类口径：机制实现 / M1 模拟验收 / M1 真实实验 / 本批新功能验收 / 发布证据。
+V03 真实付费 CLI 实验未获授权，保持未执行；本地模拟不能替代真实实验。

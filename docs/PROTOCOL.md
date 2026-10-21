@@ -209,3 +209,17 @@ started/completed/unknown 表示回执生命周期；completed 的 result.outcom
 运行详情显示执行意图、工具回执和结果未知；打开时按房间水位有界刷新，单次只保留一个请求，关闭或切换运行后忽略旧响应。SDK 提供 native-operation / native-reconciliation JSON Schema；数据库 v8 阻止不了解这些来源字段与恢复事件的旧写入程序打开。通用工具前置拦截、对外部副作用的幂等/补偿以及旧上下文下的显式安全续接仍在后续计划中；原生和 A2A 的 unrestricted 自动恢复继续关闭。
 
 接口依据：[Codex App Server](https://learn.chatgpt.com/docs/app-server)、[Claude Code hooks/tool 生命周期](https://code.claude.com/docs/en/hooks)、[ACP tool calls](https://agentclientprotocol.com/protocol/v1/tool-calls)。这些接口描述生命周期，未宣称本应用可以撤销任意 Shell/网络效果。
+
+﻿## Room lifecycle 与图片低层操作（2026-10-21 新增）
+
+- Room revision 从 1 开始；room.configure 单事务 + expectedRevision CAS；
+  生命周期 active → deleting → deleted，每次推进 revision+1。
+- room.delete 返回 deleting；Worker finalizer 写 room.deleted；active 列表只含 active；
+  deleted 410；deleting 禁止新执行、工具与图片读取。
+- 新事件：room.configured / room.deleting / room.deletion.updated / room.deleted。
+- 低层图片工具：image_upload_begin / image_upload_chunk / image_upload_complete，
+  随后 room_post；chunk 192 KiB，单图 1 B–10 MiB，pending 每 Agent 2 / 每房间 4，TTL 30 分钟。
+- operationId 派生 begin/part/complete/post 稳定 commandId；重试复用，不重复 artifact/message。
+- 服务端不接收本地 path；只接受真实静态 PNG/JPEG/WebP，拒绝 APNG/动画 WebP/伪装 MIME/超像素。
+- 私有预览：GET /api/artifacts/:id/image，owner 鉴权、active room、verified image、
+  image/png、nosniff、inline、same-origin、private no-store；deleting/deleted 返回 410。

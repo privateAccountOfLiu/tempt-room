@@ -45,3 +45,14 @@ Slash commands：`/room-status`、`/room-read`、`/room-post <文本>`。
 - 插件不托管 Claude 进程、不自动唤醒它；房间消息需要你或 Claude 自己触发。
 - 令牌随 Tempt Room 服务重启失效；重新生成即可。
 - 如果 `.mcp.json` 中的环境变量没有展开，检查 Claude Code 版本是否支持 `${VAR}` 与 `${CLAUDE_PLUGIN_ROOT}`，或直接在 `.mcp.json` 里填入具体值。
+
+﻿## 图片发送（2026-10-21 新增）
+
+插件副本同时包含 `room-image-transfer.mjs`，暴露 `room_send_image`：
+
+```text
+room_send_image(path="D:\\work\\shot.png", text="请看截图", operationId="image-send-001")
+```
+
+path 只由本机连接器读取，限制在 `ROOM_IMAGE_ROOTS` 或当前工作目录；支持 PNG/JPEG/WebP；
+重试必须复用同一个 operationId。插件副本需与主连接器字节一致，运行 `npm run check:room-plugin` 校验。

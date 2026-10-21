@@ -236,3 +236,14 @@ T03 已完成重启后的真实复测：当前 Codex 会话以外部成员接入
 已提供[完整真实 Agent 场景脚本](REAL-AGENT-ACCEPTANCE.md)，涵盖三个编程 Agent 的稳定会话、文件修改、npm/Git、MCP、取消、目标版本、依赖审查与应用。`--check` 不发送模型 prompt，`--allow-paid` 才进入付费场景。此脚本尚未执行真实模型测试。
 
 协议依据：[Codex App Server](https://learn.chatgpt.com/docs/app-server)、[Claude 程序化 CLI](https://code.claude.com/docs/en/headless)、[DeepSeek ACP](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/acp/acp/README.md)、[A2A 规范](https://a2a-protocol.org/latest/specification/)。
+
+﻿## 图片 / 房间生命周期批次验收补充（2026-10-21）
+
+已验收：房间设置原子保存/revision 冲突/忙成员拒绝、删除确认/deleting/最后房间空状态；
+已验真图片私有内联路由、缩略图/失败降级/键盘 Lightbox、纯图片消息；
+外部 MCP 与 bridge room_send_image（根边界/分块/稳定 operationId/丢回复幂等/超时分类）；
+备份恢复 DB+artifact+baselines+apply+hash；导入图片重新验真并生成预览。
+单元/集成 541/541；room-image races 9/9；external image 4/4；浏览器完整回归通过。
+
+未验收：AppContainer true pipe（--mode sandbox 为 not_verified）、真实宿主手动发图、
+GitHub Actions release 首跑、V03 真实付费 CLI 三组对照。

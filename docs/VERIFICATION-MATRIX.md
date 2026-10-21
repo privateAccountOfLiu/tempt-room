@@ -111,3 +111,24 @@ npm run test:external-mcp
 npm run room:refresh-claude -- --session-url "<启动地址>"  # 仅显式轮换令牌后需要
 npm run room:refresh-codex  -- --session-url "<启动地址>"
 ```
+
+﻿## 图片 / 房间生命周期批次验证矩阵（2026-10-21）
+
+```bash
+npm run typecheck
+npm test                                             # 541/541
+npx tsx --test tests/room-image-races.test.ts         # 9/9
+npx tsx --test tests/external-image-tools.test.ts     # 4/4
+npm run acceptance:room-images -- --check
+npm run acceptance:parallel -- --check
+npm run test:room-images-native -- --mode host       # verified=true
+npm run test:room-images-native -- --mode sandbox    # not_verified
+npm run check:room-plugin
+npm run test:mcp-connectors                          # 15/15
+npm run test:browser
+npm run test:preflight -- --skip-browser --skip-sdk  # development_only
+npm run test:preflight -- --expected-head <sha>      # release，需 clean checkout
+```
+
+证据：`.state/parallel-room-image/`、`.state/room-images-native/latest.json`、
+`.state/preflight/latest.json`、`.state/browser-e2e/`。旧报告结论不被本次追加改写。

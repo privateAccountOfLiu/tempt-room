@@ -32,3 +32,10 @@
 ![桌面工作台](./screenshots/workbench-desktop.png)
 
 [手机端对话](./screenshots/workbench-mobile.png) · [手机端协作面板](./screenshots/workbench-mobile-panel.png) · [手机端房间切换](./screenshots/workbench-mobile-rooms.png) · [讨论设置](./screenshots/workbench-discussion.png)
+
+﻿## 房间设置 / 删除 / 图片展示（2026-10-21 新增）
+
+- 设置保存为一条带 revision 的 room.configure；冲突/忙成员错误保留表单。
+- 删除有明确文案、二次确认、deleting 状态和最后房间空状态；成功后切到下一 active 房间。
+- 已验真图片显示懒加载缩略图；加载失败降级文件卡；Lightbox 支持 Escape、焦点返回、下载原图。
+- 纯图片消息不渲染空 Markdown；deleting/deleted 后旧图片 URL 返回 410。

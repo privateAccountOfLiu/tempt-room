@@ -38,7 +38,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | V01 开发/发布报告分模式 | in_progress | schemaVersion 2、sourceBefore/sourceAfter、tracked/working/untracked+lockfile hash、`--release --expected-head` 前置失败 not_run、source_changed 检测与 checksPassed/releaseEligible 已通过 5 个用例；CLI 入口已由 V02 preflight 接入，真实 clean release 运行待 CI |
 | V02 CI/preflight 接入真实入口 | in_progress | preflight 改为 collaboration release/development 单次入口 + 连接器/并行/图片检查；外层 sourceBefore/After 与 releaseEligible/verdict；CI 传 github.sha、上传证据；本地 skip 模式 preflight PASS（development_only）；真实 release CI 运行待下次推送验证 |
 | V03 固定版本真实 CLI 与三组对照 | not_started | |
-| V04 文档、备份导入导出与统一口径 | in_progress | 备份/restore 带水位与文件 hash；导出 omittedArtifacts（单件 8MiB/总量 32MiB/缺失）；导入图片重新解码验真、重生成 preview、清除客户端伪造尺寸；7 个导入/导出用例通过；文档统一仍待补 |
+| V04 文档、备份导入导出与统一口径 | in_progress | 备份/restore（水位+文件 hash+三类目录）、导出 omittedArtifacts、导入重验真/重生成 preview；10 个文档已补统一 24 卡口径与验证矩阵；真实 CI/V03 仍待 |
 
 ## G00 — 开工记录与测试隔离
 
@@ -1488,6 +1488,28 @@ delivery/image-upload 细节与全入口 assertActiveRoom 仍待补）
   UI-WORKBENCH）未批量改写；总量 32MiB 与多件导出省略的专门断言未加；
   无二进制导入时 UI 缺失卡片未做浏览器断言；V03 仍等待付费授权
 下一张卡与依赖：V03（需明确付费模型/CLI 授权）
+```
+
+## V04 — 文档统一补充
+
+```
+卡号与状态：V04 补充切片 / in_progress
+基线 SHA：e3f6d9e；实现见本次提交
+修改文件：AGENT-PARALLEL-PROGRESS、NEXT-AGENT-PROGRESS、CAPABILITY-COMPLETION、
+PLAN-CLOSURE、VERIFICATION-MATRIX、ACCEPTANCE、PROTOCOL、EXTERNAL-MCP、
+UI-WORKBENCH、plugins/tempt-room-claude/README
+内容：统一 24 卡口径（G00–G01/P01–P06/R01–R05/I01–I07/V01–V04）；
+五类状态（机制/M1 模拟/M1 真实/本批新功能/发布证据）；
+引用同一验证矩阵与证据路径，不复制另一份完成状态；
+PROTOCOL 增加 room lifecycle/revision/image 低层操作/私有路由；
+EXTERNAL-MCP 与 plugin README 增加 room_send_image path/roots/operationId/恢复；
+UI-WORKBENCH 增加原子设置、删除状态、图片缩略图/Lightbox；
+验收 541/541 测试；secret-scan PASS（0 finding）。
+未验证：真实 AppContainer 图片管道、真实宿主手动发图、CI release 首跑、
+V03 付费真实 CLI 实验。
+证据：.state/parallel-room-image/v04-import-tests-20261022.log、
+.state/secret-scan/latest.json
+下一张卡：V03（等待付费授权）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移

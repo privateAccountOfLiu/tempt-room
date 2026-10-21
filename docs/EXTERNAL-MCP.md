@@ -133,3 +133,18 @@ console.log(receipt);
 每个写操作必须具有稳定 `commandId`。连接超时后不能简单创建新 ID 重做写操作；保存并重发原命令，服务器会返回幂等收据。Agent 作者由令牌绑定，不能从正文或自填作者字段冒充他人。不要使用拥有完整 owner 权限的 `RoomClient` 作为普通 Agent 连接器。
 
 协议版本、任务认领、上下文对齐、事件游标与 JSON Schema 见 [PROTOCOL.md](PROTOCOL.md)、[客户端包说明](../packages/client/README.md)和[协议包说明](../packages/protocol/README.md)。
+
+﻿## 图片：room_send_image 便利工具（2026-10-21 新增）
+
+```json
+{"name":"room_send_image","arguments":{"path":"D:\\work\\shot.png","text":"请看截图","alt":"截图","operationId":"image-send-20261021-001"}}
+```
+
+- path 只由连接器在本机读取；必须是普通绝对文件，拒绝 symlink/junction、UNC、URL、ADS；
+  只能在 `ROOM_IMAGE_ROOTS`（分号分隔）或连接器 cwd 内。
+- 支持 PNG/JPEG/WebP，1 B–10 MiB，分块 192 KiB。
+- operationId 稳定：响应丢失后复用同一个值，服务端按 root+阶段幂等。
+- 只上传未发消息时可先用 SDK uploadImage；sendImage 失败返回 stage=post 与 artifactId，
+  用同一个 operationId 补发。
+- room_post 支持 attachments/replyTo 与可选 text，旧纯文本调用兼容。
+- 错误以 isError:true + code/message/stage/retryable/status 返回；401/403/410 不自动重试。
