@@ -23,11 +23,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 680352e88014b95f4a062bf9fb37180042f170d4 (dirty)
+source HEAD: 2de8ed712145b3ab1c8cd7b3dddf290d6d2c1cc3 (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-21T00-53-53-122Z-fb94bd66/report.json
+report: .state/collaboration-baseline/run-2026-10-21T01-13-44-602Z-4659e5a1/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -225,19 +225,19 @@ report: .state/collaboration-baseline/run-2026-10-21T00-53-53-122Z-fb94bd66/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-108bLc/report.json`，170.3s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-JiigQy/report.json`，173.6s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-k4s9Ci/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-pjuqwZ/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-21T00-53-53-122Z-fb94bd66/report.json`
-- `.state/collaboration-baseline/run-2026-10-21T00-53-53-122Z-fb94bd66/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-21T00-53-53-122Z-fb94bd66/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-21T00-53-53-122Z-fb94bd66/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-21T01-13-44-602Z-4659e5a1/report.json`
+- `.state/collaboration-baseline/run-2026-10-21T01-13-44-602Z-4659e5a1/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-21T01-13-44-602Z-4659e5a1/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-21T01-13-44-602Z-4659e5a1/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -705,3 +705,11 @@ report: .state/collaboration-baseline/run-2026-10-21T00-53-53-122Z-fb94bd66/repo
 - 新增 retryIo：对 EPERM/EACCES/EBUSY/ENOTEMPTY 做指数退避重试（默认 8 次，40ms 起）
 - stageAgentRuntime 的 rename 接入 retryIo，缓解杀软/安装器短暂持有句柄导致的 preflight 抖动
 - 新增 retry-io 测试 2 项：瞬时错误重试成功、永久错误不重试/耗尽后抛出
+
+## C04b Job Object 硬保证
+
+- 新增 tools/job-launcher C# helper：CreateJobObject + JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE，透明代理 stdin/stdout/stderr，子进程启动后 AssignProcessToJobObject
+- Host 模式通过 job-launcher.exe 启动（存在 .state/tools/job-launcher.exe 时）；helper 退出/被杀时内核关闭 job handle，终止整棵子进程树
+- HostChannel cleanupProof 标记 evidence=job-object-kill-on-close；仍保留 taskkill+CIM tracked PID 扫描
+- 新增 job-launcher 测试：仅杀 helper（非 /T）时孙进程 ESRCH；HostChannel 证明 evidence 正确
+- 构建：npm run build:job-launcher（需要 dotnet SDK）；helper 未构建时自动回退原 taskkill 路径

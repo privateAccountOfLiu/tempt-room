@@ -23,7 +23,7 @@ import {NativeEvidenceParser,type NativeEvidence} from './native-evidence.ts';
 import {nativeExecutionStream} from './native-stream.ts';
 export { ExecutionUnknown, RemoteCanceled } from './errors.ts';
 
-export interface AdapterContext { onNativeEvidence?:(evidence:NativeEvidence)=>void; onExternalRead?: (evidence:{kind:'file'|'database'|'network';source:string;version?:string;hash?:string;fetchedAt:string})=>void; onCleanupProof?: (proof:{checkedAt:string;remainingProcesses:number;trackedProcesses:number;evidence:'taskkill-tree-scan'})=>void; registerSteer?: (handler:(text:string)=>Promise<void>)=>void; executionId?:string; agent: AgentDescriptor; run: Run; prompt: string; workspace: string; home: string; stateRoot: string; nativeSession?: string; signal: AbortSignal; host: SandboxHost; hostMode?: boolean; onRoomTool?: (request:any)=>Promise<any>; requestInput?: (question:string,signal?:AbortSignal)=>Promise<string>; transport?:typeof remoteRequest; onToolPermission?: (request:any)=>boolean|Promise<boolean>; saveCodexState?:(state:CodexRunState)=>void }
+export interface AdapterContext { onNativeEvidence?:(evidence:NativeEvidence)=>void; onExternalRead?: (evidence:{kind:'file'|'database'|'network';source:string;version?:string;hash?:string;fetchedAt:string})=>void; onCleanupProof?: (proof:{checkedAt:string;remainingProcesses:number;trackedProcesses:number;evidence:'taskkill-tree-scan'|'job-object-kill-on-close'})=>void; registerSteer?: (handler:(text:string)=>Promise<void>)=>void; executionId?:string; agent: AgentDescriptor; run: Run; prompt: string; workspace: string; home: string; stateRoot: string; nativeSession?: string; signal: AbortSignal; host: SandboxHost; hostMode?: boolean; onRoomTool?: (request:any)=>Promise<any>; requestInput?: (question:string,signal?:AbortSignal)=>Promise<string>; transport?:typeof remoteRequest; onToolPermission?: (request:any)=>boolean|Promise<boolean>; saveCodexState?:(state:CodexRunState)=>void }
 export type AgentAdapter = ProtocolAdapter<AdapterContext,SandboxHost>;
 const native = new Set(['codex', 'claude', 'deepseek']);
 export async function diagnose(agent: AgentDescriptor, host: SandboxHost): Promise<Diagnostic> {
@@ -314,8 +314,9 @@ async function hostLaunch(ctx: AdapterContext): Promise<NativeLaunch> {
   }
     ctx.signal.throwIfAborted();
     hostDebug(`[launch] exe=${executable} args=${JSON.stringify([...argsPrefix,...args])} cwd=${ctx.workspace} mcp=${JSON.stringify(mcp)}`);
-    const child=spawn(executable,[...argsPrefix,...args],{cwd:ctx.workspace,env,windowsHide:true,stdio:'pipe'});
-    const channel=new HostChannel(child,ctx.executionId??ctx.run.id);
+    const launcher=process.platform==='win32'?(process.env.ROOM_JOB_LAUNCHER??join(process.cwd(),'.state','tools','job-launcher.exe')):undefined,useLauncher=Boolean(launcher&&existsSync(launcher));
+    const child=spawn(useLauncher?launcher!:executable,useLauncher?['--',executable,...argsPrefix,...args]:[...argsPrefix,...args],{cwd:ctx.workspace,env,windowsHide:true,stdio:'pipe'});
+    const channel=new HostChannel(child,ctx.executionId??ctx.run.id,{jobLauncher:useLauncher});
     return {channel,key,mcp,start:async()=>{},cleanup:()=>pipe.close()};
   } catch(error) { pipe.close(); throw error; }
 }

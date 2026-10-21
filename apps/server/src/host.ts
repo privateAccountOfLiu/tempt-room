@@ -16,7 +16,7 @@ export function hostDebug(line: string): void {
 }
 
 /** Kill a native child together with everything it spawned. */
-export interface ProcessTreeProof { checkedAt: string; remainingProcesses: number; trackedProcesses: number; evidence: 'taskkill-tree-scan' }
+export interface ProcessTreeProof { checkedAt: string; remainingProcesses: number; trackedProcesses: number; evidence: 'taskkill-tree-scan' | 'job-object-kill-on-close' }
 /** Kill a native child tree, then verify every descendant observed before the kill is gone. */
 export function killProcessTree(pid: number | undefined): void {
   if (!pid) return;
@@ -124,13 +124,15 @@ export class HostChannel {
   stderr = '';
   onFrame?: (frame: any) => void;
   cleanupProof?: ProcessTreeProof;
+  private readonly jobLauncher: boolean;
   private buffer = '';
   private counter = 0;
   private readonly rpc = new Map<number, { resolve: (value: any) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }>();
   private resolveExitFn!: (value: any) => void;
   readonly exit: Promise<any>;
 
-  constructor(public readonly child: ChildProcessWithoutNullStreams, public readonly runId: string) {
+  constructor(public readonly child: ChildProcessWithoutNullStreams, public readonly runId: string, options?: {jobLauncher?: boolean}) {
+    this.jobLauncher = options?.jobLauncher === true;
     this.exit = new Promise(resolve => { this.resolveExitFn = resolve; });
     hostDebug(`[host] spawned pid=${child.pid} run=${runId}`);
     createInterface({ input: child.stdout }).on('line', line => {
@@ -186,6 +188,7 @@ export class HostChannel {
   async terminate(): Promise<void> {
     if (this.ended) return;
     this.cleanupProof = killProcessTreeWithProof(this.child.pid);
+    if (this.jobLauncher && this.cleanupProof) this.cleanupProof = {...this.cleanupProof, evidence: 'job-object-kill-on-close'};
     try {
       await Promise.race([this.exit, delay(10000).then(() => { throw new ExecutionUnknown('未确认本机 Agent 进程树退出'); })]);
     } catch (error) {

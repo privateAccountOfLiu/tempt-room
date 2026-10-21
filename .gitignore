@@ -17,3 +17,5 @@ packages/*/dist/
 # User-specific Agent state and credential-bearing config backups
 .codex/
 *.tempt-room.bak.*
+tools/job-launcher/bin/
+tools/job-launcher/obj/
