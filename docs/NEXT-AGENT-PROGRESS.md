@@ -802,3 +802,12 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - 进行中 run 的实时/已保存草稿仍显示在会话底部；讨论、最终回复替换草稿等原有行为不变
 - 浏览器 E2E 新增断言：终端草稿默认收起、可展开，且旧目标草稿仍显示「已被新目标替代」；partial-drafts.png 截图确认
 - preflight 8/8（.state/preflight/run-pHvdhU，190.5s）；测试 422/422；浏览器 45/45（.state/browser-e2e/run-AZQVDi）
+
+## D 盘空间清理（第 132 轮）
+
+- 清理前实测 D: 可用 8.61 GB，清理后 28.8 GB，释放约 19.7 GB
+- 删除 Tempt Room 可重建产物的运行时副本与旧探针目录：native-pipecompat 的两级 runtimes、sdk-probes 的 consumer/packages/npm-cache、claude-smoke / sandbox-handoff-smoke / sandbox-artifact-smoke 的 state、fencing-native-probes 的 runtimes、native-recheck/native-reftable/native-git-research 的 runtimes、publish-checkout、旧 browser-e2e 运行、.cache 等
+- 保留：room.sqlite(38 MB) 与 WAL、artifacts、backups、docs 引用所需的探针报告/JSON、最新 browser/preflight 证据、job-launcher、runtimes 缓存
+- `scripts/probe-sdk.mjs` 新增保留最近 10 次运行，避免每次 preflight/SDK 校验重复累积（此前 193 个 run，约 1.8 GB）
+- 清理后 `npm test` 仍 422/422，服务 50 个房间/DB 38 MB 正常
+- 未清理（需用户决定）：Rust FreeOrBit/target 13.4 GB、salmon target 1.6 GB、Download 19 GB、Document 43.4 GB（QQ 12.3 GB / WeChat 5.2 GB 等）

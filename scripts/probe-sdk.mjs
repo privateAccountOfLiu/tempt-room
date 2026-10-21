@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {mkdirSync,mkdtempSync,readFileSync,writeFileSync,existsSync} from 'node:fs';
+import {mkdirSync,mkdtempSync,readFileSync,writeFileSync,existsSync,readdirSync,rmSync,statSync} from 'node:fs';
 import {join,resolve,dirname} from 'node:path';
 import {createHash} from 'node:crypto';
 
 const project=resolve('.'),parent=join(project,'.state','sdk-probes');mkdirSync(parent,{recursive:true});
+// Keep only the newest 10 SDK probe runs; each run copies a consumer tree and can grow ~10 MB.
+const oldRuns=readdirSync(parent).filter(name=>name.startsWith('run-')).map(name=>({name,path:join(parent,name),mtime:statSync(join(parent,name)).mtimeMs})).sort((a,b)=>b.mtime-a.mtime);
+for(const old of oldRuns.slice(10)){try{rmSync(old.path,{recursive:true,force:true});}catch{}}
 const root=mkdtempSync(join(parent,'run-')),packages=join(root,'packages'),consumer=join(root,'consumer'),cache=join(root,'npm-cache');
 for(const path of [packages,consumer,cache])mkdirSync(path);
 const npm=process.env.npm_execpath??join(dirname(process.execPath),'node_modules','npm','bin','npm-cli.js');
