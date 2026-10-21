@@ -709,7 +709,8 @@ report: .state/collaboration-baseline/run-2026-10-21T01-13-44-602Z-4659e5a1/repo
 ## C04b Job Object 硬保证
 
 - 新增 tools/job-launcher C# helper：CreateJobObject + JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE，透明代理 stdin/stdout/stderr，子进程启动后 AssignProcessToJobObject
-- Host 模式通过 job-launcher.exe 启动（存在 .state/tools/job-launcher.exe 时）；helper 退出/被杀时内核关闭 job handle，终止整棵子进程树
+- Host 模式默认不启用；仅 ROOM_JOB_LAUNCHER=1 且 .state/tools/job-launcher.exe 存在时启用。helper 退出/被杀时内核关闭 job handle，终止整棵子进程树
+- 说明：job-launcher 的 stdio 代理在真实 Codex app-server 上出现 initialize 超时，因此保持 opt-in，默认继续使用 taskkill+CIM 路径
 - HostChannel cleanupProof 标记 evidence=job-object-kill-on-close；仍保留 taskkill+CIM tracked PID 扫描
 - 新增 job-launcher 测试：仅杀 helper（非 /T）时孙进程 ESRCH；HostChannel 证明 evidence 正确
 - 构建：npm run build:job-launcher（需要 dotnet SDK）；helper 未构建时自动回退原 taskkill 路径

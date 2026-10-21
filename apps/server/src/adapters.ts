@@ -314,7 +314,7 @@ async function hostLaunch(ctx: AdapterContext): Promise<NativeLaunch> {
   }
     ctx.signal.throwIfAborted();
     hostDebug(`[launch] exe=${executable} args=${JSON.stringify([...argsPrefix,...args])} cwd=${ctx.workspace} mcp=${JSON.stringify(mcp)}`);
-    const launcher=process.platform==='win32'?(process.env.ROOM_JOB_LAUNCHER??join(process.cwd(),'.state','tools','job-launcher.exe')):undefined,useLauncher=Boolean(launcher&&existsSync(launcher));
+    const launcher=process.platform==='win32'&&process.env.ROOM_JOB_LAUNCHER==='1'?join(process.cwd(),'.state','tools','job-launcher.exe'):undefined,useLauncher=Boolean(launcher&&existsSync(launcher));
     const child=spawn(useLauncher?launcher!:executable,useLauncher?['--',executable,...argsPrefix,...args]:[...argsPrefix,...args],{cwd:ctx.workspace,env,windowsHide:true,stdio:'pipe'});
     const channel=new HostChannel(child,ctx.executionId??ctx.run.id,{jobLauncher:useLauncher});
     return {channel,key,mcp,start:async()=>{},cleanup:()=>pipe.close()};
