@@ -3,9 +3,10 @@ import {Store,digest,now,SYSTEM} from './store.ts';
 import {assertRunFence} from './execution.ts';
 import {ExecutionUnknown} from './errors.ts';
 import {nativeOutcome,type NativeEvidence} from './native-evidence.ts';
+import type { EventStore } from './ports/event-store.ts';
 
 export class NativeOperations {
-  constructor(private store:Store){}
+  constructor(private store: EventStore){}
   begin(fence:RunFence,agent:AgentDescriptor,prompt:string,nativeSession?:string){
     return this.store.atomic(()=>{
       const run=assertRunFence(this.store,fence),inputId=digest([run.id,run.deltaContextId??run.contextId??run.basedOnSeq]),operationId='native_intent_'+inputId;

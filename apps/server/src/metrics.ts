@@ -1,6 +1,7 @@
 import type { InboxDelivery, InputBatch, Integration, Run, WakeIntent } from '../../../packages/protocol/src/index.ts';
 import type { BudgetReservation } from '../../../packages/protocol/src/index.ts';
 import type { Store } from './store.ts';
+import type { EventStore } from './ports/event-store.ts';
 
 export interface RoomMetrics {
   queueDepth: number;
@@ -24,7 +25,7 @@ export interface RoomMetrics {
 
 const isPending = (run: Run) => run.status === 'queued';
 
-export function collectMetrics(store: Store): RoomMetrics {
+export function collectMetrics(store: EventStore): RoomMetrics {
   let queueDepth = 0, activeRuns = 0, oldestPendingAgeMs = 0, unknownRuns = 0;
   const startLatencies: number[] = [], durations: number[] = [];
   for (const run of store.list<Run>('runs')) {

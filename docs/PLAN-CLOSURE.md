@@ -63,20 +63,21 @@
 
 | 波次 | 状态 | 说明 |
 | --- | --- | --- |
-| F01 EventStore/Transport 接口 | 可选未实施 | 现有 Store/Transport 已满足使用；接口提取属 P2 演进，不影响闭环 |
+| F01 EventStore/Transport 接口 | 完成 | `apps/server/src/ports/event-store.ts`、`agent-transport.ts`；Store/Service/Worker 与核心辅助模块经端口；`tests/event-store-transport-contract.test.ts` 文件库/内存库同契约、transport fixture 状态机 |
 | F02 导出/导入/可靠外发 | 完成 | `tests/room-export.test.ts`、`tests/room-import.test.ts`、`tests/outbound.test.ts`、`tests/outbound-audit.test.ts` |
-| F03 AgentScope Service 适配器 | 可选未实施 | 计划标注可选；未接入第三方 AgentScope 服务 |
+| F03 AgentScope Service 适配器 | fixture 完成（可选） | `apps/server/src/ports/agent-scope.ts` 映射 session/output/input/cancel/outcome；`tests/agent-scope-transport.test.ts` fixture 通过；真实 AgentScope 版本未锁定，能力保持 unverified，不宣称真实 Service 集成 |
 
 ## 外部边界（明示，不作为未完成核心项）
 
 - 宿主 CLI 自带权限 UI：客户端行为，房间侧无法拦截；已通过 `interceptionGaps` 明示，并提供 external MCP 写工具 owner 审批桥。
 - DeepSeek ACP / Claude 无运行中 steer 协议：Codex 已真实验证；ACP/Claude 仅支持下一轮投递。
 - Job Object launcher 的 dotnet 构建已纳入 `npm run build` 与 preflight；缺 SDK 时警告并自动回退 taskkill+CIM（[JOB-LAUNCHER.md](JOB-LAUNCHER.md)）。
+- MiniMax Code 以外部 MCP 接入（provider `minimax` 强制 external）；真实 MCP 注册需在 MiniMax Code 应用内执行一次（[MINIMAX-INTEGRATION.md](MINIMAX-INTEGRATION.md)）。
 
 ## 最终验证
 
-- 单元/集成测试：420/420
-- 发布前门禁：8/8（含 job-launcher 构建步骤）
+- 单元/集成测试：426/426
+- 发布前门禁：8/8（含 job-launcher 构建步骤；run-Dzi19c）
 - 浏览器 E2E：45/45
 - 生产冒烟：10/10
 - 协作基线：PASS（`.state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d`）

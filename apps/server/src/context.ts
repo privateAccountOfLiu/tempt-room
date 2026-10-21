@@ -1,9 +1,10 @@
 import {contextSeqOf,ProtocolError} from '../../../packages/protocol/src/index.ts';
 import type { Decision,Message,Run,RunContext,Task } from '../../../packages/protocol/src/index.ts';
 import type { Store } from './store.ts';
+import type { EventStore } from './ports/event-store.ts';
 
 /** Reconstruct at an event cursor, never from mutable current message rows. */
-export function captureContext(store:Store,roomId:string,throughSeq:number):RunContext {
+export function captureContext(store: EventStore,roomId:string,throughSeq:number):RunContext {
   const maxMessages=store.settings().maxContextMessages;
   const messages:{seq:number;message:Message}[]=[],decisions=new Map<string,Decision>(),runs=new Map<string,Pick<Run,'taskId'|'taskVersion'>>();let cursor=0;
   while(cursor<throughSeq){
@@ -25,7 +26,7 @@ export function captureContext(store:Store,roomId:string,throughSeq:number):RunC
   const snapshot=store.snapshotAt(roomId,throughSeq);
   return {fromSeq:messages[0]?.seq??throughSeq,throughSeq,messages:messages.map(item=>item.message),decisions:[...decisions.values()],members:snapshot.agents.map(({id,name,role})=>({id,name,role}))};
 }
-export function runContext(store:Store,run:Run):RunContext {
+export function runContext(store: EventStore,run:Run):RunContext {
   if(run.deltaContextId){const delta=store.get<RunContext>('contexts',run.deltaContextId);if(delta)return delta;}
   return run.contextId?store.get<RunContext>('contexts',run.contextId)??captureContext(store,run.roomId,contextSeqOf(run)):captureContext(store,run.roomId,contextSeqOf(run));
 }

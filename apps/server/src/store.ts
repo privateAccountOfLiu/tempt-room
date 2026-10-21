@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { VERSION, capabilitiesFor, executionSettingsSchema,eventSchema,eventMetadata,EventContractError,projectionTableNames,type ProjectionTable,type ExecutionSettings, type Actor, type AgentDescriptor, type Room, type RoomEvent, type RoomSnapshot, type Run, type Task, type Discussion,type ToolOperation } from '../../../packages/protocol/src/index.ts';
 import { MemoryProjectionSink,SqlProjectionSink,projectEvent,projectionJson } from './event-projections.ts';
+import type { EventStore } from './ports/event-store.ts';
 export const DATABASE_VERSION=16;
 
 export const uid = (prefix = 'id') => `${prefix}_${randomUUID().replaceAll('-', '')}`;
@@ -19,7 +20,7 @@ export function canonical(value: unknown): string {
 }
 export const digest = (value: unknown) => createHash('sha256').update(canonical(value)).digest('hex');
 
-export class Store {
+export class Store implements EventStore {
   readonly db: DatabaseSync;
   private transactionEvents: RoomEvent[] | null = null;
   private rebuilding=false;
@@ -221,6 +222,9 @@ CREATE TABLE IF NOT EXISTS capability_evidence_history(id TEXT PRIMARY KEY, room
       cursor = last;
     }
     if (cursor < throughSeq) throw new Error(`Event scan stopped before watermark ${throughSeq} (at ${cursor})`);
+  }
+  findPreviousOperation(runId: string, agentId: string, operationId: string): { body: string } | undefined {
+    return this.db.prepare("SELECT body FROM operations WHERE json_extract(body,'$.runId')=? AND json_extract(body,'$.agentId')=? AND json_extract(body,'$.operationId')=? ORDER BY json_extract(body,'$.generation') DESC LIMIT 1").get(runId,agentId,operationId) as {body:string}|undefined;
   }
   receipt(id: string): { hash: string; receipt: any } | undefined { const r = this.db.prepare('SELECT hash,receipt FROM commands WHERE id=?').get(id) as any; return r ? { hash: r.hash, receipt: JSON.parse(r.receipt) } : undefined; }
   saveReceipt(id: string, hash: string, receipt: unknown) { this.db.prepare('INSERT INTO commands VALUES(?,?,?)').run(id, hash, JSON.stringify(receipt)); }

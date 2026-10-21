@@ -811,3 +811,12 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - `scripts/probe-sdk.mjs` 新增保留最近 10 次运行，避免每次 preflight/SDK 校验重复累积（此前 193 个 run，约 1.8 GB）
 - 清理后 `npm test` 仍 422/422，服务 50 个房间/DB 38 MB 正常
 - 未清理（需用户决定）：Rust FreeOrBit/target 13.4 GB、salmon target 1.6 GB、Download 19 GB、Document 43.4 GB（QQ 12.3 GB / WeChat 5.2 GB 等）
+
+## F01 / F03 / MiniMax（第 133 轮）
+
+- F01：新增 `apps/server/src/ports/event-store.ts`、`agent-transport.ts`；Store 显式实现 EventStore；RoomService/Worker/context/execution/resource-manager/tool-operations 改为端口依赖；Worker 生产默认 `localAgentTransport`；新增事件存储文件/内存同契约测试与 transport fixture 状态机测试
+- F03：新增 `apps/server/src/ports/agent-scope.ts`（fixture contract），映射 session/output/input/cancel/outcome；能力全部 unverified；新增本地 HTTP fixture 测试；文档注明未锁定真实 AgentScope 版本
+- MiniMax Code：新增 provider `minimax`（仅 external），UI 类型/标签/Mi 标记；connect API 生成 MiniMax `mavis mcp create` 片段与 `minimax-mcp.json`；新增 `docs/MINIMAX-INTEGRATION.md`、`docs/F01-PORTS.md`、`docs/F03-AGENT-SCOPE.md`
+- 真实 MiniMax MCP 注册需在 MiniMax Code 应用内执行生成片段；未宣称真实桌面链路自动验证
+
+- F01/F03/MiniMax 最终验证：426/426 测试；preflight 8/8（.state/preflight/run-Dzi19c，187.6s）；浏览器 45/45（.state/browser-e2e/run-PfV2DU）；MiniMax provider 实测 connect snippets 含 minimax、minimax-mcp.json 已生成

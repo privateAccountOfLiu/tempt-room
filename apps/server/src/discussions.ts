@@ -1,5 +1,6 @@
 import {contextSeqOf,type Discussion,type Run,type Message} from '../../../packages/protocol/src/index.ts';
 import {Store,uid} from './store.ts';
+import type { EventStore } from './ports/event-store.ts';
 
 export function discussionPrompt(d:Discussion):string{
   const common=`讨论目标：${d.goal}\n当前第 ${d.round}${d.stopOnConvergence?'':`/${d.rounds}`} 轮。根据你的角色给出具体意见，认真回应其他成员的观点，避免重复。此阶段只讨论，不发布交付物；如指定了总结人，服务端会在讨论结束后单独安排总结。`;
@@ -9,7 +10,7 @@ export function discussionPrompt(d:Discussion):string{
 }
 
 /** Called only after a whole convergence round has become terminal. */
-export function assessConvergence(store:Store,d:Discussion,completed:Run[]):boolean{
+export function assessConvergence(store: EventStore,d:Discussion,completed:Run[]):boolean{
   const candidate=d.consensus;
   const matching=completed.filter(run=>run.discussionBallot&&run.discussionBallot.proposalId===(candidate?.proposalId??null));
   const agreed=matching.filter(run=>run.discussionBallot!.agree&&candidate&&run.discussionBallot!.proposal===candidate.text);
@@ -29,7 +30,7 @@ export function assessConvergence(store:Store,d:Discussion,completed:Run[]):bool
 }
 
 /** Full final replies, not the normal bounded chat window. The range is immutable. */
-export function discussionSummaryPrompt(store:Store,d:Discussion):string{
+export function discussionSummaryPrompt(store: EventStore,d:Discussion):string{
   const runs=new Map(store.list<Run>('runs',d.roomId).filter(r=>r.discussionId===d.id&&r.discussionRole!=='summary').map(r=>[r.id,r]));
   const results=[...runs.values()].map(r=>({agentId:r.agentId,round:r.round,status:r.status,error:r.error,ballot:r.discussionBallot}));
   const rows:unknown[]=[];let cursor=d.startedSeq??0,bytes=Buffer.byteLength(JSON.stringify({goal:d.goal,results,consensus:d.consensus}));

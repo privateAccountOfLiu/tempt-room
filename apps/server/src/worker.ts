@@ -8,6 +8,8 @@ import { diagnose, ExecutionUnknown, RemoteCanceled, runAdapter } from './adapte
 import { SandboxHost } from './sandbox.ts';
 import { digest, now, Store, SYSTEM, uid } from './store.ts';
 import { RoomService } from './service.ts';
+import type { EventStore } from './ports/event-store.ts';
+import { LocalAdapterTransport, localAgentTransport, type AgentTransport } from './ports/agent-transport.ts';
 import { Workspaces, safePath } from './workspaces.ts';
 import { chatWorkspace,sessionKey } from './sessions.ts';
 import { redactDiagnostic } from './diagnostics.ts';
@@ -59,6 +61,7 @@ export class Worker {
   readonly workspaces: Workspaces;
   private active = new Map<string, AbortController>();
   private executions=new Map<string,Readonly<RunFence>>();
+  private readonly transport: AgentTransport;
   private steerWakeInFlight = new Set<string>();
   private toolApprovals = new Map<string,{roomId:string;agentId:string;tool:string;argsDigest:string;createdAt:string;resolve:(allow:boolean)=>void;timer:NodeJS.Timeout}>();
   private steerHandlers = new Map<string,{generation:number;executionId?:string;handler:(text:string)=>Promise<void>}>();
@@ -73,7 +76,8 @@ export class Worker {
   private toolCalls = new Map<string,number>();
   private usageSequence = new Map<string,number>();
   readonly streamListeners = new Set<(delta: StreamDelta) => void>();
-  constructor(public store: Store, public service: RoomService, public root: string,private options:{adapter?:typeof runAdapter}={}) {
+  constructor(public store: EventStore, public service: RoomService, public root: string,private options:{adapter?:typeof runAdapter;transport?:AgentTransport}={}) {
+    this.transport=options?.transport??(options?.adapter?new LocalAdapterTransport(options.adapter):localAgentTransport);
     this.operations=new ToolOperations(store,()=>store.settings().maxToolResultBytes);
     this.inbox=new InboxService(store);
     this.nativeOperations=new NativeOperations(store);
@@ -432,7 +436,9 @@ export class Worker {
         if(current.status!=='cancel_requested')current.status='running';
         current.updatedAt=now();this.store.atomic(()=>{this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);});
       };
-      for await (const output of (this.options.adapter??runAdapter)({ onNativeEvidence:nativeIntent?evidence=>this.nativeOperations.observe(nativeIntent!,evidence):undefined, executionId:fence.executionId,agent, run, prompt, workspace, home, stateRoot: this.root, hostMode, onRoomTool: hostMode ? (request:any) => this.executeTool(run.id, request, fence) : undefined, nativeSession: attached?undefined:this.store.session(scope), signal: controller.signal, host: this.host, saveCodexState, requestInput:(question,signal)=>this.requestInput(run,question,signal?AbortSignal.any([controller.signal,signal]):controller.signal),onToolPermission:async(request:any)=>{const authMode=this.store.settings().toolAuthorizationMode;if(authMode==='off')return true;const fingerprint=agentCapabilityFingerprint(agent),evidence=this.store.list('capability_evidence',run.roomId).filter((item:any)=>item.fingerprint===fingerprint) as any,state=verifiedCapabilityState(fingerprint,evidence,'preToolGate'),allowed=state==='verified_supported';try{this.store.event(run.roomId,'tool.authorization.recorded',{id:run.agentId,kind:'agent'},{runId:run.id,tool:'acp.permission',authorizationDecision:allowed?'allow':'deny',...(allowed?{}:{reason:'capability_unverified'}),argumentDigest:digest({toolCall:request?.toolCall??null}),fingerprint,authorizationMode:authMode},null,run.id);}catch{}return authMode==='warn'?true:allowed;},onExternalRead:(evidence:{kind:'file'|'database'|'network';source:string;version?:string;hash?:string;fetchedAt:string})=>{const current=this.store.get<Run>('runs',run.id);if(!current||terminalStates.has(current.status))return;const exists=(current.externalReads??[]).some(read=>read.kind===evidence.kind&&read.source===evidence.source&&read.version===evidence.version&&read.hash===evidence.hash);if(exists)return;current.externalReads=[...(current.externalReads??[]),evidence];current.updatedAt=now();this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);},onCleanupProof:(proof)=>{const current=this.store.get<Run>('runs',run.id);if(!current||terminalStates.has(current.status))return;current.cleanupProof={checkedAt:proof.checkedAt,remainingProcesses:proof.remainingProcesses,evidence:proof.evidence};current.updatedAt=now();this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);},registerSteer:(handler)=>{this.steerHandlers.set(run.id,{generation:run.generation??1,executionId:run.executionId,handler});} })) {
+      const execution=this.transport.openExecution({ onNativeEvidence:nativeIntent?evidence=>this.nativeOperations.observe(nativeIntent!,evidence):undefined, executionId:fence.executionId,agent, run, prompt, workspace, home, stateRoot: this.root, hostMode, onRoomTool: hostMode ? (request:any) => this.executeTool(run.id, request, fence) : undefined, nativeSession: attached?undefined:this.store.session(scope), signal: controller.signal, host: this.host, saveCodexState, requestInput:(question,signal)=>this.requestInput(run,question,signal?AbortSignal.any([controller.signal,signal]):controller.signal),onToolPermission:async(request:any)=>{const authMode=this.store.settings().toolAuthorizationMode;if(authMode==='off')return true;const fingerprint=agentCapabilityFingerprint(agent),evidence=this.store.list('capability_evidence',run.roomId).filter((item:any)=>item.fingerprint===fingerprint) as any,state=verifiedCapabilityState(fingerprint,evidence,'preToolGate'),allowed=state==='verified_supported';try{this.store.event(run.roomId,'tool.authorization.recorded',{id:run.agentId,kind:'agent'},{runId:run.id,tool:'acp.permission',authorizationDecision:allowed?'allow':'deny',...(allowed?{}:{reason:'capability_unverified'}),argumentDigest:digest({toolCall:request?.toolCall??null}),fingerprint,authorizationMode:authMode},null,run.id);}catch{}return authMode==='warn'?true:allowed;},onExternalRead:(evidence:{kind:'file'|'database'|'network';source:string;version?:string;hash?:string;fetchedAt:string})=>{const current=this.store.get<Run>('runs',run.id);if(!current||terminalStates.has(current.status))return;const exists=(current.externalReads??[]).some(read=>read.kind===evidence.kind&&read.source===evidence.source&&read.version===evidence.version&&read.hash===evidence.hash);if(exists)return;current.externalReads=[...(current.externalReads??[]),evidence];current.updatedAt=now();this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);},onCleanupProof:(proof)=>{const current=this.store.get<Run>('runs',run.id);if(!current||terminalStates.has(current.status))return;current.cleanupProof={checkedAt:proof.checkedAt,remainingProcesses:proof.remainingProcesses,evidence:proof.evidence};current.updatedAt=now();this.store.event(run.roomId,'run.updated',SYSTEM,{run:current},null,run.id);},registerSteer:(handler)=>{this.steerHandlers.set(run.id,{generation:run.generation??1,executionId:run.executionId,handler});} });
+      try {
+      for await (const output of execution.outputs) {
         assertRunIdentity(this.store,run);
         if(!attached||run.codex?.nativeStatus!=='completed')controller.signal.throwIfAborted();
         if (output.type === 'text') {
@@ -449,6 +455,7 @@ export class Worker {
         else if (output.type === 'input') { this.publishMessage(run, output.question, uid('msg')); }
         else if (output.type === 'artifact'){if(artifacts.length>=10||Buffer.byteLength(output.text)>2**20)throw new Error('候选交付物超过 10 份或单份 1 MiB 上限');artifacts.push(output);}
       }
+      } finally { execution.close?.(); }
       if(nativeIntent)this.nativeOperations.complete(nativeIntent);
       return {text,messageId,artifacts};
     }catch(error){

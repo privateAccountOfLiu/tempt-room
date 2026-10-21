@@ -1,6 +1,7 @@
 import type { Artifact,Integration,Run,Task } from '../../../packages/protocol/src/index.ts';
 import type { Store } from './store.ts';
-export function dependencyInputs(store:Store,task:Task){
+import type { EventStore } from './ports/event-store.ts';
+export function dependencyInputs(store: EventStore,task:Task){
   const versions:Record<string,number>={};
   for(const id of task.dependencies){const dependency=store.get<Task>('tasks',id);if(!dependency||dependency.roomId!==task.roomId||dependency.status!=='completed')throw new Error('依赖任务尚未完成');versions[id]=dependency.version;}
   const artifacts=store.list<Artifact>('artifacts',task.roomId).filter(artifact=>{

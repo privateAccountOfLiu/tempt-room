@@ -2,16 +2,17 @@ import { idSchema,ProtocolError,type RunFence,type ToolOperation } from '../../.
 import { Store,digest,now,SYSTEM } from './store.ts';
 import { assertRunFence } from './execution.ts';
 import {assertContextCurrent} from './context-reconciliation.ts';
+import type { EventStore } from './ports/event-store.ts';
 
 /** Reservations commit before side effects. An uncertain operation is never rerun. */
 export class ToolOperations {
-  constructor(private store:Store,private maxResultBytes:()=>number=()=>2**21){}
+  constructor(private store: EventStore,private maxResultBytes:()=>number=()=>2**21){}
   execute(fence:RunFence,operationId:string,name:string,args:unknown,action:()=>unknown):any {
     idSchema.parse(operationId);
     const hash=digest({name,args}),id='op_'+digest([fence.runId,fence.agentId,fence.generation,operationId]);
     const reserved=this.store.atomic(()=>{
       const current=assertRunFence(this.store,fence);
-      const prior=this.store.db.prepare("SELECT body FROM operations WHERE json_extract(body,'$.runId')=? AND json_extract(body,'$.agentId')=? AND json_extract(body,'$.operationId')=? ORDER BY json_extract(body,'$.generation') DESC LIMIT 1").get(fence.runId,fence.agentId,operationId) as {body:string}|undefined;
+      const prior=this.store.findPreviousOperation(fence.runId,fence.agentId,operationId);
       const previous=this.store.get<ToolOperation>('operations',id)??(prior?JSON.parse(prior.body) as ToolOperation:undefined);
       if(previous){
         if(previous.hash!==hash)throw new ProtocolError('operation_conflict','同一 operationId 不能用于不同工具或参数',409);

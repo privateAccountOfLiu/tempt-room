@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {discussionPrompt,assessConvergence,discussionSummaryPrompt} from './discussions.ts';
 import { agentSchema,contextSeqOf,taskContractSchema, capabilitiesFor, commandSchema,payloadSchemas,executionSettingsSchema, ProtocolError, VERSION, terminalStates, roomBudgetError, type Actor, type AgentDescriptor, type Artifact, type Command, type Discussion, type Message, type Receipt, type Run, type DiscussionRound, type Task, type Decision, type AgentSession, type Subscription, type WakeIntent, type ProjectBinding, type Integration, type BudgetReservation, type CapabilityEvidence } from '../../../packages/protocol/src/index.ts';
 import { digest, now, OWNER, Store, SYSTEM, uid } from './store.ts';
+import type { EventStore } from './ports/event-store.ts';
 import {assertContextCurrent} from './context-reconciliation.ts';
 import { assertRunFence } from './execution.ts';
 import { captureContext } from './context.ts';
@@ -18,7 +19,7 @@ import {canonicalProjectPath,buildProjectManifest,projectBaseCommit} from './pro
 import {taskVerificationRecordSchema} from '../../../packages/protocol/src/index.ts';
 
 /** External (non-managed) claims must heartbeat within this window or the worker recycles the task. */
-const externalTaskLeaseMs = (store: Store) => store.settings().taskLeaseMs;
+const externalTaskLeaseMs = (store: EventStore) => store.settings().taskLeaseMs;
 
 export class RoomService {
   onCancel: (runId: string) => void = () => {};
@@ -27,7 +28,7 @@ export class RoomService {
   onInput: (runId: string, text: string) => void = () => {};
   readonly inputDelivery: InputDeliveryService;
   private activeTraceId?:string;
-  constructor(public store: Store) { this.inputDelivery = new InputDeliveryService(store); }
+  constructor(public store: EventStore) { this.inputDelivery = new InputDeliveryService(store); }
   execute(raw: unknown, actor: Actor = OWNER,scope?:{runId:string;generation?:number;executionId?:string}): Receipt {
     const parsed = commandSchema.safeParse(raw); if (!parsed.success) throw new ProtocolError('invalid_command', parsed.error.message);
     const command = parsed.data, hash = digest({ command, actor,...(scope?{scope}:{}) });
@@ -747,7 +748,7 @@ export class RoomService {
   }
 }
 
-function p95DiscussionWindow(store:Store,discussion:Discussion):number{
+function p95DiscussionWindow(store:EventStore,discussion:Discussion):number{
   const samples=store.list<Run>('runs',discussion.roomId).filter(run=>run.startedAt&&run.finishedAt&&run.status==='completed').map(run=>{const agent=store.get<AgentDescriptor>('agents',run.agentId);return agent?{durationMs:Math.max(0,Date.parse(run.finishedAt!)-Date.parse(run.startedAt!)),provider:agent.provider,adapterFingerprint:agentCapabilityFingerprint(agent),model:agent.model,taskClass:run.discussionId?'discussion':'task'}:undefined;}).filter(Boolean) as {durationMs:number;provider:string;adapterFingerprint:string;model?:string;taskClass:string}[];
   const windows=discussion.participants.map(agentId=>{const agent=store.get<AgentDescriptor>('agents',agentId);return agent?discussionWindowEstimate(samples,{provider:agent.provider,adapterFingerprint:agentCapabilityFingerprint(agent),model:agent.model,taskClass:'discussion'}).windowMs:undefined;}).filter((value):value is number=>value!==undefined);
   return windows.length?Math.max(...windows):90_000;

@@ -32,7 +32,7 @@ import type {TaskVerificationRecord,DependencyRequirement} from './task-acceptan
 
 export const VERSION = '0.1' as const;
 export const idSchema = z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/);
-export const providerSchema = z.enum(['codex', 'claude', 'deepseek', 'api', 'a2a', 'demo']);
+export const providerSchema = z.enum(['codex', 'claude', 'deepseek', 'minimax', 'api', 'a2a', 'demo']);
 export type Provider = z.infer<typeof providerSchema>;
 export const capabilitiesSchema = z.object({
   streaming: z.boolean(), resume: z.boolean(), cancel: z.boolean(),
@@ -58,6 +58,7 @@ export const agentSchema = z.object({
   responseFormat:z.enum(['text','room-json']).default('text'),
   capabilities: capabilitiesSchema.optional()
 }).superRefine((agent,ctx)=>{
+  if(agent.provider==='minimax'&&agent.connectionMode!=='external')ctx.addIssue({code:'custom',message:'MiniMax Code 目前仅支持外部会话 / MCP 接入，由 MiniMax Code 自己的运行时负责模型与工具'});
   if(agent.connectionMode==='attach'&&(agent.provider!=='codex'||agent.executionMode!=='host'||!agent.codexBinding))ctx.addIssue({code:'custom',message:'附着模式只支持 Codex，必须选择已有宿主会话并配置线程绑定'});
 });
 export type AgentDescriptor = z.infer<typeof agentSchema>;

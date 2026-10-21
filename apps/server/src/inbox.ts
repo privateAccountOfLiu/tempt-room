@@ -1,6 +1,7 @@
 import { ProtocolError, terminalStates, type AgentSession, type InboxDelivery, type RoomEvent, type Subscription, type WakeIntent } from '../../../packages/protocol/src/index.ts';
 import { digest, now, Store, SYSTEM } from './store.ts';
 import { shouldWake } from './wake-policy.ts';
+import type { EventStore } from './ports/event-store.ts';
 
 export interface InboxScanResult {
   blocked?: string;
@@ -16,7 +17,7 @@ export interface InboxScanResult {
  * creation: delivery and wake intent are facts, execution is a later decision.
  */
 export class InboxService {
-  constructor(private store: Store) {}
+  constructor(private store: EventStore) {}
 
   scan(roomId: string, agentSessionId: string, options: {throughSeq?: number} = {}): InboxScanResult {
     return this.store.atomic(() => this.scanInsideTransaction(roomId, agentSessionId, options.throughSeq));

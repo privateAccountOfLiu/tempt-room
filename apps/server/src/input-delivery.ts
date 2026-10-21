@@ -1,5 +1,6 @@
 import { ProtocolError, type InboxDelivery, type InputBatch, type InputDeliveryMode } from '../../../packages/protocol/src/index.ts';
 import { digest, now, Store, SYSTEM, uid } from './store.ts';
+import type { EventStore } from './ports/event-store.ts';
 
 export interface CreateBatchInput {
   roomId: string;
@@ -12,7 +13,7 @@ export interface CreateBatchInput {
 
 /** Persist a bounded input batch before any adapter receives it. */
 export class InputDeliveryService {
-  constructor(private store: Store) {}
+  constructor(private store: EventStore) {}
 
   createBatch(input: CreateBatchInput): InputBatch | undefined {
     return this.store.atomic(() => {

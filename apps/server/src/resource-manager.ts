@@ -1,5 +1,6 @@
 import { ProtocolError, type CleanupProof, type ResourceLease, type Run } from '../../../packages/protocol/src/index.ts';
 import { now, Store, SYSTEM, uid } from './store.ts';
+import type { EventStore } from './ports/event-store.ts';
 
 export interface AcquireInput {
   roomId: string;
@@ -10,7 +11,7 @@ export interface AcquireInput {
   leaseMs?: number;
 }
 
-export function acquireResource(store: Store, input: AcquireInput): ResourceLease {
+export function acquireResource(store: EventStore, input: AcquireInput): ResourceLease {
   return store.atomic(() => {
     const canonicalKey = normalizeResourceKey(input.key);
     const existing = store.list<ResourceLease>('resource_leases', input.roomId).filter(item => item.canonicalKey === canonicalKey && ['active', 'quarantined'].includes(item.status));
@@ -26,7 +27,7 @@ export function acquireResource(store: Store, input: AcquireInput): ResourceLeas
   });
 }
 
-export function releaseResource(store: Store, roomId: string, leaseId: string, proof: CleanupProof): ResourceLease {
+export function releaseResource(store: EventStore, roomId: string, leaseId: string, proof: CleanupProof): ResourceLease {
   return store.atomic(() => {
     const lease = store.list<ResourceLease>('resource_leases', roomId).find(item => item.id === leaseId);
     if (!lease) throw new ProtocolError('not_found', '资源租约不存在', 404);
@@ -38,7 +39,7 @@ export function releaseResource(store: Store, roomId: string, leaseId: string, p
   });
 }
 
-export function quarantineResource(store: Store, roomId: string, leaseId: string, reason: string): ResourceLease {
+export function quarantineResource(store: EventStore, roomId: string, leaseId: string, reason: string): ResourceLease {
   return store.atomic(() => {
     const lease = store.list<ResourceLease>('resource_leases', roomId).find(item => item.id === leaseId);
     if (!lease) throw new ProtocolError('not_found', '资源租约不存在', 404);
@@ -49,7 +50,7 @@ export function quarantineResource(store: Store, roomId: string, leaseId: string
 }
 
 /** Leases from a previous process have no trustworthy cleanup proof. */
-export function expireQuarantinedLeases(store: Store, ttlMs: number): number {
+export function expireQuarantinedLeases(store: EventStore, ttlMs: number): number {
   if (ttlMs <= 0) return 0;
   const cutoff = Date.now() - ttlMs;
   let expired = 0;
@@ -61,7 +62,7 @@ export function expireQuarantinedLeases(store: Store, ttlMs: number): number {
   return expired;
 }
 
-export function recoverResourceLeases(store: Store): number {
+export function recoverResourceLeases(store: EventStore): number {
   let recovered = 0;
   for (const lease of store.list<ResourceLease>('resource_leases').filter(item => item.status === 'active')) {
     quarantineResource(store, lease.roomId, lease.id, 'restart_without_cleanup_proof');
@@ -70,7 +71,7 @@ export function recoverResourceLeases(store: Store): number {
   return recovered;
 }
 
-export function expireResourceLeases(store: Store): number {
+export function expireResourceLeases(store: EventStore): number {
   let expired = 0;
   for (const lease of store.list<ResourceLease>('resource_leases').filter(item => item.status === 'active' && item.leaseUntil && Date.parse(item.leaseUntil) <= Date.now())) {
     const next: ResourceLease = {...lease, status: 'revoked', updatedAt: now()};
