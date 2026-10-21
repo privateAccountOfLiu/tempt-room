@@ -2,6 +2,7 @@
 
 > 能力完成定义（E04）见 [CAPABILITY-COMPLETION.md](CAPABILITY-COMPLETION.md)。
 > 计划闭环审计见 [PLAN-CLOSURE.md](PLAN-CLOSURE.md)。
+> Job launcher 构建/回退见 [JOB-LAUNCHER.md](JOB-LAUNCHER.md)。
 
 # Next Agent 实施进度（v1.1 / M0 波次）
 
@@ -227,11 +228,11 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-eos1W1/report.json`，174.3s）
+- `npm run test:preflight`：8/8 通过（`.state/preflight/run-kUH23W/report.json`，185.1s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-wj7Ax5/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-r1Zkx0/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
@@ -745,3 +746,11 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - 新增 docs/PLAN-CLOSURE.md：A–F 波次逐项状态与证据
 - A–E 核心闭环完成；F02 完成；F01/F03 为计划标注的可选 P2，未实施但仍保留为可选
 - 外部边界：宿主 CLI 权限 UI、ACP/Claude steer 协议、Job launcher dotnet 构建
+
+## Job launcher 构建依赖闭环（第 132 轮）
+
+- 新增 scripts/build-job-launcher.mjs：有 dotnet 自动 publish，无 dotnet 警告并 exit 0
+- npm run build 与 preflight 新增 job-launcher 步骤；preflight 8/8 PASS（run-kUH23W，185.1s）
+- npm run check:job-launcher 检查构建状态；ROOM_JOB_LAUNCHER_REQUIRED=1 可强制缺失即失败
+- 回退验证：模拟缺 dotnet → fallback exit 0；required → exit 1；恢复后 built
+- 新增 docs/JOB-LAUNCHER.md

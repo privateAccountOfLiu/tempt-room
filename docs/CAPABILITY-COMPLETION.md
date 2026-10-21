@@ -40,7 +40,7 @@
 | --- | --- | --- |
 | 真实 CLI 能力验证 | 能力状态机、指纹失效、缺口原因 | 真实 codex/claude/deepseek 会话尚未在授权环境跑通 |
 | 宿主权限拦截 | ACP `session/request_permission` 按策略允许/拒绝；MCP 写入走工具授权；external MCP 被拒写工具可进入 owner 审批桥（GET/POST /api/tool-approvals） | 原生 CLI 自带权限 UI 仍在宿主侧不可拦截；已在 `interceptionGaps` 明示 |
-| 进程树清理 | AppContainer jobEmpty；remote/demo no-local；native host Job Object kill-on-close（tools/job-launcher）+ taskkill/CIM 扫描 | 可选：无 dotnet 环境需先构建 launcher |
+| 进程树清理 | AppContainer jobEmpty；remote/demo no-local；native host Job Object kill-on-close（tools/job-launcher，npm build/preflight 自动构建；缺 dotnet 自动回退 taskkill/CIM） | — |
 | 外部读取证据 | file/db/network 自动采集 + owner 显式命令 | artifact 内容不做秘密扫描；网络证据依赖响应头 |
 | 房间导出/导入 | 事件、artifact、脱敏、ID remap | 导入的 seq/throughSeq 引用按原顺序近似；不含导入后的敏感字段重扫 |
 | 真实 steer | Codex turn/steer 已真实端到端验证（docs/B06-REAL-STEER.md）；ACP/Claude 暂无 steer 协议 | 需要 DeepSeek ACP/Claude 侧协议支持 |
@@ -58,7 +58,7 @@
 
 - 单元/集成测试：399/399
 - 浏览器 E2E：45/45
-- 发布前门禁：7/7
+- 发布前门禁：8/8
 - 生产冒烟：10/10
 - 协作基线：PASS
 - 实时服务：http://127.0.0.1:4317（PID 记录在 `docs/NEXT-AGENT-PROGRESS.md`）

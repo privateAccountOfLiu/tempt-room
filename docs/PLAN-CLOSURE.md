@@ -39,7 +39,7 @@
 | C01 跨 Run 操作去重 | 完成 | `tests/native-operations.test.ts`、`tests/recovery-proof.test.ts` |
 | C02 工具前置策略 | 完成 | `tests/tool-authorization.test.ts`、`tests/acp-permission.test.ts`、`tests/tool-approval.test.ts`；宿主 CLI 自带权限 UI 属外部边界 |
 | C03 未知结果核对/续接 | 完成 | `tests/native-operations.test.ts`、`tests/external-context.test.ts` |
-| C04 租约与进程树证明 | 完成 | `tests/resource-lease.test.ts`、`tests/cleanup-proof.test.ts`、`tests/job-launcher.test.ts`；Job launcher 默认启用（需 `npm run build:job-launcher`） |
+| C04 租约与进程树证明 | 完成 | `tests/resource-lease.test.ts`、`tests/cleanup-proof.test.ts`、`tests/job-launcher.test.ts`；`npm run build`/preflight 自动构建 launcher，缺 dotnet 自动回退 taskkill+CIM（[JOB-LAUNCHER.md](JOB-LAUNCHER.md)） |
 
 ## D 批
 
@@ -56,7 +56,7 @@
 | --- | --- | --- |
 | E01 UI/可观测性 | 完成 | 浏览器 E2E 45 项、`.state/browser-e2e/run-wj7Ax5` |
 | E02 双真实 CLI 实验 | 完成 | [E02-REAL-EXPERIMENT.md](E02-REAL-EXPERIMENT.md)、[evidence/e02-real-dual-agent-report.json](evidence/e02-real-dual-agent-report.json) |
-| E03 CI/release 证据 | 完成 | `.github/workflows/ci.yml`、preflight 7/7 `.state/preflight/run-eos1W1` |
+| E03 CI/release 证据 | 完成 | `.github/workflows/ci.yml`、preflight 8/8 `.state/preflight/run-kUH23W` |
 | E04 文档与能力完成定义 | 完成 | [CAPABILITY-COMPLETION.md](CAPABILITY-COMPLETION.md)、本文件 |
 
 ## F 批（P2，按需）
@@ -71,12 +71,12 @@
 
 - 宿主 CLI 自带权限 UI：客户端行为，房间侧无法拦截；已通过 `interceptionGaps` 明示，并提供 external MCP 写工具 owner 审批桥。
 - DeepSeek ACP / Claude 无运行中 steer 协议：Codex 已真实验证；ACP/Claude 仅支持下一轮投递。
-- Job Object launcher 依赖 dotnet 构建；未构建时自动回退 taskkill+CIM 扫描。
+- Job Object launcher 的 dotnet 构建已纳入 `npm run build` 与 preflight；缺 SDK 时警告并自动回退 taskkill+CIM（[JOB-LAUNCHER.md](JOB-LAUNCHER.md)）。
 
 ## 最终验证
 
 - 单元/集成测试：420/420
-- 发布前门禁：7/7
+- 发布前门禁：8/8（含 job-launcher 构建步骤）
 - 浏览器 E2E：45/45
 - 生产冒烟：10/10
 - 协作基线：PASS（`.state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d`）

@@ -56,6 +56,7 @@ try {
   await step('typecheck', ['run', 'typecheck']);
   await step('unit-tests', ['test']);
   await step('secret-scan', ['run', 'check:secrets'], 120_000);
+  await step('job-launcher', ['run', 'build:job-launcher'], 180_000);
   await step('build', ['run', 'build']);
   if (skipSdk) { report.steps.push({name: 'sdk-consumer', command: 'npm run test:sdk', ok: true, skipped: true, durationMs: 0, exitCode: 0}); console.log('\n=== sdk-consumer (skipped) ==='); }
   else await step('sdk-consumer', ['run', 'test:sdk']);
