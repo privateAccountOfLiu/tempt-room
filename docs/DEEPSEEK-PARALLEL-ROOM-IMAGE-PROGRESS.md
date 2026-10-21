@@ -25,13 +25,13 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | P06 M1 七项可失败用例 | in_progress | 1–6 的模拟切片已覆盖（并发=1 负例、共同基线、整体组合、局部失败/重试、幂等/fence、同文件冲突保留双方 patch）；第 7 项真实 CLI 对照依赖 V03 尚未执行 |
 | R01 Room schema/事件/迁移 | verified | room.ts 统一 schema/normalizeRoom；新增 room.configured/deleting/deletion.updated/deleted 与状态守卫；迁移整理为 v10→v18 有序升级；生成物更新 |
 | R02 单事务保存房间设置与成员 | verified | 纯规划 + 单事件 room.configured；revision CAS、成员去重/校验、忙成员移除拒绝、闲置会话结束、legacy 命令复用；5 个用例通过 |
-| R03 删除请求、停止执行与清理 | in_progress | afterCommit、room.delete 短事务、Worker finalizer、写入口拒绝、pending wake/input-batch/inbox delivery 清理已通过 6 个用例；outbound delivery 停止、image-upload 失效、全入口二次校验仍未覆盖 |
+| R03 删除请求、停止执行与清理 | in_progress | afterCommit、短事务、finalizer、写入口拒绝、wake/input/inbox 清理、outbound delivery 在非 active 房间记录 aborted 且不再尝试；image-upload 失效由 Worker expireRoom 覆盖；全入口二次校验仍未系统覆盖 |
 | R04 API、WebSocket、SDK 与列表语义 | in_progress | activeRooms/410/WS 终态/owner 导出/artifact 防绕过/RoomClient 命令/删除房间导入新身份已通过 8 个用例；agent room_wait 直接测试与双窗口 WS 同步仍未覆盖 |
 | R05 房间设置与删除 UI | in_progress | 设置改为单条 room.configure（带 revision）、冲突/忙错误保留表单、删除确认与空状态已实现；新增 Agent 自动回填与删除后双窗口浏览器验收仍待补 |
 | I01 图片协议、工具参数与权限 | verified | images.ts 冻结分块/元数据/操作 ID；artifact 图片元数据；image 工具名与写权限映射；attachment-only 消息；7+3 个用例通过；真实上传实现归 I02/I05 |
 | I02 有界可恢复的上传临时状态 | verified | image_uploads/parts 表 + migration 19、分块状态机、配额/TTL、原子落盘、缺失块检测、GC 与 Worker image 工具/删除房间失效接线完成；重启进程 E2E 仍由 I04 覆盖 |
 | I03 解码验真、原图与安全预览 | verified | sharp 0.35.5 + 签名/结构检查 + 完整解码 + 1920 PNG 预览 + 原子落盘/稳定 artifactId；Worker 三个低层工具已接线并通过 3+3 用例；bridge/helper 归 I04 |
-| I04 托管 bridge/host/AppContainer 传输 | in_progress | Worker 三段式工具、helper、bridge `room_send_image`、toolchain 复制；真实 HostRoomPipe 固定图 smoke 通过（`test:room-images-native --mode host`）；AppContainer 模式明确 not_verified |
+| I04 托管 bridge/host/AppContainer 传输 | in_progress | host pipe 固定图 smoke + AppContainer probe 已验证 bridge 在沙箱内 advertise `room_send_image`（sandbox probe 23/23 通过）；AppContainer 真图片上传仍 not_verified（`--mode sandbox` 明确不冒充） |
 | I05 外部 MCP、插件与 SDK 发图 | in_progress | SDK、外部 MCP room_send_image、真实 stdio→HTTP 重试幂等、HTTP timeout/401/403/410 分类与 no-retry 语义通过 4 个用例；并发双图与手动宿主验证待补 |
 | I06 安全内联路由与图片展示 | verified | 私有 `/api/artifacts/:id/image`（active/verified/hash/no-store）、缩略图、失败降级、键盘 Lightbox、纯图不渲染空 Markdown 已完成并通过 3 个接口用例与完整浏览器 E2E |
 | I07 跨功能竞态 | in_progress | 9 个用例覆盖删房/移除成员/并行上传/丢回执/导出回放/删后审计/解码期间删房/托管 stale generation/最后房间 restart + 列表为空 + 旧图片 URL 410；删除与最终 project apply 并发仍未覆盖 |
@@ -1510,6 +1510,43 @@ V03 付费真实 CLI 实验。
 证据：.state/parallel-room-image/v04-import-tests-20261022.log、
 .state/secret-scan/latest.json
 下一张卡：V03（等待付费授权）
+```
+
+## R03/I04 — outbound 终止与 AppContainer bridge 工具发现
+
+```
+卡号与状态：R03/I04 补充切片 / in_progress
+基线 SHA：7534373（V04 文档提交）；实现见本次提交
+修改文件和关键符号：
+  apps/server/src/worker.ts
+    deliverOutbound 对 normalizeRoom(room).status !== 'active' 的房间：
+      不发起任何 webhook 请求；对未 delivered 的 enqueue 写一次
+      audit.recorded action=outbound.aborted:<deliveryId>:room_<status>，
+      重启/下一 tick 仍不会继续外发尝试。
+  sandbox/RoomSandbox/Program.cs
+    AppContainer probe 的 bridge tools/list 期望更新为
+    room_read,room_post,room_send_image,task_propose,artifact_publish，
+    修复新增图片工具导致的 sandbox probe 失败。
+  tests/room-deletion.test.ts（+1 个用例）
+    outbound.enqueued 后立即 room.delete；deliverOutbound() 不产生
+    outbound.attempted，只留下稳定 outbound.aborted 审计原因。
+执行命令、cwd、环境、开始结束、退出码：
+  npm run build:sandbox                                           exit 0
+  npm run test:sandbox -- --probe                                exit 0（23/23 通过）
+  npx tsc --noEmit                                               exit 0
+  npx tsx --test --test-name-pattern=outbound tests/room-deletion.test.ts  exit 0
+  npm test                                                        exit 0（542 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-22 07:05–07:40 CST
+证据路径：
+  .state/parallel-room-image/r03-i04-tests-20261022.log
+  .state/parallel-room-image/sandbox-build-20261022.log
+实际覆盖：
+  删除后未发外发请求且审计终止原因；AppContainer 沙箱内 bridge 列出
+  room_send_image 并完成原有 scoped room_read。
+尚未验证：
+  AppContainer 内真实图片字节/分块上传仍是 not_verified；
+  “正在外发请求”本身的中断（已发出 payload 不声称收回）未做故障注入。
+下一张卡：V03（等待付费授权）或 AppContainer 真图片 smoke
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移

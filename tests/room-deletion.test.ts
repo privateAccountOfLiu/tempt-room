@@ -131,3 +131,12 @@ test('deletion suppresses pending wakes and expires batches and inbox deliveries
   assert.ok(ctx.store.events(ctx.roomId).some(event => event.type === 'wake.suppressed'));
   assert.ok(ctx.store.events(ctx.roomId).some(event => event.type === 'input.batch.expired'));
 });
+
+test('deleting a room aborts unsent outbound deliveries with a stable audit reason', async t => {
+  const ctx = fixture(t);
+  ctx.store.event(ctx.roomId, 'outbound.enqueued', SYSTEM, {deliveryId: 'outbound_delete_test', url: 'http://127.0.0.1:9/hook', throughSeq: 1, redacted: true, createdAt: now()});
+  ctx.command('room.delete', {expectedRevision: 1});
+  await ctx.worker.deliverOutbound();
+  assert.equal(ctx.store.events(ctx.roomId).filter(event => event.type === 'outbound.attempted').length, 0, 'must not attempt a delivery after deletion started');
+  assert.ok(ctx.store.events(ctx.roomId).some(event => event.type === 'audit.recorded' && String((event.payload as any).action).startsWith('outbound.aborted:outbound_delete_test')));
+});

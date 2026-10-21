@@ -14,7 +14,7 @@ import { Workspaces, safePath } from './workspaces.ts';
 import { ImmutableBaselines } from './immutable-baselines.ts';
 import { IntegrationRunner } from './integration-runner.ts';
 import { ImageUploads } from './image-uploads.ts';
-import { imageUploadBeginSchema, imageUploadChunkSchema, imageUploadCompleteSchema } from '../../../packages/protocol/src/index.ts';
+import { imageUploadBeginSchema, imageUploadChunkSchema, imageUploadCompleteSchema, normalizeRoom } from '../../../packages/protocol/src/index.ts';
 import { chatWorkspace,sessionKey } from './sessions.ts';
 import { redactDiagnostic } from './diagnostics.ts';
 import { runContext } from './context.ts';
@@ -795,6 +795,16 @@ export class Worker {
           if(event.type==='outbound.enqueued'){enqueued.set(payload.deliveryId,payload);attempts.set(payload.deliveryId,[]);}
           else if(event.type==='outbound.attempted'&&attempts.has(payload.deliveryId))attempts.get(payload.deliveryId)!.push(payload);
           else if(event.type==='outbound.delivered')delivered.add(payload.deliveryId);
+        }
+        const lifecycle=normalizeRoom(room).status;
+        if(lifecycle!=='active'){
+          for(const deliveryId of enqueued.keys()){
+            if(delivered.has(deliveryId))continue;
+            const marker='outbound.aborted:'+deliveryId;
+            if(events.some(event=>event.type==='audit.recorded'&&(event.payload as any)?.action===marker))continue;
+            this.store.event(room.id,'audit.recorded',SYSTEM,{action:marker+':room_'+lifecycle});
+          }
+          continue;
         }
         for(const [deliveryId,item] of enqueued){
           if(delivered.has(deliveryId))continue;

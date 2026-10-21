@@ -171,7 +171,7 @@ const cp=require('node:child_process');
 const requests=[{jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-06-18'}},{jsonrpc:'2.0',id:2,method:'tools/list'},{jsonrpc:'2.0',id:3,method:'tools/call',params:{name:'room_read',arguments:{}}}];
 const output=cp.execFileSync(process.execPath,[process.argv[2]],{input:requests.map(frame=>JSON.stringify(frame)).join('\n')+'\n',encoding:'utf8',timeout:10000});
 const frames=output.trim().split(/\r?\n/).map(line=>JSON.parse(line));
-if(frames.length!==3||frames[0].result.protocolVersion!=='2025-06-18'||frames[1].result.tools.map(tool=>tool.name).join(',')!=='room_read,room_post,task_propose,artifact_publish'||frames[2].result.isError||!JSON.parse(frames[2].result.content[0].text).ok)throw new Error('MCP handshake or scoped tool response failed');
+if(frames.length!==3||frames[0].result.protocolVersion!=='2025-06-18'||frames[1].result.tools.map(tool=>tool.name).join(',')!=='room_read,room_post,room_send_image,task_propose,artifact_publish'||frames[2].result.isError||!JSON.parse(frames[2].result.content[0].text).ok)throw new Error('MCP handshake or scoped tool response failed');
 console.log('node-room-mcp-ok');
 """);
                 var result=await RunTool(tools.Node,[script,Path.Combine(Path.GetDirectoryName(tools.Node)!,"room-bridge.mjs")]);
