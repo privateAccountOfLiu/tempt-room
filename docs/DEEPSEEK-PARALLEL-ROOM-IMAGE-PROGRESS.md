@@ -35,7 +35,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | I05 外部 MCP、插件与 SDK 发图 | in_progress | Browser/Node SDK uploadImage/sendImage（Web Crypto、稳定 commandId、错误 stage）与 RoomAgentClient 方法已完成并通过 4 个用例；外部 MCP room_send_image、helper 与插件同步仍未接线 |
 | I06 安全内联路由与图片展示 | verified | 私有 `/api/artifacts/:id/image`（active/verified/hash/no-store）、缩略图、失败降级、键盘 Lightbox、纯图不渲染空 Markdown 已完成并通过 3 个接口用例与完整浏览器 E2E |
 | I07 跨功能竞态 | in_progress | 删房/移除成员/并行上传/丢回执重试/导出回放/删后审计 6 类竞态通过 6 个用例；`acceptance:room-images --check` 通过；托管取消、删除与最终 apply、最后房间重启组合仍未覆盖 |
-| V01 开发/发布报告分模式 | not_started | |
+| V01 开发/发布报告分模式 | in_progress | schemaVersion 2、sourceBefore/sourceAfter、tracked/working/untracked+lockfile hash、`--release --expected-head` 前置失败 not_run、source_changed 检测与 checksPassed/releaseEligible 已完成并通过 5 个用例；真实 release 运行与 expected-head 参数化脚本入口待补 |
 | V02 CI/preflight 接入真实入口 | not_started | |
 | V03 固定版本真实 CLI 与三组对照 | not_started | |
 | V04 文档、备份导入导出与统一口径 | not_started | |
@@ -1057,6 +1057,52 @@ delivery/image-upload 细节与全入口 assertActiveRoom 仍待补）
   删除与最终 project apply 并发、最后房间删除后 restart/重建列表未纳入本卡；
   host/sandbox 真管道与 external stdio transport 证据仍由 I04/I05 补
 下一张卡与依赖：V01（开发/发布报告分模式）
+```
+
+## V01 — 开发报告与发布报告分模式
+
+```
+卡号与状态：V01 / in_progress（报告模型/CLI/校验完成；真实 release 命令入口待接 preflight）
+基线 SHA / 实现 SHA / dirty 与内容摘要：
+  基线 5417ef3（I07 提交）；实现见本次提交
+修改文件和关键符号：
+  scripts/verify-collaboration-baseline.ts（重构）
+    SourceSnapshot：head/dirty/status/gitOk/gitError/trackedTreeHash/
+    workingContentHash/untrackedManifestHash/lockfileHash/generatedAt；
+    使用 git ls-files -z / --others --exclude-standard -z，按路径+类型+字节数+
+    SHA256 生成 manifest，不使用空格拆文件名；Git 失败记录 source_unknown；
+    VerificationReport schemaVersion 2：mode/sourceBefore/sourceAfter/
+    sourceStable/checksPassed/releaseEligible/releaseBlockers；
+    `--release --expected-head <40hex>`：HEAD 缺失/格式错误/不匹配、dirty、
+    git 失败时所有命令记录 not_run 且 exitCode=null，不把“没跑”当通过；
+    命令结束后重新 capture，HEAD/tracked/working/untracked/lockfile 任一变化
+    则 releaseEligible=false/exit 1；development 模式允许 dirty，
+    但 checksPassed/ok 仍严格根据命令结果；
+    parseVerifyArgs 拒绝未知参数和缺失 expected-head
+  tests/verification-report.test.ts（重写 5 个用例）
+变更前触发条件 / 变更后行为：
+  变更前：报告只有 statusHash，无法区分 git 失败与 clean；dirty 树也可生成
+  单一 ok；没有 release 模式或 expected-head，命令 not_run 无法表达。
+  变更后：开发/发布两套明确判定；release 绑定完整 HEAD、干净树和执行前后
+  源码内容一致；not_run/失败/源码变化都使 release 失败。
+接口/事件/迁移/兼容性：
+  新报告 schemaVersion=2；保留 schemaVersion 1 的 source 兼容字段；
+  CLI 默认仍是 development，不带 --release 时不要求 clean/expected-head。
+执行命令、cwd、环境、开始结束、退出码：
+  npm run typecheck                                            exit 0
+  npx tsx --test tests/verification-report.test.ts              exit 0（5 pass / 0 fail）
+  npm test                                                      exit 0（529 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-22 02:05–02:30 CST
+证据路径：
+  .state/parallel-room-image/v01-tests-20261022.log
+实际覆盖的模式和失败分支：
+  开发模式成功/失败；release clean+expected-head 成功；dirty 失败并 not_run；
+  expected-head 不匹配；repo 内容执行后变化；未知/缺失 CLI 参数
+尚未验证项及明确原因：
+  真实 `--release` 命令集（typecheck/test/replay）未在本轮执行，因为当前树
+  仍 dirty 且 release 要求 clean；expected-head 参数尚未接入 npm preflight
+  脚本/CI；schemaVersion 1 旧报告读取兼容路径未做读取器测试
+下一张卡与依赖：V02（CI/preflight 接入真实入口）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移
