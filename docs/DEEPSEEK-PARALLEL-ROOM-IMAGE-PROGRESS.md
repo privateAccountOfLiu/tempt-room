@@ -1,7 +1,9 @@
 # DeepSeek 后续实施进展：并行交付闭环、房间管理与 Agent 图片消息
 
-本文件是 [实施 Plan](../../deepseek-parallel-room-image-plan-v2.md) 的唯一进展台账。
+本文件是 [实施 Plan](DEEPSEEK-PARALLEL-ROOM-IMAGE-IMPLEMENTATION-PLAN.md) 的唯一进展台账。
 Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、命令、退出码、证据路径与未覆盖项。
+
+> 副本说明：仓库根目录的 `deepseek-parallel-room-image-plan-v2.md` 与 `docs/DEEPSEEK-PARALLEL-ROOM-IMAGE-IMPLEMENTATION-PLAN.md` 当前内容相同。本文件与 docs 索引以 docs 下的副本为准；两份副本的去重与同步闸门列入 V04（文档统一），在此之前不擅自删除任一份。
 
 状态取值：`not_started / in_progress / blocked / verified`。未验证的能力不得改写为完成。
 
