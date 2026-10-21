@@ -61,18 +61,22 @@ export function planRoomImport(source: RoomExportLike, options: {newRoomId: stri
     return value;
   };
   const createdAt = options.now ?? new Date().toISOString();
+  const importedRoom = replace(source.room);
+  delete importedRoom.deletion;
   const room = {
-    ...replace(source.room),
+    ...importedRoom,
     id: options.newRoomId,
     name: String(options.name ?? source.room.name ?? '导入房间').slice(0, 80),
     seq: 0,
+    revision: 1,
+    status: 'active',
     createdAt
   };
   const events: ImportedEvent[] = [];
   let inserted = 0;
   for (const event of source.events) {
     if (!event || typeof event.type !== 'string') continue;
-    const skipped = ['room.created', 'room.updated', 'projection.checkpoint'].includes(event.type);
+    const skipped = ['room.created', 'room.updated', 'room.deleting', 'room.deletion.updated', 'room.deleted', 'projection.checkpoint'].includes(event.type);
     if (!skipped) inserted++;
     if (typeof event.seq === 'number') seqMap.set(event.seq, inserted);
     if (!skipped) events.push({...event, payload: replace(event.payload ?? {})});

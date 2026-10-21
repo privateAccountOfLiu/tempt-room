@@ -1128,6 +1128,9 @@ export class Worker {
       if(startSeq>room.seq)throw new ProtocolError('invalid_cursor','游标超出当前房间事件序号',400);
       let cursor=startSeq;
       while (Date.now() < deadline) {
+        const lifecycleRoom = this.store.room(roomId);
+        if ((lifecycleRoom as {status?: string}|undefined)?.status === 'deleted') throw new ProtocolError('room_deleted', '房间已删除', 410);
+        if ((lifecycleRoom as {status?: string}|undefined)?.status === 'deleting') throw new ProtocolError('room_deleting', '房间正在删除', 409);
         if(!this.store.get<AgentDescriptor>('agents',agentId)?.enabled||!this.store.room(roomId)?.members.includes(agentId))throw new ProtocolError('forbidden','Agent 房间访问已撤销',403);
         const events=this.store.events(roomId,cursor,1000),messages:unknown[]=[];
         for(const event of events){cursor=event.seq;if(event.type==='chat.message.created')messages.push(event.payload.message);if(messages.length===20)break;}

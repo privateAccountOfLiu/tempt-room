@@ -104,3 +104,27 @@ test('room import remaps basedOnSeq and context seq references after skipped roo
   assert.equal(advanced.delta.throughSeq, 2);
   assert.equal(advanced.delta.headSeq, 2);
 });
+
+test('importing a tombstoned room creates a fresh active identity and drops deletion facts', () => {
+  const deletion = {requestedAt: '2026-01-02T00:00:00.000Z', requestedBy: 'owner', commandId: 'delete_old', deletedAt: '2026-01-02T00:01:00.000Z', pendingReasons: []};
+  const deleted = {
+    version: '0.1',
+    room: {id: 'room_dead', name: 'Deleted source', members: [], seq: 4, revision: 3, status: 'deleted', deletion, createdAt: '2026-01-01T00:00:00.000Z'},
+    events: [
+      {type: 'room.created', payload: {room: {id: 'room_dead'}}},
+      {type: 'room.deleting', payload: {room: {id: 'room_dead', status: 'deleting', revision: 2, deletion}}},
+      {type: 'room.deletion.updated', payload: {room: {id: 'room_dead', status: 'deleting', revision: 2, deletion}}},
+      {type: 'room.deleted', payload: {room: {id: 'room_dead', status: 'deleted', revision: 3, deletion}}},
+      {type: 'chat.message.created', payload: {message: {id: 'msg_life123', roomId: 'room_dead', actor: {id: 'owner', kind: 'human'}, text: 'surviving history'}}}
+    ]
+  };
+  const plan = planRoomImport(deleted, {newRoomId: 'room_fresh', name: 'Fresh', salt: 'import-lifecycle'});
+  assert.equal(plan.room.id, 'room_fresh');
+  assert.equal(plan.room.status, 'active');
+  assert.equal(plan.room.revision, 1);
+  assert.equal(plan.room.deletion, undefined);
+  assert.ok(!plan.events.some(event => ['room.deleting', 'room.deletion.updated', 'room.deleted'].includes(event.type)));
+  const message = plan.events.find(event => event.type === 'chat.message.created')!.payload as any;
+  assert.equal(message.message.roomId, 'room_fresh');
+  assert.equal(message.message.text, 'surviving history');
+});

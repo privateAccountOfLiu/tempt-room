@@ -53,7 +53,7 @@ export class RoomClient {
           if(stopped)return;
           await cursor.accept(frame);
           if(frame.type==='room.deleted'){stopped=true;onStatus?.(false);connection.close(1000,'room_deleted');}
-        }).catch(()=>connection.close(1013,'Event replay required')).finally(()=>{bufferedBytes-=bytes;});
+        }).catch(error=>{ if((error as any)?.code==='room_deleted'||(error as any)?.status===410){stopped=true;onStatus?.(false);connection.close(1000,'room_deleted');return;} connection.close(1013,'Event replay required'); }).finally(()=>{bufferedBytes-=bytes;});
       };
       connection.onclose = event => {
         if(socket!==connection)return;
