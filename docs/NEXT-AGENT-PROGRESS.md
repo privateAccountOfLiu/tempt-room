@@ -228,11 +228,11 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：8/8 通过（`.state/preflight/run-RLF17Z/report.json`，184.7s）
+- `npm run test:preflight`：8/8 通过（`.state/preflight/run-PSxff1/report.json`，180.4s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（.state/browser-e2e/run-Uvk4if/report.json`）
+- 浏览器 E2E：45/45 通过（.state/browser-e2e/run-d4W0yM/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
@@ -750,7 +750,7 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 ## Job launcher 构建依赖闭环（第 132 轮）
 
 - 新增 scripts/build-job-launcher.mjs：有 dotnet 自动 publish，无 dotnet 警告并 exit 0
-- npm run build 与 preflight 新增 job-launcher 步骤；preflight 8/8 PASS（run-RLF17Z，185.1s）
+- npm run build 与 preflight 新增 job-launcher 步骤；preflight 8/8 PASS（run-PSxff1，185.1s）
 - npm run check:job-launcher 检查构建状态；ROOM_JOB_LAUNCHER_REQUIRED=1 可强制缺失即失败
 - 回退验证：模拟缺 dotnet → fallback exit 0；required → exit 1；恢复后 built
 - 新增 docs/JOB-LAUNCHER.md
@@ -763,7 +763,7 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - 尺寸对齐：未完成运行卡片使用与 usage-history 相同的 box（margin-left 46px、padding 12px、border、font-size 11px），未修改 settings.css/workbench.css 中的 usage-history 样式
 - 浏览器 E2E 在折叠态断言两卡片的 width/left/height 一致
 
-- 最终验证：preflight 8/8（run-RLF17Z，194.4s）；浏览器 E2E 45/45（run-4VOpKe）；折叠卡片 width/left/height 对齐断言通过
+- 最终验证：preflight 8/8（run-PSxff1，194.4s）；浏览器 E2E 45/45（run-4VOpKe）；折叠卡片 width/left/height 对齐断言通过
 
 ## 品牌图标与用户控件（第 132 轮）
 
@@ -772,7 +772,7 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - 默认 codex agent 显示名改为 ChatGPT（seed 与实时 DB 均已更新）；provider 标签改为 ChatGPT App Server
 - 浏览器 E2E 新增 owner/品牌图标断言与 provider-icons.png 截图
 
-- 品牌图标验证：浏览器 E2E 通过并生成 provider-icons.png（ChatGPT/Claude/DeepSeek 官方图标）；preflight 8/8（run-RLF17Z，187.0s）
+- 品牌图标验证：浏览器 E2E 通过并生成 provider-icons.png（ChatGPT/Claude/DeepSeek 官方图标）；preflight 8/8（run-PSxff1，187.0s）
 
 ## 严重修复：host 模式讨论发言被误当作交付物发布（第 132 轮）
 
@@ -782,7 +782,7 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - 真实回归：room_c6a08a5927b645ea9ae69bfef510a05a / disc_f1ccdf0e9a7a48e0b9021a4a29de7d75，Codex+DeepSeek 1 轮 2 人讨论 completed、两个 run completed、无 error，中文目标完整
 - 顺带修复：live DB 中 ChatGPT agent role 因先前 PowerShell API 编码产生的问号，已用 UTF-8 请求恢复为「开发实现与测试」
 
-- 讨论修复最终验证：421/421 测试；preflight 8/8（.state/preflight/run-RLF17Z，184.7s）；实时服务 PID 12364
+- 讨论修复最终验证：421/421 测试；preflight 8/8（.state/preflight/run-PSxff1，184.7s）；实时服务 PID 12364
 
 ## 讨论超时修复：讨论响应使用独立超时（第 132 轮）
 
@@ -792,3 +792,5 @@ report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/repo
 - 测试：tests/discussion-timeout.test.ts 断言讨论 run=discussionTimeoutMs、聊天 run=chatTimeoutMs
 - 真实回归：room_046d0d633a45437686f338c84c2c508b / disc_6afae40245a64f7a9f0164554acecd77，Codex+Claude+DeepSeek 全部 completed（timeoutMs=900000），讨论 completed，3 条评审消息
 - 说明：此前已 stopped 的讨论不会自动恢复；需重新发起讨论
+
+- 讨论超时修复最终验证：422/422 测试；preflight 8/8（.state/preflight/run-PSxff1，180.4s）；实时服务 PID 23712

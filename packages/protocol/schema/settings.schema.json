@@ -72,6 +72,12 @@
       "minimum": 1000,
       "maximum": 7200000
     },
+    "discussionTimeoutMs": {
+      "default": 900000,
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 7200000
+    },
     "taskLeaseMs": {
       "default": 600000,
       "type": "integer",
@@ -249,6 +255,7 @@
     "maxProcesses",
     "taskTimeoutMs",
     "chatTimeoutMs",
+    "discussionTimeoutMs",
     "taskLeaseMs",
     "tokenBudget",
     "costBudgetUsd",
