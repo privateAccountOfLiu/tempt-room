@@ -39,7 +39,7 @@
 | 能力 | 已有 | 缺口 |
 | --- | --- | --- |
 | 真实 CLI 能力验证 | 能力状态机、指纹失效、缺口原因 | 真实 codex/claude/deepseek 会话尚未在授权环境跑通 |
-| 宿主权限拦截 | ACP `session/request_permission` 已按策略允许/拒绝；MCP 写入走工具授权 | 原生 CLI 自带权限 UI 不可拦截；已在 `interceptionGaps` 明示 |
+| 宿主权限拦截 | ACP `session/request_permission` 按策略允许/拒绝；MCP 写入走工具授权；external MCP 被拒写工具可进入 owner 审批桥（GET/POST /api/tool-approvals） | 原生 CLI 自带权限 UI 仍在宿主侧不可拦截；已在 `interceptionGaps` 明示 |
 | 进程树清理 | AppContainer jobEmpty；remote/demo no-local；native host Job Object kill-on-close（tools/job-launcher）+ taskkill/CIM 扫描 | 可选：无 dotnet 环境需先构建 launcher |
 | 外部读取证据 | file/db/network 自动采集 + owner 显式命令 | artifact 内容不做秘密扫描；网络证据依赖响应头 |
 | 房间导出/导入 | 事件、artifact、脱敏、ID remap | 导入的 seq/throughSeq 引用按原顺序近似；不含导入后的敏感字段重扫 |

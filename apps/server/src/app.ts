@@ -310,6 +310,8 @@ export async function createApp(options: AppOptions = {}) {
     const room = store.room(request.params.id); if (!room) throw new ProtocolError('not_found', '房间不存在', 404);
     return store.list<UsageSample>('usage_samples', room.id).sort((a, b) => a.observedAt.localeCompare(b.observedAt));
   });
+  app.get('/api/tool-approvals',()=>worker.pendingToolApprovals());
+  app.post<{Params:{id:string};Body:{approve?:boolean}}>('/api/tool-approvals/:id',request=>{if(typeof request.body?.approve!=='boolean')throw new ProtocolError('invalid_request','approve 必须是布尔值',400);if(!worker.decideToolApproval(request.params.id,request.body.approve))throw new ProtocolError('not_found','审批请求不存在或已处理',404);return {decided:true};});
   app.get<{Params:{id:string}}>('/api/rooms/:id/wake-intents', request => {
     const room = store.room(request.params.id); if (!room) throw new ProtocolError('not_found','房间不存在',404);
     return store.list<WakeIntent>('wake_intents', room.id).sort((a, b) => b.sourceSeq - a.sourceSeq);

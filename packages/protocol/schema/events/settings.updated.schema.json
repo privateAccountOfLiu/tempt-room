@@ -236,6 +236,12 @@
           "default": "",
           "type": "string",
           "maxLength": 100
+        },
+        "externalToolApprovalTimeoutMs": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 120000
         }
       },
       "required": [
@@ -273,7 +279,8 @@
         "outboundAllowPrivate",
         "outboundMaxAttempts",
         "outboundTimeoutMs",
-        "outboundSigningSecretEnv"
+        "outboundSigningSecretEnv",
+        "externalToolApprovalTimeoutMs"
       ],
       "additionalProperties": false
     }

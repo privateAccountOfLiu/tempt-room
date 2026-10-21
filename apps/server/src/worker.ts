@@ -60,6 +60,7 @@ export class Worker {
   private active = new Map<string, AbortController>();
   private executions=new Map<string,Readonly<RunFence>>();
   private steerWakeInFlight = new Set<string>();
+  private toolApprovals = new Map<string,{roomId:string;agentId:string;tool:string;argsDigest:string;createdAt:string;resolve:(allow:boolean)=>void;timer:NodeJS.Timeout}>();
   private steerHandlers = new Map<string,{generation:number;executionId?:string;handler:(text:string)=>Promise<void>}>();
   private operations:ToolOperations;
   private inbox:InboxService;
@@ -637,6 +638,7 @@ export class Worker {
     });
     this.toolCalls.delete(run.id);
     this.steerHandlers.delete(run.id);
+    for(const [id,entry] of this.toolApprovals)if(entry.roomId===run.roomId&&entry.agentId===run.agentId)entry.resolve(false);
     const stored=this.store.get<Run>('runs',run.id);
     if(stored&&this.shouldAutoRetry(stored))queueMicrotask(()=>this.autoRetry(stored));
   }
@@ -886,6 +888,19 @@ export class Worker {
    * environment joins a room through a scoped token instead of a managed run.
    * Tools are limited to room read/post, task proposal and report publication.
    */
+  /** Owner-mediated approval bridge for external MCP host tool calls. */
+  requestToolApproval(roomId:string,agentId:string,tool:string,argsDigest:string,timeoutMs:number):Promise<boolean>{
+    const id=uid('approval');
+    return new Promise(resolve=>{
+      const timer=setTimeout(()=>{this.store.event(roomId,'audit.recorded',SYSTEM,{action:'tool.approval.timeout:'+id});this.toolApprovals.delete(id);resolve(false);},timeoutMs);
+      timer.unref?.();
+      this.toolApprovals.set(id,{roomId,agentId,tool,argsDigest,createdAt:now(),resolve:(allow)=>{clearTimeout(timer);this.toolApprovals.delete(id);this.store.event(roomId,'audit.recorded',SYSTEM,{action:(allow?'tool.approval.approved:':'tool.approval.denied:')+id});resolve(allow);},timer});
+      this.store.event(roomId,'audit.recorded',SYSTEM,{action:'tool.approval.requested:'+id+':'+agentId+':'+tool});
+    });
+  }
+  pendingToolApprovals(){return [...this.toolApprovals.entries()].map(([id,item])=>({id,roomId:item.roomId,agentId:item.agentId,tool:item.tool,argsDigest:item.argsDigest,createdAt:item.createdAt}));}
+  decideToolApproval(id:string,approve:boolean):boolean{const entry=this.toolApprovals.get(id);if(!entry)return false;entry.resolve(approve);return true;}
+
   async agentTool(agentId: string, roomId: string, name: string, args: any, commandId=uid('tool')): Promise<any> {
     const agent = this.store.get<AgentDescriptor>('agents', agentId), room = this.store.room(roomId);
     if (!agent || !agent.enabled) throw new Error('Agent 未启用');
@@ -895,7 +910,12 @@ export class Worker {
     if(externalAuthMode!=='off'){
       const fingerprint=agentCapabilityFingerprint(agent),decision=authorizeTool({actor:{id:agentId,kind:'agent'},transport:'external',fingerprint,capabilityEvidence:this.store.list('capability_evidence',roomId).filter((item:any)=>item.fingerprint===fingerprint) as any,tool:String(name),args});
       this.store.event(roomId,'tool.authorization.recorded',{id:agentId,kind:'agent'},{runId:agentId,tool:String(name),authorizationDecision:decision.decision,...(decision.reason?{reason:decision.reason}:{}),argumentDigest:decision.argumentDigest,fingerprint,authorizationMode:externalAuthMode},null,null);
-      if(decision.decision==='deny'&&externalAuthMode==='enforce')throw new ProtocolError('tool_denied',`工具未获授权：${decision.reason}`,403);
+      if(decision.decision==='deny'&&externalAuthMode==='enforce'){
+        const timeout=this.store.settings().externalToolApprovalTimeoutMs;
+        if(timeout<=0)throw new ProtocolError('tool_denied',`工具未获授权：${decision.reason}`,403);
+        const approved=await this.requestToolApproval(roomId,agentId,String(name),decision.argumentDigest,timeout);
+        if(!approved)throw new ProtocolError('tool_denied',`工具审批未通过：${decision.reason}`,403);
+      }
     }
     if(['room_read','room_status'].includes(name))z.object({}).strict().parse(args??{});
     const actor = { id: agentId, kind: 'agent' as const };

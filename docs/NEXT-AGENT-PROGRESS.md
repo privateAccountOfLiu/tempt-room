@@ -23,11 +23,11 @@
 
 ```text
 collaboration baseline: PASS
-source HEAD: 339be1b9188a985547b1990a4f6fd4bc3379ca28 (dirty)
+source HEAD: c0de3abecc5c5fe1c408d5248c47362ef11d4e9e (dirty)
 typecheck: passed
 test: passed
 replay: passed
-report: .state/collaboration-baseline/run-2026-10-21T01-33-51-656Z-86be3061/report.json
+report: .state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/report.json
 ```
 
 ### A01 — 审计导出分页
@@ -225,19 +225,19 @@ report: .state/collaboration-baseline/run-2026-10-21T01-33-51-656Z-86be3061/repo
 - `npm run verify:collaboration`：PASS（typecheck / test / replay）
 - `npm run verify:capabilities`：PASS（2 个模拟契约；真实 CLI not_run；`.state/capability-probes/run-2026-10-19T15-13-32-804Z-4c86d96b/report.json`）
 - `npm test`：331/331
-- `npm run test:preflight`：7/7 通过（`.state/preflight/run-VfiDqJ/report.json`，176.5s）
+- `npm run test:preflight`：7/7 通过（`.state/preflight/run-eos1W1/report.json`，174.3s）
 - 本轮 `--with-native` 的 sandbox-probe 出现 native-host 请求超时；该项未参与 B02 验收，未改动 sandbox 代码
 - `npm run test:replay`：通过（随 verify 记录）
 - `npx tsc --noEmit`：通过
-- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-hfFqcq/report.json`）
+- 浏览器 E2E：45/45 通过（`.state/browser-e2e/run-wj7Ax5/report.json`）
 - 本轮未运行 `--allow-paid` 真实模型，未启动模型请求
 
 证据：
 
-- `.state/collaboration-baseline/run-2026-10-21T01-33-51-656Z-86be3061/report.json`
-- `.state/collaboration-baseline/run-2026-10-21T01-33-51-656Z-86be3061/typecheck.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-21T01-33-51-656Z-86be3061/test.stdout.txt`
-- `.state/collaboration-baseline/run-2026-10-21T01-33-51-656Z-86be3061/replay.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/report.json`
+- `.state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/typecheck.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/test.stdout.txt`
+- `.state/collaboration-baseline/run-2026-10-21T01-43-40-148Z-7e231f3d/replay.stdout.txt`
 
 ## C04a 起点 — 房间并发槽位
 
@@ -729,3 +729,11 @@ report: .state/collaboration-baseline/run-2026-10-21T01-33-51-656Z-86be3061/repo
 - Codex 回复 JOB_ENABLED_OK，Run completed
 - cleanupProof=job-object-kill-on-close，remainingProcesses=0
 - launcher 单测：仅杀 helper 时孙进程退出；HostChannel JSON-RPC initialize 经代理返回 echo
+
+## C02 MCP 宿主权限审批桥
+
+- Settings 新增 externalToolApprovalTimeoutMs（默认 0=直接拒绝；>0 时进入 owner 审批）
+- Worker.requestToolApproval：enforce 模式 deny 的 external MCP 写工具调用挂起等待 owner，超时/拒绝 fail closed，并写 audit.recorded（requested/approved/denied/timeout）
+- 新增 GET /api/tool-approvals 与 POST /api/tool-approvals/:id（approve:boolean）；协作面板新增「工具审批」允许/拒绝
+- 新增 tool-approval 测试 2 项：批准后执行、拒绝/未知 fail closed
+- 客户端宿主权限 UI 仍在宿主侧不可拦截，已在 interceptionGaps 明示；房间侧提供可审计的 owner 审批桥

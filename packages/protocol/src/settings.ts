@@ -39,7 +39,8 @@ export const executionSettingsSchema=z.object({
   outboundAllowPrivate:z.boolean().default(false),
   outboundMaxAttempts:z.number().int().min(1).max(20).default(8),
   outboundTimeoutMs:z.number().int().min(1000).max(60000).default(10000),
-  outboundSigningSecretEnv:z.string().max(100).default('')
+  outboundSigningSecretEnv:z.string().max(100).default(''),
+  externalToolApprovalTimeoutMs:z.number().int().min(0).max(120000).default(0)
 }).strict();
 export type ExecutionSettings=z.infer<typeof executionSettingsSchema>;
 export const defaultExecutionSettings:ExecutionSettings=executionSettingsSchema.parse({});
