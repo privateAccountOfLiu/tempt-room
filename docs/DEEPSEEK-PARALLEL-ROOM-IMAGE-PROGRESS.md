@@ -18,7 +18,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | G00 开工记录与测试隔离 | verified | 基线 SHA/状态/工具链已落盘；fixture 隔离要求写入本文件与后续卡 |
 | G01 两份外部 MCP 与防漂移 | verified | 语法错误在当前 HEAD 已修复；新增契约测试 15/15 与字节级同步闸门 |
 | P01 候选枚举不消耗容量 | verified | 候选不再提前占用房间容量；派发前二次校验；资源忙保持排队不判失败 |
-| P02 不可变基线与 host 独立目录 | in_progress | 共享扫描器/不可变基线/host-isolated/GC/旧绑定补建；依赖 patch 叠入工作区带冻结 hash+before 校验已实现并测试；attached isolated 真实模式仍无环境 |
+| P02 不可变基线与 host 独立目录 | verified | 共享扫描器/基线冻结/host-isolated/GC/旧绑定补建/依赖 patch 叠入均验证；真实 Codex attach 线程 + isolated 任务经 Worker 正确失败（workspace_mode_unsupported，0 模型请求，后端保持存活） |
 | P03 按 canonical 项目互斥、异步验收 | verified | 项目锁跨房间 canonical 互斥；验收异步化并纳入超时/输出上限/进程树清理；新增 4 个并发与 HTTP 用例 |
 | P04 staging 精确组合 | verified | staging 由当前已认可目标 + 候选组成；目标/候选/verifier 篡改与无关文件变化均在 apply 前拒绝；journal 记录目标前后摘要 |
 | P05 双启动屏障与真实派发 | verified | 可控 adapter 由真实 Worker 派发；两个 Run 同时进入后才释放，独立工作区、真实产物、owner 验收和 integration 全链路通过 |
@@ -1848,6 +1848,29 @@ Codex/DeepSeek 宿主入口未测试；真实费用按 usage known 记录，未�
 脚本：scripts/real-three-group-execute.ts（--execute + ROOM_EXPERIMENT_AUTHORIZED=1）
 代码提交：本次提交（执行脚本与 planner 一起可重放；付费数据不进入仓库）
 下一张卡：V02（GitHub-hosted CI 首跑仍待推送）
+```
+
+## P02 — 真实附着线程 + isolated 拒绝探针
+
+```
+时间：2026-10-22 09:14 CST
+Codex：C:\Users\35151\AppData\Local\OpenAI\Codex\bin\6257d9e8f63c0f2b\codex.exe
+       codex-cli 0.163.0-alpha.11（app-server --listen ws + capability token）
+模型：本地 Responses fixture（NATIVE_ATTACH_FIXTURE_OK），真实模型请求 0
+新增：scripts/probe-attached-isolated-guard.ts
+  1. 启动本机真实 Codex App Server WebSocket（随机 loopback + bearer token）；
+  2. 真实 thread/start 后由 AttachedCodexChannel 诊断（4 项 ready）；
+  3. 把该 attach Agent 放入临时 Store/Room，创建 workspaceMode=isolated 的项目任务；
+  4. Worker 派发后 Run failed，error=“附着线程的工作目录固定，无法为该任务提供独立工作区”，
+     run.workspacePath 仍是线程 expectedCwd，未偷偷退回/切换源目录；
+  5. localFixtureRequests=0/localFixtureResponses=0，证明拒绝发生在模型请求前；
+  6. 探针断开后 App Server /readyz 仍 200，脚本只清理自己启动的后端。
+结果：guardOk=true，ok=true，report
+  .state/codex-attach/worker-guard/probe-HxylN2/report.json
+日志：.state/parallel-room-image/attached-isolated-guard-20261022.log
+未验证：真实桌面共享 WS 端点（本机没有该端点）；本次附加到脚本自己启动的真实
+  Codex App Server，而非用户桌面实例。
+下一张卡：V02（GitHub Actions 首跑结果跟踪中）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移
