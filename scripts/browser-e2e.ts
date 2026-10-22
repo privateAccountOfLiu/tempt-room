@@ -805,10 +805,13 @@ try {
     await waitFor('代码复制请求与反馈',async()=>await evaluate("window.__copiedCode")===(codeExample+'\n')&&(await bodyText()).includes('已复制'));
     await evaluate("(()=>{if(window.__clipboardDescriptor)Object.defineProperty(navigator,'clipboard',window.__clipboardDescriptor);else delete navigator.clipboard;})()");
     step('code-block-copy-feedback');
+    // The runner may default to prefers-reduced-motion: reduce, so pin the
+    // no-preference branch before asserting the tab animation exists.
+    await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]},sessionId);
     const animation=await evaluate("getComputedStyle(document.querySelector('.panel-page')).animationName");if(animation!=='panel-reveal')fail('缺少页签动效');
     await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]},sessionId);
     if(await evaluate("getComputedStyle(document.querySelector('.panel-page')).animationName")!=='none')fail('未遵守减少动态效果');
-    await send('Emulation.setEmulatedMedia',{features:[]},sessionId);
+    await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]},sessionId);
     step('motion-and-reduced-motion');
     const responsive=[];
     for(const width of [320,390,768,1024,1440,1920]){
