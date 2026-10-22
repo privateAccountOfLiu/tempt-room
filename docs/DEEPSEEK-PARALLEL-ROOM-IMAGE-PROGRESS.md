@@ -37,7 +37,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | I07 跨功能竞态 | verified | 13 个用例覆盖 I07 清单：删房/移除成员/并行/丢回执/导出回放/删后审计/解码期间删房/托管 cancel+task-version+stale generation/最后房间 restart/删除 vs accepted integration apply/新增成员上传/缺失 artifact UI 降级 |
 | V01 开发/发布报告分模式 | verified | schemaVersion 2、sourceBefore/After、tracked/working/untracked+lockfile hash、release 前置/not_run/source_changed；在 clean HEAD e5b372b 上真实 release 通过（typecheck/test/replay，checksPassed=true, releaseEligible=true） |
 | V02 CI/preflight 接入真实入口 | in_progress | preflight 单次 collaboration + 连接器/并行/图片/build/sdk/browser/production；在 clean HEAD ef0b54b 上完整 release preflight PASS（11 步，releaseEligible=true, sourceStable=true）；GitHub-hosted CI 首跑仍待推送 |
-| V03 固定版本真实 CLI 与三组对照 | not_started | |
+| V03 固定版本真实 CLI 与三组对照 | in_progress | 无模型三组对照 planner/fixture/owner verifier hash/硬限制/overlap/unknown-cost 与 `--check` 报告已实现并通过 5 个用例；真实付费 CLI 执行仍等待明确授权 |
 | V04 文档、备份导入导出与统一口径 | in_progress | 备份/restore（水位+文件 hash+三类目录）、导出 omittedArtifacts、导入重验真/重生成 preview；10 个文档已补统一 24 卡口径与验证矩阵；真实 CI/V03 仍待 |
 
 ## G00 — 开工记录与测试隔离
@@ -1771,6 +1771,55 @@ parallel-task-integration、acceptance-parallel-tasks、native-acceptance 子进
 未验证：GitHub-hosted Actions 首跑（需推送/授权）；本报告只证明本地 clean
 HEAD 的 release 路径，不等于已发布或已获发布授权。
 下一张卡：V03（等待付费授权）
+```
+
+## V03 — 固定版本真实 CLI 与三组对照（无模型就绪切片）
+
+```
+卡号与状态：V03 / in_progress（planner 与 --check 就绪；真实付费执行未授权）
+基线 SHA：3f463ee；实现见本次提交
+修改文件和关键符号：
+  scripts/real-experiment-groups.ts（新增）
+    ExperimentAgent/ExperimentLimits/ExperimentGroup/ExperimentPlan；
+    createExperimentFixture：一次性 order-query fixture + owner 控制的
+      verify-order-query.mjs，记录 verifierHash/fixtureHash；
+    planThreeGroupExperiment：single / parallel-independent / collaborative
+      三组同目标同验收；限制 maxMinutes/maxActivations/maxCostUsd；
+      排除 demo/external/attach；host-source 并行警告；
+    executionOverlap：ISO 时间缺失/非法→known=false，绝不当作重叠；
+    summarizeExperimentCosts：knownUsd、unknownCount、unknownRuns，
+      不把 unknown 当 0；
+  scripts/real-three-group-experiment.ts（新增）
+    --check：创建 fixture、冻结 verifier、校验硬限制、写
+      .state/real-experiment/three-group-plan.json，零模型/零 CLI；
+    --execute 明确拒绝：真实执行需要单独显式付费授权；
+    ROOM_EXPERIMENT_AGENTS_JSON 注入 Agent 元数据，缺失即 blockers；
+  package.json：新增 experiment:three-groups；
+  tests/real-experiment-groups.test.ts（新增 5 用例）
+变更前触发条件 / 变更后行为：
+  变更前：existing real-dual 实验是会话级顺序两任务，不证明项目并行，
+  没有三组对照、owner verifier hash、硬限制或 overlap 判定。
+  变更后：可在无模型条件下检查 V03 三组计划的完整性、fixture/verifier
+  不可变摘要、激活/时长/费用上限和成本 unknown 语义；真实运行保持显式授权门。
+接口/事件/迁移/兼容性：
+  纯脚本/测试；不触发生成物或数据库迁移；不调用模型。
+执行命令、cwd、环境、开始结束、退出码：
+  npx tsc --noEmit                                               exit 0
+  npm run experiment:three-groups                               exit 0（ready=false blockers 列明无真实 Agent）
+  npx tsx --test tests/real-experiment-groups.test.ts             exit 0（5 pass / 0 fail）
+  npm test                                                        exit 0（555 pass / 0 fail）
+  cwd=仓库根，Windows PowerShell 5.1，2026-10-22 08:36–09:00 CST
+证据路径：
+  .state/parallel-room-image/v03-planner-tests-20261022.log
+  .state/real-experiment/three-group-plan.json（本地 ignored；检查报告）
+实际覆盖：
+  三组计划结构、fixture/verifier hash、硬限制、demo/external/attach 拒绝、
+  overlap known/unknown、cost unknown 计数
+尚未验证及明确原因：
+  真实固定版本 CLI 的三组执行、真实 patch/integration/journal 证据、
+  实际 tokens/cost 与墙钟区间、CLI 绝对路径/版本采集仍需要用户对模型费用与
+  时长的明确授权；当前没有执行任何付费请求。
+下一张卡：V04（文档统一已完成，剩余真实 CI 首跑）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移
