@@ -36,7 +36,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | I06 安全内联路由与图片展示 | verified | 私有 `/api/artifacts/:id/image`（active/verified/hash/no-store）、缩略图、失败降级、键盘 Lightbox、纯图不渲染空 Markdown 已完成并通过 3 个接口用例与完整浏览器 E2E |
 | I07 跨功能竞态 | verified | 13 个用例覆盖 I07 清单：删房/移除成员/并行/丢回执/导出回放/删后审计/解码期间删房/托管 cancel+task-version+stale generation/最后房间 restart/删除 vs accepted integration apply/新增成员上传/缺失 artifact UI 降级 |
 | V01 开发/发布报告分模式 | verified | schemaVersion 2、sourceBefore/After、tracked/working/untracked+lockfile hash、release 前置/not_run/source_changed；在 clean HEAD e5b372b 上真实 release 通过（typecheck/test/replay，checksPassed=true, releaseEligible=true） |
-| V02 CI/preflight 接入真实入口 | in_progress | preflight 单次 collaboration + 连接器/并行/图片/build/sdk/browser/production；在 clean HEAD ef0b54b 上完整 release preflight PASS（11 步，releaseEligible=true, sourceStable=true）；GitHub-hosted CI 首跑仍待推送 |
+| V02 CI/preflight 接入真实入口 | verified | GitHub Actions run 39706835693（HEAD 51caec9）verify/native-image-pipe/release-preflight 全 success；verdict=release_eligible、releaseEligible=true、sourceStable=true；修复 CI 上 reduced-motion、schema LF 与 release fail-closed |
 | V03 固定版本真实 CLI 与三组对照 | verified | 无模型 planner + 真实付费三组：6 activations/63.8s/$0.727（上限 30min/12/$5），parallel overlap 12.0s，collaborative upstream+downstream integration 均 applied，verifier hash 固定；仅 Claude host 一种 CLI 入口 |
 | V04 文档、备份导入导出与统一口径 | verified | 备份/restore（水位+文件 hash+三类目录）、导出 omittedArtifacts、导入重验真/重生成 preview；10 个文档统一 24 卡口径；真实 CI 由 V02 跟踪 |
 
@@ -1871,6 +1871,34 @@ Codex：C:\Users\35151\AppData\Local\OpenAI\Codex\bin\6257d9e8f63c0f2b\codex.exe
 未验证：真实桌面共享 WS 端点（本机没有该端点）；本次附加到脚本自己启动的真实
   Codex App Server，而非用户桌面实例。
 下一张卡：V02（GitHub Actions 首跑结果跟踪中）
+```
+
+## V02 — GitHub Actions 真实首跑
+
+```
+时间：2026-10-22 09:38–09:49 CST
+仓库：privateAccountOfLiu/tempt-room，main
+HEAD：51caec95015e89e590a66c12192cc1fb782d5feb
+运行：https://github.com/privateAccountOfLiu/tempt-room/actions/runs/39706835693
+结论：conclusion=success；三个 job 全 success
+  verify: 19 步（typecheck、secret、audit、unit/contract、replay/fencing、
+    fault-injection、two-connection、connector/plugin、parallel+image、build）
+  native-image-pipe: 真实 named pipe + 固定 PNG，无模型
+  release-preflight: 147–150s collaboration release + 10 步全部 PASS，
+    verdict=release_eligible releaseEligible=true sourceStable=true
+修复的真实 CI 问题：
+  1) GitHub runner 默认 reduced-motion 让页签动效断言失败 → 显式固定
+     prefers-reduced-motion=no-preference，然后测试 reduce；
+  2) Windows runner autocrlf 使生成 schema 的工作区字节与仓库 LF 不同，
+     被 release 稳定性判为 source_changed → .gitattributes 固定
+     packages/protocol/schema/** eol=lf；
+  3) preflight 在 release 模式 releaseEligible=false 时曾不退出非零 →
+     现在 release 模式 fail-closed，缺证据/源变化即 exit 1。
+证据：.state/parallel-room-image/git-push-20261022.log、
+      .state/ci-artifacts/39705530148/**（首跑失败报告）
+      本次本地日志 .state/parallel-room-image/browser-motion-fix-20261022.log
+未验证：GitHub 上的 release 发布/tag（未创建，不属于 V02）；仓库仍是
+  本地开发分支，无正式发布动作。
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移
