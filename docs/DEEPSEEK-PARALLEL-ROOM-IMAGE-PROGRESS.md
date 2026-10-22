@@ -22,7 +22,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | P03 按 canonical 项目互斥、异步验收 | verified | 项目锁跨房间 canonical 互斥；验收异步化并纳入超时/输出上限/进程树清理；新增 4 个并发与 HTTP 用例 |
 | P04 staging 精确组合 | verified | staging 由当前已认可目标 + 候选组成；目标/候选/verifier 篡改与无关文件变化均在 apply 前拒绝；journal 记录目标前后摘要 |
 | P05 双启动屏障与真实派发 | verified | 可控 adapter 由真实 Worker 派发；两个 Run 同时进入后才释放，独立工作区、真实产物、owner 验收和 integration 全链路通过 |
-| P06 M1 七项可失败用例 | in_progress | 1–6 的模拟切片已覆盖（并发=1 负例、共同基线、整体组合、局部失败/重试、幂等/fence、同文件冲突保留双方 patch）；第 7 项真实 CLI 对照依赖 V03 尚未执行 |
+| P06 M1 七项可失败用例 | verified | 1–6 模拟切片 + 第 7 项真实 CLI 三组对照已执行（Claude Code 2.1.117 host，两个独立 Agent，真实 patch/integration/journal，费用 $0.727）；另一种宿主入口未测 |
 | R01 Room schema/事件/迁移 | verified | room.ts 统一 schema/normalizeRoom；新增 room.configured/deleting/deletion.updated/deleted 与状态守卫；迁移整理为 v10→v18 有序升级；生成物更新 |
 | R02 单事务保存房间设置与成员 | verified | 纯规划 + 单事件 room.configured；revision CAS、成员去重/校验、忙成员移除拒绝、闲置会话结束、legacy 命令复用；5 个用例通过 |
 | R03 删除请求、停止执行与清理 | in_progress | afterCommit、短事务、finalizer、写入口拒绝、wake/input/inbox 清理、outbound delivery 在非 active 房间记录 aborted 且不再尝试；image-upload 失效由 Worker expireRoom 覆盖；全入口二次校验仍未系统覆盖 |
@@ -32,13 +32,13 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | I02 有界可恢复的上传临时状态 | verified | image_uploads/parts 表 + migration 19、分块状态机、配额/TTL、原子落盘、缺失块检测、GC 与 Worker image 工具/删除房间失效接线完成；重启进程 E2E 仍由 I04 覆盖 |
 | I03 解码验真、原图与安全预览 | verified | sharp 0.35.5 + 签名/结构检查 + 完整解码 + 1920 PNG 预览 + 原子落盘/稳定 artifactId；Worker 三个低层工具已接线并通过 3+3 用例；bridge/helper 归 I04 |
 | I04 托管 bridge/host/AppContainer 传输 | verified | host HostRoomPipe 与 AppContainer 真 sandbox（staged Node+bridge）两种模式固定图上传均 verified=true；sandbox probe 23/23；helper symlink 祖先检查改为只到允许根 |
-| I05 外部 MCP、插件与 SDK 发图 | in_progress | SDK、外部 MCP room_send_image、真实 stdio→HTTP 重试幂等、timeout/401/403/410 分类、两个独立 MCP 进程并发上传不同图通过 5 个用例；真实宿主手动发图待验证 |
+| I05 外部 MCP、插件与 SDK 发图 | verified | SDK/外部 MCP/插件/真实 stdio 重试/超时分类/并发 + 真实 Claude Code host 发图（verified 16×10 artifact + message）；Codex/DeepSeek 宿主未测 |
 | I06 安全内联路由与图片展示 | verified | 私有 `/api/artifacts/:id/image`（active/verified/hash/no-store）、缩略图、失败降级、键盘 Lightbox、纯图不渲染空 Markdown 已完成并通过 3 个接口用例与完整浏览器 E2E |
 | I07 跨功能竞态 | verified | 13 个用例覆盖 I07 清单：删房/移除成员/并行/丢回执/导出回放/删后审计/解码期间删房/托管 cancel+task-version+stale generation/最后房间 restart/删除 vs accepted integration apply/新增成员上传/缺失 artifact UI 降级 |
 | V01 开发/发布报告分模式 | verified | schemaVersion 2、sourceBefore/After、tracked/working/untracked+lockfile hash、release 前置/not_run/source_changed；在 clean HEAD e5b372b 上真实 release 通过（typecheck/test/replay，checksPassed=true, releaseEligible=true） |
 | V02 CI/preflight 接入真实入口 | in_progress | preflight 单次 collaboration + 连接器/并行/图片/build/sdk/browser/production；在 clean HEAD ef0b54b 上完整 release preflight PASS（11 步，releaseEligible=true, sourceStable=true）；GitHub-hosted CI 首跑仍待推送 |
-| V03 固定版本真实 CLI 与三组对照 | in_progress | 无模型三组对照 planner/fixture/owner verifier hash/硬限制/overlap/unknown-cost 与 `--check` 报告已实现并通过 5 个用例；真实付费 CLI 执行仍等待明确授权 |
-| V04 文档、备份导入导出与统一口径 | in_progress | 备份/restore（水位+文件 hash+三类目录）、导出 omittedArtifacts、导入重验真/重生成 preview；10 个文档已补统一 24 卡口径与验证矩阵；真实 CI/V03 仍待 |
+| V03 固定版本真实 CLI 与三组对照 | verified | 无模型 planner + 真实付费三组：6 activations/63.8s/$0.727（上限 30min/12/$5），parallel overlap 12.0s，collaborative upstream+downstream integration 均 applied，verifier hash 固定；仅 Claude host 一种 CLI 入口 |
+| V04 文档、备份导入导出与统一口径 | verified | 备份/restore（水位+文件 hash+三类目录）、导出 omittedArtifacts、导入重验真/重生成 preview；10 个文档统一 24 卡口径；真实 CI 由 V02 跟踪 |
 
 ## G00 — 开工记录与测试隔离
 
@@ -1820,6 +1820,34 @@ HEAD 的 release 路径，不等于已发布或已获发布授权。
   实际 tokens/cost 与墙钟区间、CLI 绝对路径/版本采集仍需要用户对模型费用与
   时长的明确授权；当前没有执行任何付费请求。
 下一张卡：V04（文档统一已完成，剩余真实 CI 首跑）
+```
+
+## V03 — 真实付费三组实验执行
+
+```
+授权：用户选择“授权，使用默认硬限制”（30min / 12 activations / 5 USD）
+时间：2026-10-22 08:52–08:53 CST
+CLI：C:\Users\35151\.local\bin\claude.exe 2.1.117（Claude Code），
+     provider=claude，model=claude-sonnet-4-6，endpoint=api.deepseek.com/anthropic，
+     executionMode=host，workspaceMode=isolated，两个独立 Agent ID real_a/real_b
+Fixture：一次性 order-query；owner verifier hash
+     54b52818a0a8feb941a8b88ddc0ae7256a953fed5e205ad87021faf77e918a4c
+结果：ok=true; modelRequests=6; elapsedMs=63750; knownCostUsd=0.7271498;
+     unknownCount=0；上限 maxMinutes=30/maxActivations=12/maxCostUsd=5，均未超
+  single：1 次 Run completed
+  single-image：真实 host room_send_image 成功，artifact_08bad94f...，
+    message_3c781176...，verified 16×10，previewHash 97eb017c...
+  parallel-independent：2 个 Run 均 completed，真实执行区间 overlapMs=12014
+  collaborative：upstream+downstream Run completed；两项 integration 均 applied
+    integration_4a046f45... / integration_dd25432c...
+失败/限制：无 errors；真实宿主仅 Claude Code 一个入口（两个 Agent 共用该 CLI 配置），
+Codex/DeepSeek 宿主入口未测试；真实费用按 usage known 记录，未把 unknown 当 0。
+报告：.state/real-experiment/three-group-report.json（ignored，含 runs/groups/costs）
+日志：.state/parallel-room-image/v03-paid-experiment-final2-20261022.log
+      .state/parallel-room-image/v03-paid-experiment-final-20261022.log
+脚本：scripts/real-three-group-execute.ts（--execute + ROOM_EXPERIMENT_AUTHORIZED=1）
+代码提交：本次提交（执行脚本与 planner 一起可重放；付费数据不进入仓库）
+下一张卡：V02（GitHub-hosted CI 首跑仍待推送）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移

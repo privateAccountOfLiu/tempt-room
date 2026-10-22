@@ -38,6 +38,7 @@
     "check:job-launcher": "node scripts/build-job-launcher.mjs --check",
     "experiment:real": "tsx scripts/real-dual-agent-experiment.ts",
     "experiment:three-groups": "tsx scripts/real-three-group-experiment.ts --check",
+    "experiment:three-groups:execute": "tsx scripts/real-three-group-execute.ts --execute",
     "test:production": "tsx scripts/production-smoke.ts",
     "test:preflight": "tsx scripts/preflight.ts",
     "report:readiness": "tsx scripts/release-readiness.ts",
