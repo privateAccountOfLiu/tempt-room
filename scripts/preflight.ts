@@ -103,6 +103,8 @@ try {
   const skipped = report.steps.filter(item => item.skipped);
   report.releaseEligible = report.ok && report.mode === 'release' && Boolean(expectedHead) && report.sourceStable && skipped.length === 0;
   if (!report.ok) report.verdict = 'checks_failed';
+// A release run must fail closed when any evidence is missing or the source moved.
+if (!report.ok || (report.mode === 'release' && !report.releaseEligible)) process.exitCode = 1;
   else if (report.mode !== 'release') report.verdict = 'development_only';
   else if (!report.sourceStable) report.verdict = 'source_changed';
   else if (skipped.length) report.verdict = 'skipped_required_checks';

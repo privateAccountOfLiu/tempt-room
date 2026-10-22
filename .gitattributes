@@ -8,3 +8,5 @@
 *.dll binary
 *.pipe binary
 *.asar binary
+
+packages/protocol/schema/** text eol=lf
