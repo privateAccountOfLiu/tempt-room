@@ -25,7 +25,7 @@ Plan 只描述待做工作，本文件记录实际发生的事：实现 SHA、�
 | P06 M1 七项可失败用例 | verified | 1–6 模拟切片 + 第 7 项真实 CLI 三组对照已执行（Claude Code 2.1.117 host，两个独立 Agent，真实 patch/integration/journal，费用 $0.727）；另一种宿主入口未测 |
 | R01 Room schema/事件/迁移 | verified | room.ts 统一 schema/normalizeRoom；新增 room.configured/deleting/deletion.updated/deleted 与状态守卫；迁移整理为 v10→v18 有序升级；生成物更新 |
 | R02 单事务保存房间设置与成员 | verified | 纯规划 + 单事件 room.configured；revision CAS、成员去重/校验、忙成员移除拒绝、闲置会话结束、legacy 命令复用；5 个用例通过 |
-| R03 删除请求、停止执行与清理 | in_progress | afterCommit、短事务、finalizer、写入口拒绝、wake/input/inbox 清理、outbound delivery 在非 active 房间记录 aborted 且不再尝试；image-upload 失效由 Worker expireRoom 覆盖；全入口二次校验仍未系统覆盖 |
+| R03 删除请求、停止执行与清理 | verified | afterCommit、短事务、finalizer、activeRooms/租约/apply journal/input/outbound/wake/inbox/image 清理与写入口拒绝；新增 table-driven 断言覆盖 8 类业务命令 + 重复 delete 幂等，均在 dispatch 前 room_inactive |
 | R04 API、WebSocket、SDK 与列表语义 | verified | activeRooms/410/WS 终态/owner 导出/artifact 防绕过/RoomClient 命令/删除房间导入新身份 8 用例；room_wait 删除即时结束、两个真实 WS 窗口终态、两浏览器窗口删除同步均通过 |
 | R05 房间设置与删除 UI | verified | 设置单命令/冲突保留+刷新、新增 Agent 自动预选、删除确认/取消/手机删除/双窗口同步/最后房间空状态/两窗口同 revision 冲突保存均通过浏览器验收 |
 | I01 图片协议、工具参数与权限 | verified | images.ts 冻结分块/元数据/操作 ID；artifact 图片元数据；image 工具名与写权限映射；attachment-only 消息；7+3 个用例通过；真实上传实现归 I02/I05 |
@@ -1899,6 +1899,23 @@ HEAD：51caec95015e89e590a66c12192cc1fb782d5feb
       本次本地日志 .state/parallel-room-image/browser-motion-fix-20261022.log
 未验证：GitHub 上的 release 发布/tag（未创建，不属于 V02）；仓库仍是
   本地开发分支，无正式发布动作。
+```
+
+## R03 — 业务入口删除后二次拒绝
+
+```
+时间：2026-10-22 09:50 CST
+修改：tests/room-deletion.test.ts 新增 1 个 table-driven 用例
+覆盖：room.delete 后 status=deleting/deleted，逐项断言 message.send、
+  task.create、task.claim、run.cancel、artifact.integrate、discussion.start、
+  room.configure、project.bind 都在 dispatch 前返回 room_inactive/409；
+  重复 room.delete 返回现有状态，不重新派工。
+边界：service.execute 的统一入口校验负责命令面；Worker/outbound/wake/input/
+  image/apply 等非命令入口已分别由既有测试覆盖（见 I07 竞态套件）。
+验证：npx tsx --test --test-name-pattern='all business command entry points' ... PASS；
+  npm test 556/556；npx tsc --noEmit exit 0。
+证据：.state/parallel-room-image/r03-entrypoints-tests-20261022.log
+下一张卡：无（24 卡均已有验证证据；真实发布/tag 未执行，不在计划范围）
 ```
 
 ## G01 — 修复两份外部 MCP，并防止副本漂移

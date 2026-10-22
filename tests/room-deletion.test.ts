@@ -150,3 +150,24 @@ test('agent room_wait returns promptly when the room starts deleting', async t =
   await assert.rejects(waiting, /房间/);
   assert.ok(Date.now() - started < 3000, 'room_wait must not wait for the full timeout');
 });
+
+test('all business command entry points reject a deleting or deleted room before dispatch', t => {
+  const ctx = fixture(t);
+  const deleting = ctx.command('room.delete', {expectedRevision: 1});
+  assert.ok(['deleting', 'deleted'].includes(String(deleting.result.status)));
+  const attempts: [string, unknown][] = [
+    ['message.send', {text: 'blocked'}],
+    ['task.create', {title: 'blocked'}],
+    ['task.claim', {taskId: 'task_missing'}],
+    ['run.cancel', {runId: 'run_missing'}],
+    ['artifact.integrate', {artifactId: 'artifact_missing'}],
+    ['discussion.start', {goal: 'blocked', participants: ['demo-planner']}],
+    ['room.configure', {name: 'blocked', description: '', members: ['demo-planner'], expectedRevision: 1}],
+    ['project.bind', {sourcePath: ctx.root, allowedExecutionModes: ['sandbox']}]
+  ];
+  for (const [type, payload] of attempts) {
+    assert.throws(() => ctx.command(type, payload), (error: any) => error?.code === 'room_inactive' && /正在删除或已删除/.test(String(error?.message)), type + ' must be rejected');
+  }
+  const second = ctx.command('room.delete', {expectedRevision: 1});
+  assert.ok(['deleting', 'deleted'].includes(String(second.result.status)), 'a repeated delete reports existing state instead of dispatching business work');
+});
